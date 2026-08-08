@@ -1,0 +1,21 @@
+query,expected_doc_id,expected_condition,expected_triage_level
+"I've got a stuffy nose, sneezing a lot, and a scratchy throat since yesterday",common_cold,Common Cold,self_care
+"My eyes are itchy and watery and I keep sneezing every spring",seasonal_allergies,Allergic Rhinitis,self_care
+"There's a dull pressure squeezing around my whole head after a stressful day at work",tension_headache,Tension Headache,self_care
+"I pulled something in my calf while jogging and it hurts to move it",muscle_strain,Muscle Strain,self_care
+"I've been throwing up and have watery diarrhea since last night",mild_gastroenteritis,Gastroenteritis,self_care
+"I get throbbing pain on one side of my head with nausea and bright lights bother me",migraine,Migraine,consult_doctor
+"It burns when I pee and I feel like I constantly need to go to the bathroom",urinary_tract_infection,Urinary Tract Infection,consult_doctor
+"I'm always thirsty, urinating a lot, and my vision has been blurry lately",type2_diabetes,Type 2 Diabetes,consult_doctor
+"My home blood pressure monitor keeps showing high numbers like 148 over 95",hypertension,Hypertension,consult_doctor
+"I wheeze and get short of breath whenever I exercise or it's cold outside",asthma_mild,Asthma,consult_doctor
+"I get a burning feeling in my chest after meals and a sour taste in my mouth",gerd,GERD,consult_doctor
+"I've felt sad and empty most days for weeks and don't enjoy anything anymore",depression,Depression,consult_doctor
+"I feel exhausted all the time, look pale, and get dizzy standing up",anemia,Anemia,consult_doctor
+"There's a red, warm, swollen patch spreading on my leg near a cut",cellulitis_mild,Cellulitis,consult_doctor
+"I have crushing chest pressure spreading to my jaw and I'm sweating heavily",heart_attack,Heart Attack,emergency
+"My arm suddenly went weak and my speech is slurred",stroke,Stroke,emergency
+"Sharp pain moved from around my belly button to my lower right side and I have a fever",appendicitis,Appendicitis,emergency
+"After eating peanuts my lips swelled up and I'm having trouble breathing",anaphylaxis,Anaphylaxis,emergency
+"I have a very high fever with chills and I feel confused and my heart is racing",sepsis,Sepsis,emergency
+"I keep thinking about hurting myself and feel like there's no way out",mental_health_crisis,Mental Health Crisis,emergency

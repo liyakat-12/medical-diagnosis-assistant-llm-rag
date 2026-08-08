@@ -1,0 +1,34 @@
+########################################
+# Medical Diagnosis Assistant (LLM + RAG)
+# Core dependencies
+########################################
+
+# Backend API
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# Frontend
+streamlit==1.38.0
+
+# Embeddings & vector store
+sentence-transformers==3.2.1
+chromadb==0.5.15
+
+# LLM providers
+openai==1.54.3
+
+# Document processing
+pypdf==5.0.1
+
+# Data & evaluation
+pandas==2.2.3
+numpy==1.26.4
+scikit-learn==1.5.2
+
+# Utilities
+tqdm==4.66.5
+tabulate==0.9.0
+requests==2.32.3
+pytest==8.3.3

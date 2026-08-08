@@ -51,11 +51,34 @@ def _call_openai(system_prompt: str, user_prompt: str, model: str | None = None)
     if not config.OPENAI_API_KEY:
         raise RuntimeError(
             "OPENAI_API_KEY is not set. Add it to your .env file, or set "
-            "LLM_PROVIDER=ollama in .env to use a local model instead."
+            "LLM_PROVIDER=groq (free) or LLM_PROVIDER=ollama (local) instead."
         )
     client = OpenAI(api_key=config.OPENAI_API_KEY)
     response = client.chat.completions.create(
         model=model or config.OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.2,
+    )
+    return response.choices[0].message.content.strip()
+
+
+def _call_groq(system_prompt: str, user_prompt: str, model: str | None = None) -> str:
+    """Groq's API is OpenAI-compatible, so we reuse the OpenAI SDK with a
+    different base_url and key. Free tier, no credit card required -
+    see https://console.groq.com/keys"""
+    from openai import OpenAI
+
+    if not config.GROQ_API_KEY:
+        raise RuntimeError(
+            "GROQ_API_KEY is not set. Get a free key at https://console.groq.com/keys "
+            "and add it to your .env file."
+        )
+    client = OpenAI(api_key=config.GROQ_API_KEY, base_url=config.GROQ_BASE_URL)
+    response = client.chat.completions.create(
+        model=model or config.GROQ_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -85,9 +108,11 @@ def _call_llm(system_prompt: str, user_prompt: str, provider: str | None = None,
     provider = (provider or config.LLM_PROVIDER).strip().lower()
     if provider == "openai":
         return _call_openai(system_prompt, user_prompt, model)
+    if provider == "groq":
+        return _call_groq(system_prompt, user_prompt, model)
     if provider == "ollama":
         return _call_ollama(system_prompt, user_prompt, model)
-    raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use 'openai' or 'ollama'.")
+    raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use 'openai', 'groq', or 'ollama'.")
 
 
 def generate_grounded_answer(query: str, context_blocks: list[str]) -> str:

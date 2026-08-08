@@ -76,12 +76,14 @@ Respond with ONLY the integer score, nothing else.
 
 def llm_judge_score(answer: str, context: str) -> float | None:
     try:
-        from src.llm.generator import _call_openai
+        from src.llm.generator import _call_llm
     except Exception:
         return None
     prompt = JUDGE_PROMPT_TEMPLATE.format(context=context or "(none provided)", answer=answer)
     try:
-        raw = _call_openai("You are a strict, terse grading assistant.", prompt, model=config.JUDGE_MODEL)
+        # Judge with whichever provider is configured as the main LLM_PROVIDER,
+        # so this works out of the box with Groq's free tier too.
+        raw = _call_llm("You are a strict, terse grading assistant.", prompt)
         match = re.search(r"\d", raw)
         return float(match.group()) if match else None
     except Exception as exc:

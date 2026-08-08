@@ -51,7 +51,7 @@ DiagnosisResponse -> FastAPI (/diagnose) and Streamlit chat UI
 | Embeddings (general) | `sentence-transformers/all-MiniLM-L6-v2` | Fast, free, strong general-purpose baseline |
 | Embeddings (medical) | `pritamdeka/S-PubMedBert-MS-MARCO` | PubMedBERT fine-tuned for semantic search - domain comparison target |
 | Vector store | ChromaDB (persistent, local) | Free, zero-config, good for small/medium corpora |
-| LLM | OpenAI (`gpt-4o-mini`) or local Ollama (`llama3`) | Switch providers via one `.env` variable |
+| LLM | Groq (free, `llama-3.1-8b-instant`), OpenAI (`gpt-4o-mini`), or local Ollama (`llama3`) | Switch providers via one `.env` variable |
 | Backend | FastAPI | Simple typed REST API |
 | Frontend | Streamlit | Fast chat UI, pure Python |
 | Evaluation | pandas + scikit-learn | Recall@k, MRR, precision/recall/F1, citation coverage |
@@ -106,8 +106,13 @@ copy .env.example .env
 
 Then edit `.env`:
 
-- To use **OpenAI** (recommended, best quality): set `LLM_PROVIDER=openai`
-  and put your key in `OPENAI_API_KEY`.
+- To use **Groq (recommended, free, no credit card)**: sign up at
+  [console.groq.com](https://console.groq.com/keys), create a key, set
+  `LLM_PROVIDER=groq` and put the key in `GROQ_API_KEY`. Groq's API is
+  OpenAI-compatible and gives a generous free daily quota on
+  `llama-3.1-8b-instant`.
+- To use **OpenAI** (paid, best quality): set `LLM_PROVIDER=openai` and put
+  your key in `OPENAI_API_KEY`.
 - To use a **free local model** instead: install [Ollama](https://ollama.com),
   run `ollama pull llama3`, and set `LLM_PROVIDER=ollama`.
 

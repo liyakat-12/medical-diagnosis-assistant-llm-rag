@@ -1,11 +1,15 @@
 """
 LLM generation wrapper.
 
-Provides one function, generate(), that hides whether we're calling the
-OpenAI API or a local Ollama server, so the pipeline code never branches
-on provider.
+Supports four providers via LLM_PROVIDER in .env:
+  - mock   : offline answers built from retrieved passages (no API key)
+  - groq   : free cloud API (OpenAI-compatible)
+  - openai : paid OpenAI API
+  - ollama : local model server
 """
 from __future__ import annotations
+
+import re
 
 from src import config
 
@@ -32,6 +36,8 @@ question about their symptoms as helpfully as you can, in a short, clear list of
 possible conditions.
 """
 
+SOURCE_TITLE_RE = re.compile(r"Source:\s*(.+?)(?:\s*\(|$)", re.IGNORECASE)
+
 
 def _build_user_prompt(query: str, context_blocks: list[str]) -> str:
     if not context_blocks:
@@ -45,13 +51,68 @@ def _build_user_prompt(query: str, context_blocks: list[str]) -> str:
     )
 
 
+def _extract_title(block: str) -> str:
+    match = SOURCE_TITLE_RE.search(block)
+    if match:
+        return match.group(1).strip()
+    return "Retrieved medical document"
+
+
+def _call_mock(system_prompt: str, user_prompt: str, grounded: bool = True) -> str:
+    """Build a citation-style answer from retrieved context without calling an API.
+
+    Used for demos and submission when no API key is configured. Grounded mode
+    only lists conditions that appear in the retrieved context blocks.
+    """
+    if not grounded:
+        return (
+            "Based on common medical knowledge alone (no documents retrieved), "
+            "these symptoms could relate to several conditions such as a viral "
+            "illness, allergy, or another common cause. Without retrieval, this "
+            "answer cannot cite a trusted source and may be incomplete or incorrect.\n\n"
+            "This is not a diagnosis — please consult a qualified healthcare professional."
+        )
+
+    # Pull titles from context blocks that look like: [n] Source: Title (...)
+    titles: list[str] = []
+    for block in user_prompt.split("\n\n"):
+        if "Source:" in block:
+            title = _extract_title(block)
+            if title and title not in titles:
+                titles.append(title)
+
+    if not titles:
+        return (
+            "I could not find enough supporting material in the knowledge base "
+            "for a confident answer. Please rephrase your symptoms or consult a doctor.\n\n"
+            "This is not a diagnosis — please consult a qualified healthcare professional."
+        )
+
+    lines = [
+        "Based on the retrieved medical references, possible explanations include:",
+        "",
+    ]
+    for i, title in enumerate(titles[:4], start=1):
+        lines.append(
+            f"{i}. One possible condition associated with these symptoms may be "
+            f"related to {title} (Source: {title})."
+        )
+    lines.extend(
+        [
+            "",
+            "This is not a diagnosis — please consult a qualified healthcare professional.",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _call_openai(system_prompt: str, user_prompt: str, model: str | None = None) -> str:
     from openai import OpenAI
 
-    if not config.OPENAI_API_KEY:
+    if config._looks_like_placeholder(config.OPENAI_API_KEY):
         raise RuntimeError(
             "OPENAI_API_KEY is not set. Add it to your .env file, or set "
-            "LLM_PROVIDER=groq (free) or LLM_PROVIDER=ollama (local) instead."
+            "LLM_PROVIDER=mock (offline) or LLM_PROVIDER=groq (free)."
         )
     client = OpenAI(api_key=config.OPENAI_API_KEY)
     response = client.chat.completions.create(
@@ -71,10 +132,10 @@ def _call_groq(system_prompt: str, user_prompt: str, model: str | None = None) -
     see https://console.groq.com/keys"""
     from openai import OpenAI
 
-    if not config.GROQ_API_KEY:
+    if config._looks_like_placeholder(config.GROQ_API_KEY):
         raise RuntimeError(
             "GROQ_API_KEY is not set. Get a free key at https://console.groq.com/keys "
-            "and add it to your .env file."
+            "and add it to your .env file, or set LLM_PROVIDER=mock for offline demos."
         )
     client = OpenAI(api_key=config.GROQ_API_KEY, base_url=config.GROQ_BASE_URL)
     response = client.chat.completions.create(
@@ -104,24 +165,34 @@ def _call_ollama(system_prompt: str, user_prompt: str, model: str | None = None)
     return resp.json()["message"]["content"].strip()
 
 
-def _call_llm(system_prompt: str, user_prompt: str, provider: str | None = None, model: str | None = None) -> str:
-    provider = (provider or config.LLM_PROVIDER).strip().lower()
+def _call_llm(
+    system_prompt: str,
+    user_prompt: str,
+    provider: str | None = None,
+    model: str | None = None,
+    grounded: bool = True,
+) -> str:
+    provider = (provider or config.resolve_llm_provider()).strip().lower()
+    if provider == "mock":
+        return _call_mock(system_prompt, user_prompt, grounded=grounded)
     if provider == "openai":
         return _call_openai(system_prompt, user_prompt, model)
     if provider == "groq":
         return _call_groq(system_prompt, user_prompt, model)
     if provider == "ollama":
         return _call_ollama(system_prompt, user_prompt, model)
-    raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use 'openai', 'groq', or 'ollama'.")
+    raise ValueError(
+        f"Unknown LLM_PROVIDER '{provider}'. Use 'mock', 'openai', 'groq', or 'ollama'."
+    )
 
 
 def generate_grounded_answer(query: str, context_blocks: list[str]) -> str:
     """RAG-grounded generation: the LLM must cite the given context blocks."""
     user_prompt = _build_user_prompt(query, context_blocks)
-    return _call_llm(SYSTEM_PROMPT, user_prompt)
+    return _call_llm(SYSTEM_PROMPT, user_prompt, grounded=True)
 
 
 def generate_ungrounded_answer(query: str) -> str:
     """No retrieval at all - used as the baseline for Objective 4 (hallucination comparison)."""
     user_prompt = f"User symptom description: {query}"
-    return _call_llm(NO_RAG_SYSTEM_PROMPT, user_prompt)
+    return _call_llm(NO_RAG_SYSTEM_PROMPT, user_prompt, grounded=False)

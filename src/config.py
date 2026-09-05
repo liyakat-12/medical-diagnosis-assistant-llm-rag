@@ -44,7 +44,7 @@ GENERAL_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 # semantic search (comparison target for Objective 3)
 MEDICAL_EMBEDDING_MODEL = "pritamdeka/S-PubMedBert-MS-MARCO"
 
-EMBEDDING_MODE = os.getenv("EMBEDDING_MODE", "medical").strip().lower()  # "general" | "medical"
+EMBEDDING_MODE = os.getenv("EMBEDDING_MODE", "general").strip().lower()  # "general" | "medical"
 
 # ---------------------------------------------------------------------------
 # Retrieval
@@ -54,7 +54,9 @@ TOP_K = int(os.getenv("TOP_K", "4"))
 # ---------------------------------------------------------------------------
 # LLM
 # ---------------------------------------------------------------------------
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").strip().lower()  # "openai" | "groq" | "ollama"
+# "mock" = offline template answers from retrieved passages (no API key needed)
+# "groq" = free cloud API | "openai" = paid | "ollama" = local model
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock").strip().lower()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -69,6 +71,25 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 
 JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4o-mini")
+
+
+def _looks_like_placeholder(key: str) -> bool:
+    key = (key or "").strip()
+    if not key:
+        return True
+    return "your-key-here" in key.lower() or key in {"sk-", "gsk-", "gsk_"}
+
+
+def resolve_llm_provider() -> str:
+    """Return the effective LLM provider, falling back to mock when keys are missing."""
+    provider = LLM_PROVIDER.strip().lower()
+    if provider == "mock":
+        return "mock"
+    if provider == "groq" and _looks_like_placeholder(GROQ_API_KEY):
+        return "mock"
+    if provider == "openai" and _looks_like_placeholder(OPENAI_API_KEY):
+        return "mock"
+    return provider
 
 # ---------------------------------------------------------------------------
 # Safety

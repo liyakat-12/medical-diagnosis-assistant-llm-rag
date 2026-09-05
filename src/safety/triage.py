@@ -44,11 +44,18 @@ class TriageResult:
     matched_emergency_terms: list[str] = field(default_factory=list)
 
 
-def _most_severe_evidence_level(evidence: list[Evidence]) -> str:
+def _primary_evidence_level(evidence: list[Evidence]) -> str:
+    """Use the top-ranked (most relevant) document's triage level.
+
+    Earlier we used the most severe level among all top-k hits, which was
+    overly conservative and often escalated mild queries when one unrelated
+    emergency passage appeared in the shortlist. The emergency regex
+    guardrail still provides a hard override for true red-flag wording.
+    """
     if not evidence:
         return "consult_doctor"  # safe default when nothing was retrieved
-    best = max(evidence, key=lambda e: SEVERITY_ORDER.get(e.triage_level, 1))
-    return best.triage_level
+    level = evidence[0].triage_level
+    return level if level in SEVERITY_ORDER else "consult_doctor"
 
 
 def classify_triage(query: str, evidence: list[Evidence]) -> TriageResult:
@@ -62,11 +69,11 @@ def classify_triage(query: str, evidence: list[Evidence]) -> TriageResult:
             matched_emergency_terms=guard.matched_terms,
         )
 
-    level = _most_severe_evidence_level(evidence)
+    level = _primary_evidence_level(evidence)
     return TriageResult(
         level=level,
         label=TRIAGE_LABELS[level],
         guidance=TRIAGE_GUIDANCE[level],
-        reason="Based on the most severe condition among the top retrieved reference documents.",
+        reason="Based on the most relevant retrieved reference document.",
         matched_emergency_terms=[],
     )

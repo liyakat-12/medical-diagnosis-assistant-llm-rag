@@ -47,6 +47,24 @@ class TriageOut(BaseModel):
     reason: str
 
 
+class ClaimAuditOut(BaseModel):
+    text: str
+    cited_source: str | None
+    status: str
+    matched_title: str | None = None
+
+
+class FaithfulnessOut(BaseModel):
+    coverage: float
+    claim_count: int
+    supported_count: int
+    unsupported_count: int
+    fabricated_count: int
+    verdict: str
+    summary: str
+    claims: list[ClaimAuditOut]
+
+
 class DiagnoseResponse(BaseModel):
     query: str
     refused: bool
@@ -54,12 +72,18 @@ class DiagnoseResponse(BaseModel):
     triage: TriageOut | None
     answer: str
     citations: list[CitationOut]
+    faithfulness: FaithfulnessOut | None = None
     disclaimer: str
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "embedding_mode": config.EMBEDDING_MODE, "llm_provider": config.LLM_PROVIDER}
+    return {
+        "status": "ok",
+        "embedding_mode": config.EMBEDDING_MODE,
+        "llm_provider": config.LLM_PROVIDER,
+        "effective_llm_provider": config.resolve_llm_provider(),
+    }
 
 
 @app.post("/diagnose", response_model=DiagnoseResponse)
@@ -75,6 +99,10 @@ def diagnose(request: DiagnoseRequest) -> DiagnoseResponse:
         if result.triage
         else None
     )
+    faithfulness_out = None
+    if result.faithfulness is not None:
+        faithfulness_out = FaithfulnessOut(**result.faithfulness.to_dict())
+
     return DiagnoseResponse(
         query=result.query,
         refused=result.refused,
@@ -82,5 +110,6 @@ def diagnose(request: DiagnoseRequest) -> DiagnoseResponse:
         triage=triage_out,
         answer=result.answer,
         citations=[CitationOut(**c) for c in result.citations],
+        faithfulness=faithfulness_out,
         disclaimer=result.disclaimer,
     )

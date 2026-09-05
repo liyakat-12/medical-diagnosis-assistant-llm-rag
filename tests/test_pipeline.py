@@ -14,6 +14,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from src.ingestion.loader import build_chunks, chunk_text, load_documents
+from src.safety.citation_faithfulness import audit_citation_faithfulness
 from src.safety.guardrails import check_emergency, check_prescription_request
 
 
@@ -74,6 +75,35 @@ def test_prescription_guardrail_catches_dosage_question():
 def test_prescription_guardrail_ignores_normal_symptom_question():
     result = check_prescription_request("I have a headache and feel nauseous, what could this be?")
     assert not result.triggered
+
+
+def test_faithfulness_marks_cited_retrieved_claim_supported():
+    answer = (
+        "1. One possible condition may be related to Common Cold (Source: Common Cold).\n\n"
+        "This is not a diagnosis — please consult a qualified healthcare professional."
+    )
+    retrieved = [{"title": "Common Cold", "condition": "Common Cold", "source": "CDC"}]
+    audit = audit_citation_faithfulness(answer, retrieved)
+    assert audit.verdict == "pass"
+    assert audit.supported_count == 1
+    assert audit.unsupported_count == 0
+    assert audit.coverage == 1.0
+
+
+def test_faithfulness_flags_uncited_claim():
+    answer = "This may be related to pneumonia and you should worry."
+    retrieved = [{"title": "Common Cold", "condition": "Common Cold", "source": "CDC"}]
+    audit = audit_citation_faithfulness(answer, retrieved)
+    assert audit.unsupported_count == 1
+    assert audit.verdict == "fail"
+
+
+def test_faithfulness_flags_citation_not_in_retrieval():
+    answer = "This may be related to Pneumonia (Source: Pneumonia)."
+    retrieved = [{"title": "Common Cold", "condition": "Common Cold", "source": "CDC"}]
+    audit = audit_citation_faithfulness(answer, retrieved)
+    assert audit.fabricated_count == 1
+    assert audit.verdict == "fail"
 
 
 if __name__ == "__main__":

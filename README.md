@@ -1,25 +1,33 @@
 # Medical Diagnosis Assistant using LLM + RAG
 
-A Retrieval-Augmented Generation (RAG) system that takes a plain-language
-symptom description and returns a short, **cited** list of possible
-conditions, together with a **triage level** (self care / consult a doctor
-soon / seek emergency care) and a rule-based **safety layer** that detects
-emergencies and refuses prescription/dosage requests.
+A Retrieval-Augmented Generation (RAG) system that takes a **plain-language
+symptom description** and returns:
 
-This project was built to satisfy four objectives:
+- a short list of **possible conditions**
+- a **visible citation** on every medical claim
+- a **triage level**: self-care / consult a doctor soon / seek emergency care
+- a **rule-based safety layer** (emergency red flags + prescription/dosage refusal)
+- a **citation faithfulness audit** after generation (supported / uncited / not retrieved)
 
-1. Build a RAG pipeline over a curated collection of trusted medical
-   documents so a symptom description returns possible conditions with a
-   visible citation on every claim.
-2. Classify each query into a triage level and enforce a safety layer that
-   detects emergencies and refuses prescription/dosage requests.
-3. Compare retrieval accuracy of general-purpose sentence embeddings vs.
-   domain-specific medical embeddings (PubMedBERT), reported quantitatively.
-4. Measure the reduction in hallucination from grounding the LLM in
-   retrieved documents vs. the same LLM with no retrieval.
+This is a research and academic demo. **It is not a medical device and does
+not replace a clinician.** See [Disclaimer](#disclaimer).
 
-> **This is not a medical device and does not replace a doctor.** See
-> [Disclaimer](#disclaimer) below.
+---
+
+## Objectives
+
+| # | Objective | Status |
+|---|---|---|
+| 1 | RAG over curated medical documents: symptom text → possible conditions with a citation on every claim | Implemented |
+| 2 | Triage into three levels + safety layer (emergencies, refuse prescription/dosage) | Implemented |
+| 3 | Compare general sentence embeddings vs medical embeddings (PubMedBERT) with Recall@k and MRR | Implemented |
+| 4 | Measure hallucination reduction: full RAG pipeline vs the same model **without** retrieval | Implemented |
+
+**Unique addition:** after the answer is generated, a **citation faithfulness
+audit** checks every claim against the retrieved documents. Claims with no
+`(Source: …)` tag, or a source that was never retrieved, are flagged.
+
+---
 
 ## Architecture
 
@@ -28,61 +36,81 @@ User query
    │
    ▼
 Safety guardrails (src/safety/guardrails.py)
-   │  - prescription/dosage request?  -> refuse immediately
-   │  - emergency red-flag keywords?  -> force triage = emergency
+   │  - prescription / dosage request?  → refuse immediately (skip RAG)
+   │  - emergency red-flag keywords?    → force triage = emergency
    ▼
-Retriever (src/retrieval) -- embeds query, searches Chroma vector store
-   │  -> top-k cited passages, each tagged with its condition + triage level
+Retriever (src/retrieval)
+   │  embed query → search Chroma → top-k passages
+   │  each passage carries title, source URL, condition, triage level
    ▼
 Triage classifier (src/safety/triage.py)
-   │  -> self_care | consult_doctor | emergency
+   │  → self_care | consult_doctor | emergency
    ▼
 LLM generator (src/llm/generator.py)
-   │  -> answer grounded ONLY in retrieved passages, citation required
+   │  answer grounded ONLY in retrieved passages
+   │  every condition claim must include (Source: <title>)
    ▼
-DiagnosisResponse -> FastAPI (/diagnose) and Streamlit chat UI
+Citation faithfulness audit (src/safety/citation_faithfulness.py)
+   │  each claim: supported | no citation | citation not in retrieval
+   │  verdict: pass | partial | fail
+   ▼
+DiagnosisResponse → Streamlit chat UI  and  FastAPI POST /diagnose
 ```
+
+Orchestration is **custom Python** (no LangChain) so every step is inspectable
+for evaluation and viva defense.
+
+---
 
 ## Tech stack
 
 | Layer | Choice | Why |
 |---|---|---|
-| Orchestration | Custom Python (no LangChain) | Fully transparent for evaluation/defense - every step is inspectable code, not a black-box chain |
-| Embeddings (general) | `sentence-transformers/all-MiniLM-L6-v2` | Fast, free, strong general-purpose baseline |
-| Embeddings (medical) | `pritamdeka/S-PubMedBert-MS-MARCO` | PubMedBERT fine-tuned for semantic search - domain comparison target |
-| Vector store | ChromaDB (persistent, local) | Free, zero-config, good for small/medium corpora |
-| LLM | Groq (free, `llama-3.1-8b-instant`), OpenAI (`gpt-4o-mini`), or local Ollama (`llama3`) | Switch providers via one `.env` variable |
-| Backend | FastAPI | Simple typed REST API |
-| Frontend | Streamlit | Fast chat UI, pure Python |
-| Evaluation | pandas + scikit-learn | Recall@k, MRR, precision/recall/F1, citation coverage |
+| Orchestration | Custom Python (no LangChain) | Every step is visible code, not a black-box chain |
+| Embeddings (general) | `sentence-transformers/all-MiniLM-L6-v2` | Fast baseline for Objective 3 |
+| Embeddings (medical) | `pritamdeka/S-PubMedBert-MS-MARCO` | PubMedBERT fine-tuned for semantic search |
+| Vector store | ChromaDB (local, persistent) | Two separate indexes: general and medical |
+| Language model | `mock` (offline), Groq, OpenAI, or Ollama | Mock works with no API key |
+| Backend | FastAPI | Typed REST: `/diagnose`, `/health` |
+| Frontend | Streamlit | Chat UI with triage, sources, faithfulness card |
+| Evaluation | pandas + scikit-learn | Recall@k, MRR, precision / recall / F1, citation coverage |
+
+---
 
 ## Project structure
 
 ```
-knowledge_base/sample_documents/   20 starter medical documents (markdown, with citation front-matter)
+knowledge_base/sample_documents/   20 starter medical documents (markdown + citation front matter)
 src/
-  config.py                       All paths & settings (reads .env)
-  ingestion/loader.py              Parses documents, chunks text, attaches citations
-  embeddings/embedding_models.py   General vs. medical embedding model wrappers
+  config.py                        Paths and settings (reads .env)
+  ingestion/loader.py              Parse documents, chunk text, attach citations
+  embeddings/embedding_models.py   General vs medical embedding wrappers
   retrieval/vector_store.py        Chroma indexing + similarity search
-  retrieval/retriever.py           High-level retrieve() -> list[Evidence]
-  safety/guardrails.py             Emergency + prescription/dosage regex rules
-  safety/triage.py                 Combines guardrails + evidence -> triage level
-  llm/generator.py                 OpenAI / Ollama call wrapper + prompts
-  pipeline/rag_pipeline.py         Ties it all together -> DiagnosisResponse
-  api/main.py                      FastAPI app (/diagnose, /health)
+  retrieval/retriever.py           retrieve() → list[Evidence]
+  safety/guardrails.py             Emergency + prescription/dosage rules
+  safety/triage.py                 Guardrails + evidence → triage level
+  safety/citation_faithfulness.py  Post-generation claim vs source audit
+  llm/generator.py                 mock / Groq / OpenAI / Ollama + prompts
+  pipeline/rag_pipeline.py         Full flow → DiagnosisResponse
+  api/main.py                      FastAPI app
 app/streamlit_app.py               Chat UI
+.streamlit/config.toml             UI theme
 scripts/
-  generate_sample_kb.py            (Re)generates the 20 starter KB documents
-  build_index.py                   Builds/rebuilds the Chroma vector stores
+  generate_sample_kb.py            (Re)generate the 20 starter documents
+  build_index.py                   Build / rebuild both Chroma indexes
+  smoke_test.py                    Quick end-to-end checks (no API key)
 evaluation/
-  datasets/                        Labeled test sets (emergency, symptom->condition, hallucination Qs)
+  datasets/                        Labeled test sets
   evaluate_embeddings.py           Objective 3
   evaluate_hallucination.py        Objective 4
-  evaluate_triage.py               Safety-layer recall/precision/F1
-  evaluate_e2e.py                  End-to-end condition + triage accuracy
-tests/test_pipeline.py             Unit tests (no API key required)
+  evaluate_triage.py               Emergency-layer recall / precision / F1
+  evaluate_e2e.py                  Condition + triage accuracy
+  results/                         Saved metric CSVs
+tests/test_pipeline.py             Unit tests (no API key)
+docs/                              Implementation notes and diagrams
 ```
+
+---
 
 ## Setup
 
@@ -94,32 +122,31 @@ py -3.11 -m venv venv
 pip install -r requirements.txt
 ```
 
-> Windows note: `chromadb`, `torch`, and `sentence-transformers` do not yet
-> have full wheel support on very new Python versions. Python 3.11 or 3.12
-> is the safest choice.
+`chromadb`, `torch`, and `sentence-transformers` are most reliable on
+**Python 3.11 or 3.12**. Very new Python versions may not have wheels yet.
 
-### 2. Configure your `.env`
+### 2. Configure `.env`
 
 ```powershell
 copy .env.example .env
 ```
 
-Then edit `.env`:
+| Setting | What to do |
+|---|---|
+| `LLM_PROVIDER=mock` | Works immediately, no API key. Answers are built from retrieved passages. **Use this for the first demo.** |
+| `LLM_PROVIDER=groq` | Free cloud LLM. Get a key at [console.groq.com](https://console.groq.com/keys) and set `GROQ_API_KEY`. |
+| `LLM_PROVIDER=openai` | Paid. Set `OPENAI_API_KEY`. |
+| `LLM_PROVIDER=ollama` | Local. Install [Ollama](https://ollama.com), run `ollama pull llama3`. |
+| `EMBEDDING_MODE` | `general` (default) or `medical` — which index the live app uses |
+| `TOP_K` | How many passages to retrieve (default `4`) |
 
-- To use **Groq (recommended, free, no credit card)**: sign up at
-  [console.groq.com](https://console.groq.com/keys), create a key, set
-  `LLM_PROVIDER=groq` and put the key in `GROQ_API_KEY`. Groq's API is
-  OpenAI-compatible and gives a generous free daily quota on
-  `llama-3.1-8b-instant`.
-- To use **OpenAI** (paid, best quality): set `LLM_PROVIDER=openai` and put
-  your key in `OPENAI_API_KEY`.
-- To use a **free local model** instead: install [Ollama](https://ollama.com),
-  run `ollama pull llama3`, and set `LLM_PROVIDER=ollama`.
+If `groq` or `openai` is selected but the key is still a placeholder, the app
+falls back to `mock`.
 
 ### 3. Build the vector index
 
-This downloads the two embedding models (first run only, ~500MB) and
-indexes all 20 sample documents into two separate Chroma collections:
+First run downloads the two embedding models (~500 MB) and indexes all 20
+documents into **two** Chroma collections:
 
 ```powershell
 python scripts\build_index.py
@@ -127,55 +154,134 @@ python scripts\build_index.py
 
 ### 4. Run the app
 
-FastAPI backend:
+**Windows:** double-click `run_ui.bat` (chat UI) or `run_api.bat` (REST API).
+
+Or from a terminal:
 
 ```powershell
-uvicorn src.api.main:app --reload --port 8000
-```
-
-Streamlit chat UI (in a second terminal; works standalone too, no need to
-run the API separately):
-
-```powershell
+.\venv\Scripts\Activate.ps1
 streamlit run app\streamlit_app.py
 ```
 
-### 5. Run the unit tests (no API key required)
+Open **http://localhost:8501**
+
+FastAPI (optional; the Streamlit UI talks to the pipeline in-process):
+
+```powershell
+.\venv\Scripts\Activate.ps1
+uvicorn src.api.main:app --reload --port 8000
+```
+
+- Interactive docs: http://localhost:8000/docs
+- Health: `GET /health`
+- Diagnose: `POST /diagnose` with `{ "query": "...", "top_k": 4 }`
+
+Smoke test (no API key with mock):
+
+```powershell
+python scripts\smoke_test.py
+```
+
+### 5. Unit tests
 
 ```powershell
 python -m pytest tests\ -v
 ```
 
-## Running the evaluations (Objectives 3 and 4, plus safety-layer checks)
+---
 
-All results are written to `evaluation/results/`.
+## How to demo
+
+Try these three queries in the chat UI:
+
+| Query | What you should see |
+|---|---|
+| `I have a runny nose and sore throat for two days` | Self-care, cited conditions, faithfulness **pass** |
+| `How many mg of ibuprofen should I take?` | **Refused** — no drug or dose advice |
+| `Sudden crushing chest pain and shortness of breath` | **Emergency** triage, still grounded + cited |
+
+The UI also shows retrieved sources (with relevance) and a
+**Citation faithfulness audit** card after each answer.
+
+---
+
+## Evaluations
+
+All scripts write to `evaluation/results/`.
 
 ```powershell
-# Objective 3: general vs. medical embeddings retrieval accuracy
+# Objective 3 — general vs medical embeddings
 python evaluation\evaluate_embeddings.py
 
-# Safety layer: emergency-detection recall/precision/F1 (no API key needed)
+# Safety layer — emergency recall / precision / F1 (no API key)
 python evaluation\evaluate_triage.py
 
-# Objective 4: hallucination reduction, RAG vs. no-RAG (needs an LLM configured)
+# Objective 4 — RAG vs no-RAG citation coverage
 python evaluation\evaluate_hallucination.py
 
-# End-to-end: does the final answer surface the right condition + triage level?
+# End-to-end — expected condition + triage in the final answer
 python evaluation\evaluate_e2e.py
 ```
 
+### Latest saved results (20-document starter corpus)
+
+**Objective 3 — retrieval accuracy**
+
+| Metric | General (MiniLM) | Medical (PubMedBERT) |
+|---|---|---|
+| Recall@1 | 95% (19/20) | 70% (14/20) |
+| Recall@3 | 100% | 95% |
+| MRR | 0.975 | 0.835 |
+
+On this small corpus the **general** model retrieved the correct document more
+often. That is a valid, reportable finding — Objective 3 is to **compare and
+quantify**, not to assume medical embeddings always win.
+
+**Objective 4 — hallucination (citation coverage, mock LLM)**
+
+| Setting | Mean citation coverage |
+|---|---|
+| RAG | 100% |
+| No retrieval | 0% |
+
+The no-RAG side has nothing to cite. With `LLM_PROVIDER=mock` the no-RAG
+answer is a fixed template. For a stronger claim, rerun
+`evaluate_hallucination.py` with Groq or OpenAI (optional LLM-as-judge scores).
+
+**Safety (emergency test set)**
+
+- Recall on true emergencies: **100%** (12/12)
+- Missed emergencies: **0**
+- Prescription refusal is implemented and covered by unit tests
+
+**End-to-end (labeled symptom → condition set)**
+
+- Expected condition surfaced in the answer or citations: **20/20**
+- Triage level match: **20/20**
+
+---
+
+## Suggested faculty progress checks
+
+| Check | Date | What to show |
+|---|---|---|
+| Progress check 1 | 11.09.2026 | **Objective 1** — live RAG: symptom text → cited conditions + sources |
+| Progress check 2 | 25.09.2026 | **Objective 2 + audit** — self-care / refuse dosage / emergency + faithfulness card |
+| Progress check 3 | 09.10.2026 | **Objectives 3 and 4** — embedding table, RAG vs no-RAG coverage, limitations |
+
+---
+
 ## Extending the knowledge base
 
-The 20 documents in `knowledge_base/sample_documents/` are **starter/demo
-content** written in plain language for this project, not verbatim copies
-of any single source. Each file's front matter names the organization
-whose public guidance informed it, so every citation shown to the user is
-a real, checkable reference.
+The 20 files in `knowledge_base/sample_documents/` are **starter/demo
+content** written in plain language. They are not verbatim copies of any
+single source. Front matter names the organization whose public guidance
+informed the text, so citations shown to the user are real, checkable
+references.
 
-For a production system or a more rigorous academic submission, replace or
-extend these with verified excerpts from real guideline documents (WHO,
-CDC, NICE, Mayo Clinic, MedlinePlus, PubMed review articles, etc.). To add
-a new document, create a new `.md` file following this format:
+For a stronger academic or clinical corpus, replace or extend these with
+verified excerpts (WHO, CDC, NICE, Mayo Clinic, MedlinePlus, PubMed reviews).
+Add a new `.md` file in this format:
 
 ```markdown
 ---
@@ -193,24 +299,33 @@ Body text describing symptoms, causes, self-care, and when to seek
 professional or emergency care...
 ```
 
-Then re-run `python scripts\build_index.py` to re-index.
+Then rebuild the indexes:
 
-## Known limitations / suggested next steps
+```powershell
+python scripts\build_index.py
+```
 
-- The starter knowledge base has 20 conditions; real deployments need a
-  much larger, clinically-reviewed corpus.
-- The emergency-detection safety layer is rule-based (regex/keywords) for
-  auditability; it should be periodically reviewed and extended with real
-  missed cases, and ideally validated against clinician-labeled data at
-  scale before any real-world use.
-- No user data persistence/authentication is implemented — this is a
-  research/demo-grade pipeline, not a HIPAA-compliant clinical system.
+---
+
+## Known limitations
+
+- The starter knowledge base has **20 conditions**. A real system needs a
+  much larger, clinically reviewed corpus.
+- Emergency detection is **rule-based** (regex / keywords) on purpose, so it
+  can be audited. It should be extended from missed real cases and validated
+  on clinician-labeled data before any real-world use.
+- With `LLM_PROVIDER=mock`, answers are assembled from retrieved document
+  titles. Extra top-k hits can still appear as extra “possible” conditions.
+- Objective 4 numbers above used **mock** mode. A live LLM + judge is the
+  stronger hallucination experiment.
+- No login, no stored patient data, not HIPAA-compliant. Research/demo only.
+
+---
 
 ## Disclaimer
 
 This tool provides general information retrieved from reference medical
 documents. It is **not** a medical device, cannot examine you, and does
-**not** replace a licensed clinician. Always consult a qualified
-healthcare professional for diagnosis and treatment. If you may be
-experiencing a medical emergency, call your local emergency number
-immediately.
+**not** replace a licensed clinician. Always consult a qualified healthcare
+professional for diagnosis and treatment. If you may be experiencing a
+medical emergency, call your local emergency number immediately.

@@ -12,8 +12,10 @@ Flow for a single user query:
      retrieved evidence).
   4. Ask the LLM to generate a grounded answer, citing only the retrieved
      passages.
-  5. Package everything (answer, triage, citations, disclaimer) into one
-     response object for the API/UI layer.
+  5. Citation faithfulness audit: every claim is checked against retrieved
+     titles. Uncited or fabricated citations are flagged.
+  6. Package everything (answer, triage, citations, audit, disclaimer)
+     into one response object for the API/UI layer.
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ from dataclasses import dataclass, field
 from src import config
 from src.llm.generator import generate_grounded_answer, generate_ungrounded_answer
 from src.retrieval.retriever import Evidence, retrieve
+from src.safety.citation_faithfulness import FaithfulnessAudit, audit_citation_faithfulness
 from src.safety.guardrails import (
     PRESCRIPTION_REFUSAL_MESSAGE,
     check_prescription_request,
@@ -37,6 +40,7 @@ class DiagnosisResponse:
     triage: TriageResult | None
     answer: str
     citations: list[dict] = field(default_factory=list)
+    faithfulness: FaithfulnessAudit | None = None
     disclaimer: str = config.DISCLAIMER
 
 
@@ -57,6 +61,7 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
             triage=None,
             answer=PRESCRIPTION_REFUSAL_MESSAGE,
             citations=[],
+            faithfulness=None,
         )
 
     # --- Retrieval ---
@@ -80,6 +85,8 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
         for ev in evidence
     ]
 
+    faithfulness = audit_citation_faithfulness(answer, citations)
+
     return DiagnosisResponse(
         query=query,
         refused=False,
@@ -87,6 +94,7 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
         triage=triage,
         answer=answer,
         citations=citations,
+        faithfulness=faithfulness,
     )
 
 

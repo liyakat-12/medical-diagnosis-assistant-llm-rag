@@ -12,6 +12,11 @@ symptom description** and returns:
 This is a research and academic demo. **It is not a medical device and does
 not replace a clinician.** See [Disclaimer](#disclaimer).
 
+**New laptop?** Start at [Run on another laptop](#run-on-another-laptop). You
+need **Python 3.11**, this project folder, and about **10–15 minutes** plus
+one model download (~500 MB). No Node.js. No paid API key if you keep
+`LLM_PROVIDER=mock`.
+
 ---
 
 ## Objectives
@@ -112,81 +117,218 @@ docs/                              Implementation notes and diagrams
 
 ---
 
-## Setup
+## Run on another laptop
 
-### 1. Create a virtual environment (Python 3.11 recommended)
+Follow this section if you copied the project (USB, OneDrive, zip, or git clone)
+onto a **different computer**.
+
+### What you must install (before anything else)
+
+| Need | Required? | Details |
+|---|---|---|
+| **Python 3.11** (or 3.12) | **Yes** | [python.org/downloads](https://www.python.org/downloads/release/python-3119/). On the installer, tick **Add python.exe to PATH**. Do **not** use Python 3.13/3.14 — `torch` / `chromadb` often fail there. |
+| **pip** | Yes (comes with Python) | Check with `python -m pip --version` |
+| **Internet** | Yes, **first setup only** | Downloads Python packages and two embedding models (~500 MB) |
+| **RAM** | ~8 GB recommended | Embedding models load into memory on first query |
+| **Disk** | ~3–4 GB free | `venv` + PyTorch + Hugging Face models |
+| Git | Optional | Only if you clone from GitHub instead of copying the folder |
+| Node.js / npm | **No** | This is a Python app. `npm run dev` will not work. |
+| Groq / OpenAI key | **No** for first run | Keep `LLM_PROVIDER=mock` |
+| Ollama | **No** unless you want a local LLM | |
+
+**Windows extra:** if `python` is not found, use `py -3.11` instead.
+
+**Check Python version:**
+
+```powershell
+py -3.11 --version
+```
+
+You should see `Python 3.11.x`. If the command fails, install Python 3.11 and
+reopen the terminal.
+
+### What to copy / what to leave behind
+
+Copy the **project folder**. Do **not** copy these from the old laptop — they
+are machine-specific and will break:
+
+| Copy | Do not copy |
+|---|---|
+| `src/`, `app/`, `knowledge_base/`, `scripts/`, `evaluation/`, `tests/`, `docs/` | `venv/` — recreate it on the new laptop |
+| `requirements.txt`, `README.md`, `.env.example` | `.env` — recreate from `.env.example` (never commit keys) |
+| `run_ui.bat`, `run_api.bat` | `data/vector_store_*` — rebuild with `build_index.py` (optional to copy if you want to skip rebuild) |
+| `.streamlit/` | `__pycache__/`, `.pytest_cache/` |
+
+If you use OneDrive, copy the folder locally first (Desktop or `C:\projects\...`)
+so Python is not reading files through a sync lock.
+
+### Step 1 — Open a terminal in the project folder
+
+```powershell
+cd "C:\path\to\project MEDICAL DIAGNOSIS ASSISTANT USING LLM AND RAG"
+```
+
+Confirm you see `requirements.txt` and `app\streamlit_app.py` in that folder.
+
+### Step 2 — Create a fresh virtual environment
+
+**Windows (PowerShell):**
 
 ```powershell
 py -3.11 -m venv venv
 .\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-`chromadb`, `torch`, and `sentence-transformers` are most reliable on
-**Python 3.11 or 3.12**. Very new Python versions may not have wheels yet.
+If activation is blocked (`running scripts is disabled`):
 
-### 2. Configure `.env`
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Then run `.\venv\Scripts\Activate.ps1` again. Your prompt should start with
+`(venv)`.
+
+**Windows (Command Prompt):**
+
+```bat
+py -3.11 -m venv venv
+venv\Scripts\activate.bat
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+**macOS / Linux:**
+
+```bash
+python3.11 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+This installs FastAPI, Streamlit, sentence-transformers, ChromaDB, pandas,
+scikit-learn, pytest, and the other packages listed in `requirements.txt`.
+The first `pip install` can take several minutes (PyTorch is large).
+
+### Step 3 — Create `.env`
+
+**Windows:**
 
 ```powershell
 copy .env.example .env
 ```
 
-| Setting | What to do |
-|---|---|
-| `LLM_PROVIDER=mock` | Works immediately, no API key. Answers are built from retrieved passages. **Use this for the first demo.** |
-| `LLM_PROVIDER=groq` | Free cloud LLM. Get a key at [console.groq.com](https://console.groq.com/keys) and set `GROQ_API_KEY`. |
-| `LLM_PROVIDER=openai` | Paid. Set `OPENAI_API_KEY`. |
-| `LLM_PROVIDER=ollama` | Local. Install [Ollama](https://ollama.com), run `ollama pull llama3`. |
-| `EMBEDDING_MODE` | `general` (default) or `medical` — which index the live app uses |
-| `TOP_K` | How many passages to retrieve (default `4`) |
+**macOS / Linux:**
 
-If `groq` or `openai` is selected but the key is still a placeholder, the app
-falls back to `mock`.
+```bash
+cp .env.example .env
+```
 
-### 3. Build the vector index
+Leave these defaults for a first run on a new laptop:
 
-First run downloads the two embedding models (~500 MB) and indexes all 20
-documents into **two** Chroma collections:
+```
+LLM_PROVIDER=mock
+EMBEDDING_MODE=general
+TOP_K=4
+```
+
+No API key is required. Edit `.env` later only if you want Groq, OpenAI, or
+Ollama (see [LLM options](#llm-options-optional)).
+
+### Step 4 — Build the vector index (required once)
 
 ```powershell
 python scripts\build_index.py
 ```
 
-### 4. Run the app
+macOS / Linux: `python scripts/build_index.py`
 
-**Windows:** double-click `run_ui.bat` (chat UI) or `run_api.bat` (REST API).
+This downloads two Hugging Face models (first time only, ~500 MB) and indexes
+the 20 documents into:
 
-Or from a terminal:
+- `data/vector_store_general/`
+- `data/vector_store_medical/`
+
+Keep the terminal open until it finishes. After this, you can run the app
+offline with `LLM_PROVIDER=mock`.
+
+### Step 5 — Run the chat UI
+
+**Windows, easiest:** double-click `run_ui.bat`
+
+**Or from a terminal (venv must be active):**
 
 ```powershell
-.\venv\Scripts\Activate.ps1
 streamlit run app\streamlit_app.py
 ```
 
-Open **http://localhost:8501**
+macOS / Linux: `streamlit run app/streamlit_app.py`
 
-FastAPI (optional; the Streamlit UI talks to the pipeline in-process):
+Then open a browser at **http://localhost:8501**
 
-```powershell
-.\venv\Scripts\Activate.ps1
-uvicorn src.api.main:app --reload --port 8000
-```
+The **first** symptom you type can take 30–90 seconds (embedding model loads
+once). Later queries are faster.
 
-- Interactive docs: http://localhost:8000/docs
-- Health: `GET /health`
-- Diagnose: `POST /diagnose` with `{ "query": "...", "top_k": 4 }`
-
-Smoke test (no API key with mock):
+### Step 6 — Optional checks
 
 ```powershell
 python scripts\smoke_test.py
-```
-
-### 5. Unit tests
-
-```powershell
 python -m pytest tests\ -v
 ```
+
+### Optional — REST API
+
+The Streamlit UI does **not** need the API. Start the API only if you want
+`/diagnose`:
+
+```powershell
+uvicorn src.api.main:app --reload --port 8000
+```
+
+- Docs: http://localhost:8000/docs
+- Health: `GET /health`
+- Diagnose: `POST /diagnose` with `{ "query": "I have a runny nose", "top_k": 4 }`
+
+Windows shortcut: double-click `run_api.bat`
+
+### LLM options (optional)
+
+| Setting | What to do |
+|---|---|
+| `LLM_PROVIDER=mock` | **Recommended on a new laptop.** Offline answers from retrieved passages. |
+| `LLM_PROVIDER=groq` | Free cloud LLM. Key from [console.groq.com](https://console.groq.com/keys) → `GROQ_API_KEY` |
+| `LLM_PROVIDER=openai` | Paid. Set `OPENAI_API_KEY` |
+| `LLM_PROVIDER=ollama` | Install [Ollama](https://ollama.com), run `ollama pull llama3` |
+| `EMBEDDING_MODE` | `general` (default) or `medical` |
+| `TOP_K` | Passages to retrieve (default `4`) |
+
+If `groq` or `openai` is set but the key is still a placeholder, the app
+falls back to `mock`.
+
+### Quick checklist
+
+1. Install **Python 3.11** (Add to PATH)
+2. Copy the project folder (**not** `venv/`)
+3. `py -3.11 -m venv venv` → activate → `pip install -r requirements.txt`
+4. `copy .env.example .env` and keep `LLM_PROVIDER=mock`
+5. `python scripts\build_index.py`
+6. `streamlit run app\streamlit_app.py` → http://localhost:8501
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `python` / `pip` not found | Use `py -3.11` and `py -3.11 -m pip`. Reinstall Python 3.11 with **Add to PATH**. |
+| `Activate.ps1` cannot be loaded | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `npm run dev` / no `package.json` | Wrong command. This is Python. Use Streamlit, not npm. |
+| `torch` / `chromadb` install error | You are on Python 3.13+. Install 3.11 and recreate `venv`. |
+| UI opens but first answer hangs | Normal. Models are loading. Wait up to ~2 minutes once. |
+| Empty or old-looking UI | Hard-refresh the browser (Ctrl+F5). Confirm venv is active. |
+| `ModuleNotFoundError` | Activate `venv`, then `pip install -r requirements.txt`. Run commands from the **project root**. |
+| Retrieval / Chroma errors | Run `python scripts\build_index.py` again on this laptop. |
+| Port 8501 already in use | Close the other Streamlit window, or run `streamlit run app\streamlit_app.py --server.port 8502` |
 
 ---
 

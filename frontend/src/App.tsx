@@ -8,7 +8,9 @@ import { PageSpinner } from "./components/common/Spinner";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
-import { Privacy, Safety, NotFound } from "./pages/Privacy";
+import { Privacy } from "./pages/Privacy";
+import { Safety } from "./pages/Safety";
+import { NotFound } from "./pages/NotFound";
 
 const Chat = lazy(() => import("./pages/Chat").then((mod) => ({ default: mod.Chat })));
 const ChatHistory = lazy(() => import("./pages/ChatHistory").then((mod) => ({ default: mod.ChatHistory })));

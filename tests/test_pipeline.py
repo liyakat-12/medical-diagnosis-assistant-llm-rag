@@ -106,6 +106,28 @@ def test_faithfulness_flags_citation_not_in_retrieval():
     assert audit.verdict == "fail"
 
 
+def test_match_percents_sum_to_100():
+    from src.pipeline.rag_pipeline import match_percents
+
+    percents = match_percents([0.82, 0.61, 0.44, 0.29])
+    assert sum(percents) == 100
+    assert len(percents) == 4
+    assert percents[0] >= percents[-1]
+
+
+def test_build_possible_conditions_returns_four_unique():
+    from src.pipeline.rag_pipeline import build_possible_conditions
+
+    citations = [
+        {"condition": f"Condition {i}", "title": f"Title {i}", "source": "CDC", "url": "", "relevance_score": 0.9 - (i * 0.1)}
+        for i in range(6)
+    ]
+    rows = build_possible_conditions(citations)
+    assert len(rows) == 4
+    assert sum(row["match_percent"] for row in rows) == 100
+    assert rows[0]["condition"] == "Condition 0"
+
+
 if __name__ == "__main__":
     import pytest
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from app.core.exceptions import not_found
-from app.db.repositories import chat_repository, message_repository
+from app.repositories import chat_repository, message_repository
 
 
 def make_title(text: str) -> str:

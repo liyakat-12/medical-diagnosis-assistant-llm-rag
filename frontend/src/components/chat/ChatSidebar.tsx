@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, Menu, MessageSquarePlus, Pencil, Search, Stethoscope, Trash2, X } from "lucide-react";
+import { LogOut, MessageSquarePlus, Pencil, Search, Stethoscope, Trash2, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useChat } from "../../context/ChatContext";
 import { useApp } from "../../context/AppContext";
@@ -31,7 +31,7 @@ export function ChatSidebar() {
       ) : null}
       <aside
         className={cn(
-          "z-50 flex h-full w-72 shrink-0 flex-col border-r border-teal-100 bg-[#eef6f4] transition-transform duration-200",
+          "z-50 flex h-full w-72 shrink-0 flex-col border-r border-teal-100 bg-[#e8f2ef] transition-transform duration-200",
           "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:shadow-2xl",
           !sidebarOpen && "max-lg:-translate-x-full",
         )}
@@ -73,7 +73,7 @@ export function ChatSidebar() {
                   <div
                     className={cn(
                       "group flex items-center rounded-2xl px-2 py-2",
-                      activeChatId === chat.id ? "bg-white shadow-sm" : "hover:bg-white/70",
+                      activeChatId === chat.id ? "bg-white shadow-sm ring-1 ring-teal-100" : "hover:bg-white/80",
                     )}
                   >
                     <button
@@ -86,7 +86,7 @@ export function ChatSidebar() {
                       <span className="line-clamp-2">{chat.title}</span>
                     </button>
                     <button
-                      className="rounded-lg p-1 text-slate-400 hover:text-teal-800"
+                      className="rounded-lg p-1 text-slate-400 opacity-0 hover:text-teal-800 group-hover:opacity-100 focus:opacity-100"
                       aria-label="Rename chat"
                       onClick={() => {
                         setRenameId(chat.id);
@@ -96,7 +96,7 @@ export function ChatSidebar() {
                       <Pencil size={14} />
                     </button>
                     <button
-                      className="rounded-lg p-1 text-slate-400 hover:text-rose-700"
+                      className="rounded-lg p-1 text-slate-400 opacity-0 hover:text-rose-700 group-hover:opacity-100 focus:opacity-100"
                       aria-label="Delete chat"
                       onClick={() => void removeChat(chat.id)}
                     >
@@ -146,13 +146,6 @@ export function ChatSidebar() {
         </div>
       </Modal>
       </aside>
-      <button
-        className="fixed bottom-24 left-4 z-30 grid h-11 w-11 place-items-center rounded-full bg-teal-700 text-white shadow-lg lg:hidden"
-        onClick={() => setSidebarOpen(true)}
-        aria-label="Open conversations"
-      >
-        <Menu size={18} />
-      </button>
     </>
   );
 }

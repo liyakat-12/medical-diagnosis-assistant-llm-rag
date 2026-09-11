@@ -13,7 +13,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.db.repositories import user_repository
+from app.repositories import user_repository
 
 logger = logging.getLogger("mediassist.auth")
 

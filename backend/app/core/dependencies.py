@@ -5,7 +5,7 @@ from fastapi import Cookie, Depends, Header
 from app.core import config
 from app.core.exceptions import unauthorized
 from app.core.security import decode_token
-from app.db.repositories import user_repository
+from app.repositories import user_repository
 
 
 async def get_current_user(

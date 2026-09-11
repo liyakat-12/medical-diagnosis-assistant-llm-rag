@@ -43,6 +43,7 @@ export interface PossibleCondition {
   source?: string;
   url?: string;
   relevance_score?: number;
+  match_percent?: number;
 }
 
 export interface Faithfulness {
@@ -76,6 +77,7 @@ export interface StreamEvent {
   type: "status" | "token" | "citation" | "triage" | "metadata" | "done";
   content?: string;
   citations?: Citation[];
+  possible_conditions?: PossibleCondition[];
   level?: TriageLevel;
   label?: string;
   guidance?: string;

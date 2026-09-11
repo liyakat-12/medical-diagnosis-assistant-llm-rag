@@ -1,47 +1,81 @@
 # MediAssist technical notes
 
-This document describes the **implemented** architecture after the full-stack refactor. The live RAG, safety, evaluation, and knowledge-base code in `backend/src` remains the source of truth for medical behavior.
+This document describes the **implemented** architecture. RAG, safety, evaluation, and the knowledge base live in `backend/src` and remain the source of truth for medical behavior. The HTTP API, MongoDB, and auth live in `backend/app`.
 
 ---
 
 ## Runtime topology
 
-- Frontend: Vite dev server on `http://localhost:5173`
+- Frontend: Vite on `http://localhost:5173`
 - Backend: FastAPI on `http://localhost:8000`
 - Browser calls `/api/v1/...`; Vite proxies `/api` to the API
-- Production: build `frontend/` to static files and serve them independently or behind a reverse proxy. FastAPI is the API only; there is no Express static server.
+- Production: build `frontend/` to static files. FastAPI is the API only.
 
 CORS allows credentialed requests from `CORS_ORIGINS`. Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` when `APP_ENV=production`.
 
 ---
 
-## Backend layout
+## Folder structure
 
 ```
-backend/app/
-  main.py                 FastAPI app, CORS, startup/shutdown
-  api/router.py           mounts /api/v1 routes
-  api/routes/             auth, users, chats, messages, diagnosis, health
-  core/                   config re-export, JWT/bcrypt, dependencies, errors
-  db/mongodb.py           shared Motor client
-  db/indexes.py           startup indexes
-  db/repositories/        users, chats, messages
-  schemas/                Pydantic request/response models
-  services/               auth, chat titles, message + RAG orchestration
-  ai/, rag/, safety/      thin re-exports of backend/src modules
-
-backend/src/
-  pipeline/rag_pipeline.py
-  ingestion/
-  embeddings/
-  retrieval/
-  safety/
-  llm/generator.py        talks only to src.ai.registry
-  ai/providers/           mock, openai, groq, ollama
-  config.py
+project-root/
+├── backend/
+│   ├── app/                         # HTTP API, auth, MongoDB persistence
+│   │   ├── main.py                  # FastAPI app, CORS, lifespan
+│   │   ├── api/                     # versioned routes under /api/v1
+│   │   │   ├── router.py
+│   │   │   └── routes/              # auth, users, chats, messages, diagnosis, health
+│   │   ├── core/                    # config, JWT/bcrypt, dependencies, errors
+│   │   ├── connection/              # MongoDB client, ping, indexes
+│   │   │   ├── mongodb.py
+│   │   │   └── indexes.py
+│   │   ├── models/                  # MongoDB document shapes + serializers
+│   │   │   ├── user.py
+│   │   │   ├── chat.py
+│   │   │   └── message.py
+│   │   ├── repositories/            # database queries (always filter by owner)
+│   │   ├── schemas/                 # Pydantic API request/response models
+│   │   └── services/                # auth, chat titles, message + RAG orchestration
+│   └── src/                         # RAG / AI (used by API and evaluation)
+│       ├── config.py
+│       ├── pipeline/rag_pipeline.py
+│       ├── ingestion/
+│       ├── embeddings/
+│       ├── retrieval/
+│       ├── safety/                  # guardrails, triage, citation faithfulness
+│       ├── llm/generator.py
+│       └── ai/providers/            # mock, openai, groq, ollama
+├── frontend/src/
+│   ├── pages/                       # one page per route (Home, Safety, Privacy, …)
+│   ├── components/
+│   ├── context/
+│   ├── services/
+│   ├── types/
+│   └── utils/
+├── knowledge_base/sample_documents/
+├── data/                            # Chroma indexes (gitignored)
+├── evaluation/
+├── scripts/
+└── tests/
 ```
 
-`backend/src/api/main.py` re-exports `app.main:app` so older `uvicorn src.api.main:app` commands still work if `PYTHONPATH=backend`.
+`backend/src/api/main.py` re-exports `app.main:app` so `uvicorn src.api.main:app` still works with `PYTHONPATH=backend`.
+
+Duplicate wrapper packages (`app/ai`, `app/rag`, `app/safety`, `app/ingestion`) were removed. Call `src.*` directly.
+
+---
+
+## Connection vs models vs repositories
+
+| Layer | Folder | Responsibility |
+|---|---|---|
+| Connection | `app/connection/` | One Motor client, connect/disconnect, indexes |
+| Models | `app/models/` | Collection names, document builders, serializers |
+| Repositories | `app/repositories/` | Queries; every chat/message query includes `user_id` |
+| Schemas | `app/schemas/` | API JSON contracts (Pydantic) |
+| Services | `app/services/` | Auth cookies, titles, RAG orchestration |
+
+Do not create a new Mongo client per request. Use `get_db()` from `app.connection.mongodb`.
 
 ---
 
@@ -69,7 +103,7 @@ SSE event types: `status`, `token`, `citation`, `triage`, `metadata`, `done`.
 5. `audit_citation_faithfulness`
 6. Package `DiagnosisResponse` (`result_to_dict` for APIs)
 
-Evaluation scripts import this module directly and must keep working.
+Evaluation scripts import `src.*` and must keep working.
 
 ---
 
@@ -84,7 +118,7 @@ Evaluation scripts import this module directly and must keep working.
 | groq | `providers/groq.py` | OpenAI-compatible Groq API |
 | ollama | `providers/ollama.py` | Local HTTP at `OLLAMA_BASE_URL` |
 
-`config.resolve_llm_provider()` falls back to `mock` when a required cloud key is missing. Application code should keep using the registry rather than SDKs.
+`config.resolve_llm_provider()` falls back to `mock` when a required cloud key is missing.
 
 To add a provider: implement `generate` and `stream`, then register the class in `_PROVIDERS`.
 
@@ -104,16 +138,13 @@ To add a provider: implement `generate` and `stream`, then register the class in
 
 ```
 frontend/src/
-  main.tsx, App.tsx
+  pages/       Home, Login, Register, Chat, ChatHistory, Profile, Privacy, Safety, NotFound
+  components/  navbar, footer, chat, medical, auth, common
   context/     AuthContext, ChatContext, AppContext
-  services/    api.ts (credentials + SSE), auth.ts, chat.ts, diagnosis.ts
-  pages/       Home, Login, Register, Chat, ChatHistory, Profile, Privacy/Safety, 404
-  components/  navbar, footer, chat sidebar, medical triage, common controls
+  services/    api.ts, auth.ts, chat.ts, diagnosis.ts
 ```
 
-Auth bootstrap: show a full-page spinner until `/auth/me` (and optional refresh) finishes. Guest routes `/login` and `/register` redirect to `/chat` when a session exists. Protected routes redirect to `/login`.
-
-ChatContext owns chat list, active messages, streaming, rename, and delete. Components do not call `fetch` directly.
+Auth bootstrap: full-page spinner until `/auth/me` finishes. Guest routes redirect to `/chat` when signed in. Protected routes redirect to `/login`.
 
 ---
 

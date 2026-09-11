@@ -38,38 +38,41 @@ export function ChatInput({
   }
 
   return (
-    <form onSubmit={submit} className="border-t border-teal-100 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-        {STARTERS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            className="shrink-0 rounded-full border border-teal-100 bg-teal-50 px-3 py-1 text-xs font-bold text-teal-900"
-            onClick={() => setValue(item)}
-          >
-            {item.slice(0, 28)}...
-          </button>
-        ))}
-      </div>
-      <div className="flex items-end gap-2">
-        <Textarea
-          label="Describe your symptoms"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={onKeyDown}
-          rows={3}
-          placeholder="Describe your symptoms in your own words..."
-          disabled={disabled && !streaming}
-        />
-        {streaming ? (
-          <Button type="button" variant="danger" onClick={onStop} aria-label="Stop generating">
-            <Square size={16} />
-          </Button>
-        ) : (
-          <Button type="submit" disabled={disabled || !value.trim()} aria-label="Send message">
-            <Send size={16} />
-          </Button>
-        )}
+    <form onSubmit={submit} className="border-t border-teal-100/80 bg-white/90 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
+          {STARTERS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              className="shrink-0 rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-900 hover:bg-teal-100"
+              onClick={() => setValue(item)}
+            >
+              {item.slice(0, 32)}...
+            </button>
+          ))}
+        </div>
+        <div className="flex items-end gap-2 rounded-[1.6rem] border border-teal-100 bg-white p-2 shadow-sm">
+          <Textarea
+            label="Describe your symptoms"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={onKeyDown}
+            rows={2}
+            placeholder="Describe your symptoms in your own words..."
+            disabled={disabled && !streaming}
+            className="border-0 bg-transparent px-3 py-2 shadow-none focus:border-0 focus:ring-0"
+          />
+          {streaming ? (
+            <Button type="button" variant="danger" className="mb-1 h-11 w-11 shrink-0 rounded-full px-0" onClick={onStop} aria-label="Stop generating">
+              <Square size={16} />
+            </Button>
+          ) : (
+            <Button type="submit" className="mb-1 h-11 w-11 shrink-0 rounded-full px-0" disabled={disabled || !value.trim()} aria-label="Send message">
+              <Send size={16} />
+            </Button>
+          )}
+        </div>
       </div>
     </form>
   );

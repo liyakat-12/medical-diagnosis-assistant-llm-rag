@@ -172,9 +172,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 ),
               );
             }
-            if (event.type === "citation" && event.citations) {
+            if (event.type === "citation") {
               setMessages((current) =>
-                current.map((item) => (item.id === assistantId ? { ...item, citations: event.citations || [] } : item)),
+                current.map((item) =>
+                  item.id === assistantId
+                    ? {
+                        ...item,
+                        citations: event.citations || item.citations,
+                        possible_conditions: event.possible_conditions || item.possible_conditions,
+                      }
+                    : item,
+                ),
               );
             }
             if (event.type === "triage") {

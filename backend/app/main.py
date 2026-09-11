@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core import config
-from app.db.indexes import ensure_indexes
-from app.db.mongodb import connect, disconnect
+from app.connection.indexes import ensure_indexes
+from app.connection.mongodb import connect, disconnect
 from app.services.auth_service import seed_demo_user
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")

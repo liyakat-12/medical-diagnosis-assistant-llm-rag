@@ -4,7 +4,7 @@ from fastapi import APIRouter, Cookie, Depends, Response
 
 from app.core import config
 from app.core.dependencies import get_current_user
-from app.db.repositories import user_repository
+from app.repositories import user_repository
 from app.schemas.auth import LoginRequest, RegisterRequest, UserResponse
 from app.services import auth_service
 

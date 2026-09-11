@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.core.dependencies import get_current_user
-from app.db.repositories import user_repository
+from app.repositories import user_repository
 from app.schemas.auth import ProfileUpdateRequest, UserResponse
 
 router = APIRouter(prefix="/users", tags=["users"])

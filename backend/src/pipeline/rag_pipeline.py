@@ -32,6 +32,9 @@ from src.safety.guardrails import (
 )
 from src.safety.triage import TriageResult, classify_triage
 
+OUTCOME_LIMIT = 4
+OUTCOME_SEARCH_K = 12
+
 
 _REC_HINT = re.compile(
     r"\b(self-care|rest|fluid|see a doctor|seek|consult|emergency|monitor|"
@@ -51,6 +54,7 @@ class DiagnosisResponse:
     faithfulness: FaithfulnessAudit | None = None
     disclaimer: str = config.DISCLAIMER
     recommendations: list[str] = field(default_factory=list)
+    possible_conditions: list[dict] = field(default_factory=list)
 
 
 def _recommendations(triage: TriageResult | None, evidence: list[Evidence]) -> list[str]:
@@ -73,6 +77,88 @@ def _recommendations(triage: TriageResult | None, evidence: list[Evidence]) -> l
 
 def _format_context_block(ev: Evidence, index: int) -> str:
     return f"[{index}] Source: {ev.title} ({ev.source})\n{ev.text}"
+
+
+def _pretty_condition(value: str) -> str:
+    text = (value or "").strip()
+    if not text:
+        return "Possible match"
+    if "_" in text and " " not in text:
+        text = text.replace("_", " ")
+    return text
+
+
+def match_percents(scores: list[float]) -> list[int]:
+    """Turn retrieval scores into whole percentages that add up to 100."""
+    if not scores:
+        return []
+    cleaned = [max(0.0, float(score)) for score in scores]
+    total = sum(cleaned)
+    if total <= 0:
+        n = len(cleaned)
+        base = [100 // n] * n
+        for i in range(100 % n):
+            base[i] += 1
+        return base
+    raw = [score / total * 100 for score in cleaned]
+    floors = [int(value) for value in raw]
+    leftover = 100 - sum(floors)
+    if leftover > 0:
+        order = sorted(range(len(raw)), key=lambda i: (raw[i] - floors[i], raw[i]), reverse=True)
+        for i in order[:leftover]:
+            floors[i] += 1
+    elif leftover < 0:
+        order = sorted(range(len(raw)), key=lambda i: (raw[i] - floors[i], raw[i]))
+        for i in order[: -leftover]:
+            if floors[i] > 0:
+                floors[i] -= 1
+    return floors
+
+
+def citations_from_evidence(evidence: list[Evidence]) -> list[dict]:
+    return [
+        {
+            "title": ev.title,
+            "source": ev.source,
+            "url": ev.url,
+            "condition": ev.condition,
+            "relevance_score": round(ev.relevance_score, 4),
+        }
+        for ev in evidence
+    ]
+
+
+def build_possible_conditions(citations: list[dict], limit: int = OUTCOME_LIMIT) -> list[dict]:
+    seen: set[str] = set()
+    rows: list[dict] = []
+    for item in citations:
+        key = (item.get("condition") or item.get("title") or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        rows.append(
+            {
+                "condition": _pretty_condition(str(item.get("condition") or item.get("title") or "Condition")),
+                "title": item.get("title") or "",
+                "source": item.get("source") or "",
+                "url": item.get("url") or "",
+                "relevance_score": item.get("relevance_score") or 0.0,
+            }
+        )
+        if len(rows) >= limit:
+            break
+    percents = match_percents([float(row.get("relevance_score") or 0) for row in rows])
+    for row, percent in zip(rows, percents):
+        row["match_percent"] = percent
+    return rows
+
+
+def outcomes_for_query(query: str, citations: list[dict], embedding_mode: str | None = None) -> list[dict]:
+    rows = build_possible_conditions(citations)
+    if len(rows) >= OUTCOME_LIMIT:
+        return rows
+    extra = retrieve(query, top_k=OUTCOME_SEARCH_K, mode=embedding_mode)
+    return build_possible_conditions(citations_from_evidence(extra))
 
 
 def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | None = None) -> DiagnosisResponse:
@@ -102,17 +188,7 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
     context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
     answer = generate_grounded_answer(query, context_blocks)
 
-    citations = [
-        {
-            "title": ev.title,
-            "source": ev.source,
-            "url": ev.url,
-            "condition": ev.condition,
-            "relevance_score": round(ev.relevance_score, 4),
-        }
-        for ev in evidence
-    ]
-
+    citations = citations_from_evidence(evidence)
     faithfulness = audit_citation_faithfulness(answer, citations)
 
     return DiagnosisResponse(
@@ -124,6 +200,7 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
         citations=citations,
         faithfulness=faithfulness,
         recommendations=_recommendations(triage, evidence),
+        possible_conditions=outcomes_for_query(query, citations, embedding_mode),
     )
 
 
@@ -136,7 +213,7 @@ def result_to_dict(result: DiagnosisResponse) -> dict:
         "citations": result.citations,
         "recommendations": result.recommendations,
         "disclaimer": result.disclaimer,
-        "possible_conditions": [],
+        "possible_conditions": result.possible_conditions or build_possible_conditions(result.citations),
         "triage": None,
         "faithfulness": None,
         "provider": config.resolve_llm_provider(),
@@ -150,21 +227,6 @@ def result_to_dict(result: DiagnosisResponse) -> dict:
         }
     if result.faithfulness is not None:
         payload["faithfulness"] = result.faithfulness.to_dict()
-    seen: set[str] = set()
-    for item in result.citations:
-        key = (item.get("condition") or item.get("title") or "").strip().lower()
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        payload["possible_conditions"].append(
-            {
-                "condition": item.get("condition") or item.get("title") or "Condition",
-                "title": item.get("title") or "",
-                "source": item.get("source") or "",
-                "url": item.get("url") or "",
-                "relevance_score": item.get("relevance_score") or 0.0,
-            }
-        )
     return payload
 
 
@@ -200,17 +262,9 @@ def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: s
             "guidance": triage.guidance,
         }
 
-    citations = [
-        {
-            "title": ev.title,
-            "source": ev.source,
-            "url": ev.url,
-            "condition": ev.condition,
-            "relevance_score": round(ev.relevance_score, 4),
-        }
-        for ev in evidence
-    ]
-    yield {"type": "citation", "citations": citations}
+    citations = citations_from_evidence(evidence)
+    possible_conditions = outcomes_for_query(query, citations, embedding_mode)
+    yield {"type": "citation", "citations": citations, "possible_conditions": possible_conditions}
 
     context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
     chunks: list[str] = []
@@ -228,6 +282,7 @@ def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: s
         citations=citations,
         faithfulness=faithfulness,
         recommendations=_recommendations(triage, evidence),
+        possible_conditions=possible_conditions,
     )
     payload = result_to_dict(result)
     yield {"type": "metadata", "recommendations": payload["recommendations"], "faithfulness": payload["faithfulness"]}

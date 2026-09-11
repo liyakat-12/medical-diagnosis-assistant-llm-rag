@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from src import config
 from src.pipeline.rag_pipeline import iter_pipeline_stream, result_to_dict, run_pipeline
 
-from app.db.repositories import chat_repository, message_repository
+from app.repositories import chat_repository, message_repository
 from app.services.chat_service import get_chat, make_title
 
 

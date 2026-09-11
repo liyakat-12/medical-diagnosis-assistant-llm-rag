@@ -4,8 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 from mongomock_motor import AsyncMongoMockClient
 
-from app.db import mongodb
-from app.db.indexes import ensure_indexes
+from app.connection import mongodb
+from app.connection.indexes import ensure_indexes
 from app.main import app
 from app.services.auth_service import seed_demo_user
 

@@ -78,7 +78,14 @@ The application never answers from the model alone in the live chat. Retrieval, 
 ```
 project-root/
 ├── backend/
-│   ├── app/                  # HTTP API, auth, MongoDB, chat services
+│   ├── app/
+│   │   ├── api/              # HTTP routes
+│   │   ├── core/             # config, security, errors
+│   │   ├── connection/       # MongoDB client and indexes
+│   │   ├── models/           # user, chat, message documents
+│   │   ├── repositories/     # database queries
+│   │   ├── schemas/          # API request/response models
+│   │   └── services/         # auth, chat, RAG orchestration
 │   └── src/                  # RAG, embeddings, retrieval, safety, LLM providers
 ├── frontend/                 # Vite + React + TypeScript
 ├── knowledge_base/           # Curated markdown documents

@@ -3,103 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MediAssist | Sign in</title>
+  <title>Login | MediAssist</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/app.css" />
 </head>
-<body class="min-h-screen bg-white text-slate-800">
-  <div class="relative grid min-h-screen lg:grid-cols-2">
-    <div class="seam" aria-hidden="true">
-      <span class="seam-line"></span>
-      <span class="seam-jewel">
-        <svg viewBox="0 0 96 40" fill="none">
-          <path class="pulse-path" d="M3 20 H22 L30 8 L38 32 L48 4 L58 24 L66 20 H93" />
-        </svg>
-      </span>
+<body class="min-h-screen bg-emerald-50 text-slate-800">
+  <header class="border-b border-emerald-100 bg-white">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/images/logo-mark.png" alt="MediAssist" class="h-10 w-10 rounded-xl object-cover" />
+        <span class="text-xl font-extrabold text-slate-900">MediAssist</span>
+      </a>
+      <nav id="nav-actions" class="flex items-center gap-2"></nav>
     </div>
+  </header>
 
-    <aside class="relative hidden min-h-screen overflow-hidden bg-teal-700 text-white plus-grid lg:flex lg:flex-col lg:justify-center lg:px-12 lg:py-12 lg:pr-16">
-      <div>
-        <div class="flex items-center gap-3">
-          <img src="/images/logo-mark.png" alt="" class="h-16 w-16 rounded-2xl object-cover shadow-lg" />
-          <div>
-            <p class="text-2xl font-extrabold tracking-tight">MediAssist</p>
-            <p class="text-base text-teal-100">Cited medical RAG assistant</p>
-          </div>
-        </div>
-
-        <p class="mt-8 text-xs font-extrabold uppercase tracking-[0.2em] text-teal-100">Clinical demo</p>
-        <h1 class="mt-3 max-w-lg text-[2rem] font-extrabold leading-tight tracking-tight">Short, grounded answers from trusted notes.</h1>
-        <p class="mt-3 max-w-lg text-[0.95rem] leading-6 text-teal-50">Patients describe symptoms in plain language. The system retrieves matching documents, checks urgency, and keeps every claim cited.</p>
-
-        <div class="mt-8 flex h-[26rem] items-stretch gap-4">
-          <img src="/images/hero-rag.png" alt="A person describing symptoms while medical documents are retrieved" class="h-full w-[62%] rounded-3xl object-cover shadow-2xl shadow-teal-950/30" />
-          <ul class="grid w-[38%] grid-rows-3 gap-2.5">
-            <li class="flex items-center gap-3 rounded-2xl bg-white/12 px-3.5 backdrop-blur-sm">
-              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/15 text-[11px] font-extrabold">01</span>
-              <p class="text-[13px] font-bold leading-snug text-white">Retrieval over 40 curated documents</p>
-            </li>
-            <li class="flex items-center gap-3 rounded-2xl bg-white/12 px-3.5 backdrop-blur-sm">
-              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/15 text-[11px] font-extrabold">02</span>
-              <p class="text-[13px] font-bold leading-snug text-white">Emergency and prescription safety</p>
-            </li>
-            <li class="flex items-center gap-3 rounded-2xl bg-white/12 px-3.5 backdrop-blur-sm">
-              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/15 text-[11px] font-extrabold">03</span>
-              <p class="text-[13px] font-bold leading-snug text-white">Citation faithfulness audit</p>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </aside>
-
-    <main class="flex min-h-screen items-center bg-white px-8 py-12 sm:px-14 lg:pl-16 lg:pr-16">
-      <div class="mx-auto w-full max-w-md lg:max-w-lg">
-        <div class="mb-8 flex items-center gap-3 lg:hidden">
-          <img src="/images/logo-mark.png" alt="" class="h-16 w-16 rounded-2xl object-cover" />
-          <div>
-            <p class="text-2xl font-extrabold text-teal-800">MediAssist</p>
-            <p class="text-sm text-slate-500">Sign in to continue</p>
-          </div>
-        </div>
-
-        <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-700">Patient portal</p>
-        <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">Welcome back</h2>
-        <p class="mt-2 mb-8 text-sm leading-6 text-slate-500">Sign in to check symptoms and see cited possible conditions.</p>
-
-        <div class="mb-6 grid grid-cols-2 rounded-full bg-emerald-50 p-1">
-          <button type="button" id="tab-login" class="tab is-on rounded-full bg-white py-2.5 text-sm font-bold text-teal-800 shadow-sm" data-mode="login">Sign in</button>
-          <button type="button" id="tab-register" class="tab rounded-full py-2.5 text-sm font-bold text-slate-500" data-mode="register">Create account</button>
-        </div>
-
-        <form id="auth-form" class="space-y-4" novalidate>
-          <label id="name-field" class="hidden block text-sm font-bold text-slate-600">
-            Full name
-            <input id="name" name="name" type="text" autocomplete="name" placeholder="Your name" class="mt-1.5 w-full rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/15" />
-          </label>
-          <label class="block text-sm font-bold text-slate-600">
-            Email
-            <input id="email" name="email" type="email" autocomplete="username" required placeholder="you@email.com" class="mt-1.5 w-full rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/15" />
-          </label>
-          <label class="block text-sm font-bold text-slate-600">
-            Password
-            <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••" class="mt-1.5 w-full rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/15" />
-          </label>
-          <p id="auth-error" class="hidden text-sm font-semibold text-rose-600"></p>
-          <button type="submit" id="auth-submit" class="w-full rounded-full bg-teal-700 py-3 text-sm font-extrabold text-white shadow-lg shadow-teal-700/20 hover:bg-teal-800">Enter clinic</button>
-        </form>
-
-        <div class="mt-6 flex items-center justify-between gap-4 rounded-2xl bg-emerald-50 px-5 py-4">
-          <div>
-            <p class="text-sm font-extrabold text-teal-800">Demo account</p>
-            <p class="mt-0.5 font-mono text-xs text-slate-600">demo@clinic.local · demo123</p>
-          </div>
-          <button type="button" id="fill-demo" class="shrink-0 rounded-full border border-teal-200 bg-white px-4 py-2 text-xs font-bold text-teal-800">Use demo</button>
-        </div>
-      </div>
-    </main>
-  </div>
+  <main class="flex min-h-[calc(100vh-4.25rem)] items-center justify-center px-5 py-12">
+    <form id="auth-form" data-mode="login" class="w-full max-w-md space-y-4 rounded-3xl bg-white p-8 shadow-sm" novalidate>
+      <h1 class="text-2xl font-extrabold text-slate-900">Login</h1>
+      <label class="block text-sm font-bold text-slate-600">
+        Email
+        <input id="email" name="email" type="email" autocomplete="username" required class="mt-1.5 w-full rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/15" />
+      </label>
+      <label class="block text-sm font-bold text-slate-600">
+        Password
+        <input id="password" name="password" type="password" autocomplete="current-password" required class="mt-1.5 w-full rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/15" />
+      </label>
+      <p id="auth-error" class="hidden text-sm font-semibold text-rose-600"></p>
+      <button type="submit" id="auth-submit" class="w-full rounded-full bg-teal-700 py-3 text-sm font-extrabold text-white hover:bg-teal-800">Login</button>
+      <p class="text-center text-sm text-slate-500">No account? <a href="/register" class="font-bold text-teal-800">Register</a></p>
+    </form>
+  </main>
+  <script src="/js/nav.js"></script>
   <script src="/js/auth.js"></script>
 </body>
 </html>

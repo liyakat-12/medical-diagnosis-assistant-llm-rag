@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(ROOT_DIR / "backend"))
 
 from src import config
 from src.retrieval.vector_store import VectorStore

@@ -24,8 +24,10 @@ Every condition you mention must be followed by a citation in the form (Source: 
 3. Never provide a specific drug name, dose, or prescription. If asked, refuse and \
 recommend consulting a doctor or pharmacist.
 4. Never claim certainty. Use language like "may be" or "one possible match is".
-5. Keep the whole answer under 60 words. List at most 3 conditions. One short line each.
-6. End with this exact line: Not a diagnosis — see a clinician if needed.
+5. Keep the whole answer under 80 words. List at most 3 conditions. One short line each.
+6. Then add 2 short recommendation lines on what to do next, grounded in the context \
+(rest, fluids, when to see a doctor). Never give a drug dose.
+7. End with this exact line: Not a diagnosis — see a clinician if needed.
 """
 
 NO_RAG_SYSTEM_PROMPT = """You are a medical assistant chatbot. Answer the user's \
@@ -44,7 +46,8 @@ def _build_user_prompt(query: str, context_blocks: list[str]) -> str:
         f"Reference context (each block is a passage from a cited medical document):\n"
         f"{context}\n\n"
         f"User symptom description: {query}\n\n"
-        f"Using ONLY the context above, write a SHORT list of possible conditions with citations."
+        f"Using ONLY the context above, write a SHORT list of possible conditions with citations, "
+        f"then 2 short next-step recommendations from that context."
     )
 
 
@@ -85,6 +88,22 @@ def _call_mock(system_prompt: str, user_prompt: str, grounded: bool = True) -> s
     lines = ["Possible matches:"]
     for i, title in enumerate(titles[:3], start=1):
         lines.append(f"{i}. {title} (Source: {title}).")
+
+    recs: list[str] = []
+    for sent in re.split(r"(?<=[.!?])\s+", user_prompt):
+        text = sent.strip()
+        if len(text) < 35 or len(text) > 220:
+            continue
+        if not re.search(r"\b(self-care|rest|fluid|see a doctor|seek|consult|monitor)\b", text, re.I):
+            continue
+        if text not in recs:
+            recs.append(text)
+        if len(recs) == 2:
+            break
+    if recs:
+        lines.append("Recommendations:")
+        for rec in recs:
+            lines.append(f"- {rec}")
     lines.append("Not a diagnosis — see a clinician if needed.")
     return "\n".join(lines)
 
@@ -105,7 +124,7 @@ def _call_openai(system_prompt: str, user_prompt: str, model: str | None = None)
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.2,
-        max_tokens=160,
+        max_tokens=280,
     )
     return response.choices[0].message.content.strip()
 
@@ -129,7 +148,7 @@ def _call_groq(system_prompt: str, user_prompt: str, model: str | None = None) -
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.2,
-        max_tokens=160,
+        max_tokens=280,
     )
     return response.choices[0].message.content.strip()
 

@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(ROOT_DIR / "backend"))
 
 from src.ingestion.loader import build_chunks, chunk_text, load_documents
 from src.safety.citation_faithfulness import audit_citation_faithfulness

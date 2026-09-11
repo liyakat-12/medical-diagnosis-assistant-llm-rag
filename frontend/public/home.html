@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MediAssist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="min-h-screen bg-emerald-50 text-slate-800">
+  <header class="sticky top-0 z-10 border-b border-emerald-100 bg-white/95 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/images/logo-mark.png" alt="MediAssist" class="h-10 w-10 rounded-xl object-cover" />
+        <span class="text-xl font-extrabold text-slate-900">MediAssist</span>
+      </a>
+      <nav id="nav-actions" class="flex items-center gap-2"></nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-5 py-14">
+    <section class="grid items-center gap-10 lg:grid-cols-2">
+      <div>
+        <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-700">Medical diagnosis assistant</p>
+        <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">Cited symptom guidance from a trusted knowledge base.</h1>
+        <p class="mt-4 max-w-xl text-base leading-7 text-slate-600">Describe symptoms in plain language. The assistant retrieves matching documents, checks urgency, and keeps answers cited. It is an academic demo, not a medical device.</p>
+        <div class="mt-8 flex flex-wrap gap-3" id="home-cta">
+          <a href="/register" class="rounded-full bg-teal-700 px-6 py-3 text-sm font-extrabold text-white hover:bg-teal-800">Get started</a>
+          <a href="/login" class="rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-extrabold text-teal-800 hover:bg-emerald-50">Login</a>
+        </div>
+      </div>
+      <img src="/images/hero-rag.png" alt="Symptom description matched to medical documents" class="w-full rounded-[2rem] object-cover shadow-xl shadow-teal-900/10" />
+    </section>
+
+    <section class="mt-14 grid gap-6 sm:grid-cols-3">
+      <article class="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 class="text-base font-extrabold text-slate-900">Retrieval</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">Symptoms are matched to 40 curated medical notes, not guessed from model memory.</p>
+      </article>
+      <article class="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 class="text-base font-extrabold text-slate-900">Safety</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">Prescription requests are refused. Emergency wording is flagged for urgent care.</p>
+      </article>
+      <article class="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 class="text-base font-extrabold text-slate-900">Triage</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">Every answer is labelled self-care, see a clinician, or emergency.</p>
+      </article>
+    </section>
+  </main>
+  <script src="/js/nav.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!isLoggedIn()) return;
+      const cta = document.getElementById("home-cta");
+      if (!cta) return;
+      cta.innerHTML = `<a href="/chat" class="rounded-full bg-teal-700 px-6 py-3 text-sm font-extrabold text-white hover:bg-teal-800">Open chat</a>`;
+    });
+  </script>
+</body>
+</html>

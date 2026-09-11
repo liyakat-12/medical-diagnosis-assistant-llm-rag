@@ -19,11 +19,19 @@ app.use(
 );
 
 app.get("/", (_req, res) => {
+  res.sendFile(path.join(publicDir, "home.html"));
+});
+
+app.get("/login", (_req, res) => {
   res.sendFile(path.join(publicDir, "login.html"));
 });
 
-app.get("/app", (_req, res) => {
-  res.sendFile(path.join(publicDir, "index.html"));
+app.get("/register", (_req, res) => {
+  res.sendFile(path.join(publicDir, "register.html"));
+});
+
+app.get(["/chat", "/app"], (_req, res) => {
+  res.sendFile(path.join(publicDir, "chat.html"));
 });
 
 app.use(express.static(publicDir, { index: false }));

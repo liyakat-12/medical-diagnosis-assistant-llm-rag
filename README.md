@@ -84,22 +84,23 @@ for evaluation and viva defense.
 ## Project structure
 
 ```
-knowledge_base/sample_documents/   40 starter medical documents (markdown + citation front matter)
-src/
-  config.py                        Paths and settings (reads .env)
-  ingestion/loader.py              Parse documents, chunk text, attach citations
-  embeddings/embedding_models.py   General vs medical embedding wrappers
-  retrieval/vector_store.py        Chroma indexing + similarity search
-  retrieval/retriever.py           retrieve() → list[Evidence]
-  safety/guardrails.py             Emergency + prescription/dosage rules
-  safety/triage.py                 Guardrails + evidence → triage level
-  safety/citation_faithfulness.py  Post-generation claim vs source audit
-  llm/generator.py                 mock / Groq / OpenAI / Ollama + prompts
-  pipeline/rag_pipeline.py         Full flow → DiagnosisResponse
-  api/main.py                      FastAPI API (auth + /diagnose)
+backend/                           Python FastAPI API
+  src/
+    config.py                      Paths and settings (reads .env)
+    ingestion/loader.py            Parse documents, chunk text, attach citations
+    embeddings/embedding_models.py General vs medical embedding wrappers
+    retrieval/vector_store.py      Chroma indexing + similarity search
+    retrieval/retriever.py         retrieve() → list[Evidence]
+    safety/guardrails.py           Emergency + prescription/dosage rules
+    safety/triage.py               Guardrails + evidence → triage level
+    safety/citation_faithfulness.py Post-generation claim vs source audit
+    llm/generator.py               mock / Groq / OpenAI / Ollama + prompts
+    pipeline/rag_pipeline.py       Full flow → DiagnosisResponse
+    api/main.py                    Auth, /diagnose, and chat history
 frontend/                          Node.js + Express + Tailwind website
   server.js                        Serves UI and proxies /api → FastAPI
-  public/                          login.html, index.html, js
+  public/                          home, login, register, chat pages
+knowledge_base/sample_documents/   40 starter medical documents (markdown + citation front matter)
 scripts/
   generate_sample_kb.py            (Re)generate the 40 starter documents
   build_index.py                   Build / rebuild both Chroma indexes
@@ -261,6 +262,7 @@ You need **two** terminals: the Python API, then the website.
 **Terminal 1 — API**
 
 ```powershell
+$env:PYTHONPATH = "backend"
 uvicorn src.api.main:app --reload --port 8000
 ```
 
@@ -277,8 +279,8 @@ Then open **http://localhost:3000**
 
 - Sign in with `demo@clinic.local` / `demo123`
 - Or create a new account
-- Example symptoms sit **below** the text box
-- The answer is short; matching conditions are listed under it
+- Open **Chat** from the navbar to describe symptoms
+- Past conversations appear in the left sidebar
 
 Windows shortcut: double-click `run_full.bat` (starts both).
 
@@ -323,7 +325,7 @@ falls back to `mock`.
 3. `py -3.11 -m venv venv` → activate → `pip install -r requirements.txt`
 4. `copy .env.example .env` and keep `LLM_PROVIDER=mock`
 5. `python scripts\build_index.py`
-6. Start API: `uvicorn src.api.main:app --port 8000`
+6. Start API: `$env:PYTHONPATH="backend"; uvicorn src.api.main:app --port 8000`
 7. Start website: `cd frontend` → `npm install` → `npm run build:css` → `npm start`
 8. Open http://localhost:3000
 

@@ -19,7 +19,7 @@ import pandas as pd
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(ROOT_DIR / "backend"))
 
 from src import config
 from src.safety.guardrails import check_emergency

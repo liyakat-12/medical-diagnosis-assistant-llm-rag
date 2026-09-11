@@ -2,7 +2,8 @@
 FastAPI backend exposing the RAG pipeline over HTTP.
 
 Website (Express + Tailwind): http://localhost:3000
-API:
+API (from project root):
+    set PYTHONPATH=backend
     uvicorn src.api.main:app --reload --port 8000
 """
 from __future__ import annotations
@@ -13,6 +14,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from src import config
+from src.api import chats
 from src.api.auth import (
     LoginIn,
     RegisterIn,
@@ -30,7 +32,7 @@ from src.pipeline.rag_pipeline import run_pipeline
 app = FastAPI(
     title="Medical Diagnosis Assistant API",
     description="LLM + RAG pipeline for symptom-based condition suggestions with triage and safety guardrails.",
-    version="1.2.0",
+    version="1.3.0",
 )
 
 app.add_middleware(
@@ -104,6 +106,34 @@ class DiagnoseResponse(BaseModel):
     possible_conditions: list[ConditionOut] = []
     faithfulness: FaithfulnessOut | None = None
     disclaimer: str
+    recommendations: list[str] = []
+
+
+class ChatSummaryOut(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+
+
+class ChatMessageOut(BaseModel):
+    role: str
+    content: str
+    created_at: str
+    result: DiagnoseResponse | None = None
+
+
+class ChatOut(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    messages: list[ChatMessageOut]
+
+
+class ChatMessageIn(BaseModel):
+    query: str
+    top_k: int | None = None
 
 
 def _unique_conditions(citations: list[dict]) -> list[ConditionOut]:
@@ -124,6 +154,57 @@ def _unique_conditions(citations: list[dict]) -> list[ConditionOut]:
             )
         )
     return out
+
+
+def _diagnose_response(query: str, top_k: int | None = None) -> DiagnoseResponse:
+    result = run_pipeline(query, top_k=top_k)
+    triage_out = (
+        TriageOut(
+            level=result.triage.level,
+            label=result.triage.label,
+            guidance=result.triage.guidance,
+            reason=result.triage.reason,
+        )
+        if result.triage
+        else None
+    )
+    faithfulness_out = None
+    if result.faithfulness is not None:
+        faithfulness_out = FaithfulnessOut(**result.faithfulness.to_dict())
+
+    return DiagnoseResponse(
+        query=result.query,
+        refused=result.refused,
+        refusal_reason=result.refusal_reason,
+        triage=triage_out,
+        answer=result.answer,
+        citations=[CitationOut(**c) for c in result.citations],
+        possible_conditions=_unique_conditions(result.citations),
+        faithfulness=faithfulness_out,
+        disclaimer=result.disclaimer,
+        recommendations=list(result.recommendations or []),
+    )
+
+
+def _chat_out(chat: dict) -> ChatOut:
+    messages = []
+    for item in chat.get("messages") or []:
+        result = item.get("result")
+        messages.append(
+            ChatMessageOut(
+                role=item.get("role") or "assistant",
+                content=item.get("content") or "",
+                created_at=item.get("created_at") or "",
+                result=DiagnoseResponse(**result) if result else None,
+            )
+        )
+    return ChatOut(
+        id=chat["id"],
+        title=chat.get("title") or "New chat",
+        created_at=chat.get("created_at") or "",
+        updated_at=chat.get("updated_at") or "",
+        messages=messages,
+    )
 
 
 @app.get("/")
@@ -174,29 +255,33 @@ def logout(creds: HTTPAuthorizationCredentials | None = Depends(_optional_bearer
 
 @app.post("/diagnose", response_model=DiagnoseResponse)
 def diagnose(request: DiagnoseRequest, user: dict = Depends(require_user)) -> DiagnoseResponse:
-    result = run_pipeline(request.query, top_k=request.top_k)
-    triage_out = (
-        TriageOut(
-            level=result.triage.level,
-            label=result.triage.label,
-            guidance=result.triage.guidance,
-            reason=result.triage.reason,
-        )
-        if result.triage
-        else None
-    )
-    faithfulness_out = None
-    if result.faithfulness is not None:
-        faithfulness_out = FaithfulnessOut(**result.faithfulness.to_dict())
+    return _diagnose_response(request.query, request.top_k)
 
-    return DiagnoseResponse(
-        query=result.query,
-        refused=result.refused,
-        refusal_reason=result.refusal_reason,
-        triage=triage_out,
-        answer=result.answer,
-        citations=[CitationOut(**c) for c in result.citations],
-        possible_conditions=_unique_conditions(result.citations),
-        faithfulness=faithfulness_out,
-        disclaimer=result.disclaimer,
-    )
+
+@app.get("/chats", response_model=list[ChatSummaryOut])
+def list_chats(user: dict = Depends(require_user)) -> list[ChatSummaryOut]:
+    return [ChatSummaryOut(**item) for item in chats.list_chats(user["email"])]
+
+
+@app.post("/chats", response_model=ChatOut)
+def new_chat(user: dict = Depends(require_user)) -> ChatOut:
+    return _chat_out(chats.create_chat(user["email"]))
+
+
+@app.get("/chats/{chat_id}", response_model=ChatOut)
+def read_chat(chat_id: str, user: dict = Depends(require_user)) -> ChatOut:
+    return _chat_out(chats.get_chat(user["email"], chat_id))
+
+
+@app.post("/chats/{chat_id}/messages", response_model=ChatOut)
+def send_chat_message(
+    chat_id: str,
+    request: ChatMessageIn,
+    user: dict = Depends(require_user),
+) -> ChatOut:
+    query = (request.query or "").strip()
+    if not query:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Enter a message.")
+    result = _diagnose_response(query, request.top_k)
+    chat = chats.append_turn(user["email"], chat_id, query, result.model_dump())
+    return _chat_out(chat)

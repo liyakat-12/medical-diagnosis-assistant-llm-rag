@@ -19,6 +19,7 @@ Flow for a single user query:
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from src import config
@@ -32,6 +33,13 @@ from src.safety.guardrails import (
 from src.safety.triage import TriageResult, classify_triage
 
 
+_REC_HINT = re.compile(
+    r"\b(self-care|rest|fluid|see a doctor|seek|consult|emergency|monitor|"
+    r"stay home|humidifier|saline|ice|do not|book|call)\b",
+    re.I,
+)
+
+
 @dataclass
 class DiagnosisResponse:
     query: str
@@ -42,6 +50,25 @@ class DiagnosisResponse:
     citations: list[dict] = field(default_factory=list)
     faithfulness: FaithfulnessAudit | None = None
     disclaimer: str = config.DISCLAIMER
+    recommendations: list[str] = field(default_factory=list)
+
+
+def _recommendations(triage: TriageResult | None, evidence: list[Evidence]) -> list[str]:
+    items: list[str] = []
+    if triage and triage.guidance:
+        items.append(triage.guidance)
+    for ev in evidence[:2]:
+        for sent in re.split(r"(?<=[.!?])\s+", ev.text or ""):
+            text = sent.strip()
+            if len(text) < 35 or len(text) > 320:
+                continue
+            if not _REC_HINT.search(text):
+                continue
+            if text not in items:
+                items.append(text)
+            if len(items) >= 4:
+                return items
+    return items
 
 
 def _format_context_block(ev: Evidence, index: int) -> str:
@@ -62,6 +89,7 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
             answer=PRESCRIPTION_REFUSAL_MESSAGE,
             citations=[],
             faithfulness=None,
+            recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
         )
 
     # --- Retrieval ---
@@ -95,6 +123,7 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
         answer=answer,
         citations=citations,
         faithfulness=faithfulness,
+        recommendations=_recommendations(triage, evidence),
     )
 
 

@@ -22,6 +22,7 @@ DATA_DIR = ROOT_DIR / "data"
 PROCESSED_DIR = DATA_DIR / "processed"
 VECTOR_STORE_GENERAL_DIR = DATA_DIR / "vector_store_general"
 VECTOR_STORE_MEDICAL_DIR = DATA_DIR / "vector_store_medical"
+USERS_PATH = DATA_DIR / "users.json"
 EVAL_DATASETS_DIR = ROOT_DIR / "evaluation" / "datasets"
 EVAL_RESULTS_DIR = ROOT_DIR / "evaluation" / "results"
 

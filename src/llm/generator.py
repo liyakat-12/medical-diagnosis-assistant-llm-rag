@@ -23,12 +23,9 @@ Every condition you mention must be followed by a citation in the form (Source: 
 2. If the context does not support a confident answer, say so plainly instead of guessing.
 3. Never provide a specific drug name, dose, or prescription. If asked, refuse and \
 recommend consulting a doctor or pharmacist.
-4. Never claim certainty. Use language like "may be", "is commonly associated with", \
-"one possible explanation is".
-5. Always keep your answer concise: a short list of 2-4 possible conditions maximum, \
-each with a one-sentence rationale and its citation.
-6. End every answer with a one-line reminder that this is not a diagnosis and a \
-professional should be consulted.
+4. Never claim certainty. Use language like "may be" or "one possible match is".
+5. Keep the whole answer under 60 words. List at most 3 conditions. One short line each.
+6. End with this exact line: Not a diagnosis — see a clinician if needed.
 """
 
 NO_RAG_SYSTEM_PROMPT = """You are a medical assistant chatbot. Answer the user's \
@@ -47,7 +44,7 @@ def _build_user_prompt(query: str, context_blocks: list[str]) -> str:
         f"Reference context (each block is a passage from a cited medical document):\n"
         f"{context}\n\n"
         f"User symptom description: {query}\n\n"
-        f"Using ONLY the context above, list the possible conditions with citations."
+        f"Using ONLY the context above, write a SHORT list of possible conditions with citations."
     )
 
 
@@ -66,11 +63,8 @@ def _call_mock(system_prompt: str, user_prompt: str, grounded: bool = True) -> s
     """
     if not grounded:
         return (
-            "Based on common medical knowledge alone (no documents retrieved), "
-            "these symptoms could relate to several conditions such as a viral "
-            "illness, allergy, or another common cause. Without retrieval, this "
-            "answer cannot cite a trusted source and may be incomplete or incorrect.\n\n"
-            "This is not a diagnosis — please consult a qualified healthcare professional."
+            "No documents were retrieved, so this answer cannot be cited.\n"
+            "Not a diagnosis — see a clinician if needed."
         )
 
     # Pull titles from context blocks that look like: [n] Source: Title (...)
@@ -83,26 +77,15 @@ def _call_mock(system_prompt: str, user_prompt: str, grounded: bool = True) -> s
 
     if not titles:
         return (
-            "I could not find enough supporting material in the knowledge base "
-            "for a confident answer. Please rephrase your symptoms or consult a doctor.\n\n"
-            "This is not a diagnosis — please consult a qualified healthcare professional."
+            "Not enough matching documents for a confident answer. "
+            "Please rephrase, or see a doctor.\n"
+            "Not a diagnosis — see a clinician if needed."
         )
 
-    lines = [
-        "Based on the retrieved medical references, possible explanations include:",
-        "",
-    ]
-    for i, title in enumerate(titles[:4], start=1):
-        lines.append(
-            f"{i}. One possible condition associated with these symptoms may be "
-            f"related to {title} (Source: {title})."
-        )
-    lines.extend(
-        [
-            "",
-            "This is not a diagnosis — please consult a qualified healthcare professional.",
-        ]
-    )
+    lines = ["Possible matches:"]
+    for i, title in enumerate(titles[:3], start=1):
+        lines.append(f"{i}. {title} (Source: {title}).")
+    lines.append("Not a diagnosis — see a clinician if needed.")
     return "\n".join(lines)
 
 
@@ -122,6 +105,7 @@ def _call_openai(system_prompt: str, user_prompt: str, model: str | None = None)
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.2,
+        max_tokens=160,
     )
     return response.choices[0].message.content.strip()
 
@@ -145,6 +129,7 @@ def _call_groq(system_prompt: str, user_prompt: str, model: str | None = None) -
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.2,
+        max_tokens=160,
     )
     return response.choices[0].message.content.strip()
 

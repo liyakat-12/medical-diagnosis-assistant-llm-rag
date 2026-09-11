@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MediAssist | Symptom check</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="min-h-screen bg-emerald-50 text-slate-800">
+  <header class="sticky top-0 z-10 border-b border-emerald-100/80 bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
+      <div class="flex items-center gap-3">
+        <img src="/images/logo-mark.png" alt="MediAssist" class="h-16 w-16 rounded-2xl object-cover shadow-sm" />
+        <div>
+          <p class="text-2xl font-extrabold text-slate-900">MediAssist</p>
+          <p class="text-base font-semibold text-slate-500">Professional RAG symptom check</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="user-chip" class="hidden rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold text-teal-800 sm:inline-block"></span>
+        <button type="button" id="logout" class="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-teal-800 hover:bg-emerald-50">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-5 py-8">
+    <section class="grid items-stretch gap-6 rounded-[2rem] bg-white p-6 shadow-xl shadow-teal-900/5 sm:p-8 lg:grid-cols-[1.15fr_0.85fr]">
+      <div>
+        <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-700">Symptom check</p>
+        <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">How are you feeling today?</h1>
+        <p class="mt-2 max-w-xl text-sm leading-6 text-slate-500">Describe symptoms in a few words. You will get a short assessment, then matching conditions below.</p>
+        <label class="sr-only" for="query">Describe your symptoms</label>
+        <textarea id="query" rows="4" placeholder="Example: burning when I pee and I need to go often" class="mt-5 w-full resize-y rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/15"></textarea>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <button type="button" id="submit" class="rounded-full bg-teal-700 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-teal-700/20 hover:bg-teal-800">Check symptoms</button>
+          <span id="status" class="hidden text-sm font-semibold text-slate-500"></span>
+        </div>
+      </div>
+      <img src="/images/symptom-check.png" alt="A short cited assessment appearing after a symptom check" class="hidden h-full min-h-[240px] w-full rounded-[1.6rem] object-cover lg:block" />
+    </section>
+
+    <section id="result" class="mt-8 hidden space-y-4"></section>
+
+    <section class="mt-8 grid gap-7 sm:grid-cols-3">
+      <article class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm">
+        <img src="/images/knowledge-base.png" alt="Medical documents being retrieved for citations" class="h-36 w-full object-cover" />
+        <div class="p-4">
+          <h2 class="text-sm font-extrabold text-slate-900">Retrieve notes</h2>
+          <p class="mt-1 text-xs leading-5 text-slate-500">Your symptoms are matched to trusted documents, not guessed from memory.</p>
+        </div>
+      </article>
+      <article class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm">
+        <img src="/images/safety-guard.png" alt="Safety checks blocking prescriptions and catching emergencies" class="h-36 w-full object-cover" />
+        <div class="p-4">
+          <h2 class="text-sm font-extrabold text-slate-900">Safety first</h2>
+          <p class="mt-1 text-xs leading-5 text-slate-500">Prescription requests are refused. Emergency wording forces urgent care.</p>
+        </div>
+      </article>
+      <article class="overflow-hidden rounded-[1.5rem] bg-white shadow-sm">
+        <img src="/images/triage-levels.png" alt="Self-care, clinic visit, and emergency urgency levels" class="h-36 w-full object-cover" />
+        <div class="p-4">
+          <h2 class="text-sm font-extrabold text-slate-900">Triage levels</h2>
+          <p class="mt-1 text-xs leading-5 text-slate-500">Every answer is labelled self-care, see a clinician, or emergency.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="mt-8" aria-label="Example symptoms">
+      <h2 class="text-lg font-extrabold text-slate-900">Common symptoms</h2>
+      <p class="mt-1 text-sm text-slate-500">These sit below the form. Tap one to fill the box above.</p>
+      <div id="examples" class="mt-4 flex flex-wrap gap-3"></div>
+    </section>
+  </main>
+
+  <footer class="px-5 pb-10 text-center text-xs font-semibold text-slate-500">
+    Academic demo only. Not a medical device. Always consult a licensed clinician.
+  </footer>
+  <script src="/js/app.js"></script>
+</body>
+</html>

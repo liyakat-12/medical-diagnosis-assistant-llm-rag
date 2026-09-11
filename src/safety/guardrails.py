@@ -98,11 +98,8 @@ def check_prescription_request(text: str) -> GuardrailResult:
 
 
 PRESCRIPTION_REFUSAL_MESSAGE = (
-    "I can't recommend specific drugs, doses, or prescriptions. Dosing depends on "
-    "your medical history, weight, allergies, and other medications, and getting it "
-    "wrong can be dangerous. Please ask a licensed doctor or pharmacist for that "
-    "part - I can still help explain general information about possible conditions "
-    "and when to seek care."
+    "I cannot suggest drugs or doses. Please ask a doctor or pharmacist — "
+    "dosing depends on your history, weight, allergies, and other medicines."
 )
 
 EMERGENCY_BANNER_MESSAGE = (

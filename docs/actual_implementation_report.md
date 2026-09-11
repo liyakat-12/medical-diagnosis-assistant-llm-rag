@@ -54,15 +54,15 @@ This project builds a working, code-level Medical Diagnosis Assistant that:
    at build time. The script is ready to run once an LLM is configured.
 
 **Scope actually built:**
-- 20 knowledge base documents (not 1,000-2,000). Documents were written by
+- 40 knowledge base documents (not 1,000-2,000). Documents were written by
   the project author in plain language for demonstration, each tagged with
   a real, checkable citation (organization name + URL) — not verbatim text
   scraped from MedQuAD/WHO/CDC. This is clearly documented as a "starter/demo
   corpus" in the project README, with instructions for extending it with
   real guideline excerpts.
-- These 20 documents were chunked into **22 passages** total (most documents
-  are short enough to remain a single chunk; only longer ones split into 2).
-- A REST API (FastAPI) and a chat UI (Streamlit), both working.
+- These 40 documents are chunked with a 120-word window (most stay as one
+  passage; longer ones split with overlap).
+- A REST API (FastAPI) and a website (Express + Tailwind), both working.
 - An evaluation module producing real metrics (not RAGAS - see Section V).
 
 **Importance**: identical rationale to the synopsis — grounding + citations +
@@ -108,7 +108,7 @@ LLM generator (src/llm/generator.py)
    │  - system prompt requires a citation "(Source: <title>)" on every claim
    │  - calls OpenAI or a local Ollama server, selected by one .env variable
    ▼
-DiagnosisResponse -> FastAPI /diagnose endpoint AND Streamlit chat UI
+DiagnosisResponse -> FastAPI /diagnose endpoint AND Express website
 ```
 
 There is **no separate offline/online split, no message queue, and no
@@ -128,7 +128,7 @@ background indexing job** — indexing is a single manual script
 | LLM | `src/llm/generator.py` | `_call_openai()` / `_call_ollama()`, selected by `LLM_PROVIDER` env var; two system prompts (grounded vs. ungrounded, the latter used only for the hallucination-comparison baseline) |
 | Pipeline | `src/pipeline/rag_pipeline.py` | `run_pipeline()` ties the above together into one `DiagnosisResponse` |
 | API | `src/api/main.py` | FastAPI app, `POST /diagnose`, `GET /health` |
-| UI | `app/streamlit_app.py` | Chat interface calling the pipeline in-process (no separate API call needed) |
+| UI | `frontend/` | Express + Tailwind website (login + symptom check), proxies `/api` to FastAPI |
 
 ### Data flow — what actually exists
 
@@ -167,11 +167,9 @@ A heart attack occurs when blood flow to part of the heart is blocked...
 | uvicorn | 0.30.6 | ASGI server |
 | pydantic | 2.9.2 | API request/response schemas |
 | python-dotenv | 1.0.1 | Loading `.env` config |
-| streamlit | 1.38.0 | Chat UI |
 | sentence-transformers | 3.2.1 | Both embedding models |
 | chromadb | 0.5.15 | Vector store (persistent, local) |
 | openai | 1.54.3 | OpenAI API calls |
-| pypdf | 5.0.1 | (available for future PDF ingestion; not used by current markdown-only loader) |
 | pandas | 2.2.3 | Evaluation datasets/results |
 | numpy | 1.26.4 | Embedding array handling |
 | scikit-learn | 1.5.2 | Precision/recall/F1/confusion matrix in `evaluate_triage.py` |
@@ -216,7 +214,7 @@ not an oversight.
 
 General-purpose embeddings outperformed the medical embeddings on this small,
 plain-language corpus — a genuine, reportable finding (PubMedBERT's advantage
-typically shows up on more clinically-worded text; the 20 starter documents
+typically shows up on more clinically-worded text; the 40 starter documents
 are deliberately written in patient-friendly language). This should replace
 any assumption in the synopsis that domain embeddings will necessarily win.
 
@@ -271,7 +269,7 @@ being configured — no further coding is required for that step. The most
 significant deviations from the original synopsis are: a custom lightweight
 orchestration instead of LlamaIndex, ChromaDB instead of FAISS, no BM25
 hybrid search or re-ranking stage, no SQLite/ERD-backed logging layer, and a
-20-document starter corpus rather than 1,000-2,000 passages — these should
+40-document starter corpus rather than 1,000-2,000 passages — these should
 either be reflected as "future work" in the synopsis, or flagged to your
 guide as intentional scope reduction for a project of this size.
 
@@ -282,6 +280,7 @@ guide as intentional scope reduction for a project of this size.
 - `pritamdeka/S-PubMedBert-MS-MARCO` model card — https://huggingface.co/pritamdeka/S-PubMedBert-MS-MARCO
 - `sentence-transformers/all-MiniLM-L6-v2` model card — https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
 - FastAPI documentation — https://fastapi.tiangolo.com/
-- Streamlit documentation — https://docs.streamlit.io/
+- Express documentation — https://expressjs.com/
+- Tailwind CSS documentation — https://tailwindcss.com/docs
 - OpenAI API reference — https://platform.openai.com/docs
 - Ollama documentation — https://ollama.com/

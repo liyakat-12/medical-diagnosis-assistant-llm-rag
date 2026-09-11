@@ -13,9 +13,8 @@ This is a research and academic demo. **It is not a medical device and does
 not replace a clinician.** See [Disclaimer](#disclaimer).
 
 **New laptop?** Start at [Run on another laptop](#run-on-another-laptop). You
-need **Python 3.11**, this project folder, and about **10–15 minutes** plus
-one model download (~500 MB). No Node.js. No paid API key if you keep
-`LLM_PROVIDER=mock`.
+need **Python 3.11**, **Node.js 18+**, this project folder, and about **10–15 minutes** plus
+one model download (~500 MB). No paid API key if you keep `LLM_PROVIDER=mock`.
 
 ---
 
@@ -59,7 +58,7 @@ Citation faithfulness audit (src/safety/citation_faithfulness.py)
    │  each claim: supported | no citation | citation not in retrieval
    │  verdict: pass | partial | fail
    ▼
-DiagnosisResponse → Streamlit chat UI  and  FastAPI POST /diagnose
+DiagnosisResponse → Express website (`/app`) via `/api/diagnose`
 ```
 
 Orchestration is **custom Python** (no LangChain) so every step is inspectable
@@ -76,8 +75,8 @@ for evaluation and viva defense.
 | Embeddings (medical) | `pritamdeka/S-PubMedBert-MS-MARCO` | PubMedBERT fine-tuned for semantic search |
 | Vector store | ChromaDB (local, persistent) | Two separate indexes: general and medical |
 | Language model | `mock` (offline), Groq, OpenAI, or Ollama | Mock works with no API key |
-| Backend | FastAPI | Typed REST: `/diagnose`, `/health` |
-| Frontend | Streamlit | Chat UI with triage, sources, faithfulness card |
+| Backend | FastAPI | Typed REST: `/diagnose`, `/health`, `/auth` |
+| Frontend | Node.js + Express + Tailwind CSS | Professional login + symptom checker on port 3000 |
 | Evaluation | pandas + scikit-learn | Recall@k, MRR, precision / recall / F1, citation coverage |
 
 ---
@@ -85,7 +84,7 @@ for evaluation and viva defense.
 ## Project structure
 
 ```
-knowledge_base/sample_documents/   20 starter medical documents (markdown + citation front matter)
+knowledge_base/sample_documents/   40 starter medical documents (markdown + citation front matter)
 src/
   config.py                        Paths and settings (reads .env)
   ingestion/loader.py              Parse documents, chunk text, attach citations
@@ -97,11 +96,12 @@ src/
   safety/citation_faithfulness.py  Post-generation claim vs source audit
   llm/generator.py                 mock / Groq / OpenAI / Ollama + prompts
   pipeline/rag_pipeline.py         Full flow → DiagnosisResponse
-  api/main.py                      FastAPI app
-app/streamlit_app.py               Chat UI
-.streamlit/config.toml             UI theme
+  api/main.py                      FastAPI API (auth + /diagnose)
+frontend/                          Node.js + Express + Tailwind website
+  server.js                        Serves UI and proxies /api → FastAPI
+  public/                          login.html, index.html, js
 scripts/
-  generate_sample_kb.py            (Re)generate the 20 starter documents
+  generate_sample_kb.py            (Re)generate the 40 starter documents
   build_index.py                   Build / rebuild both Chroma indexes
   smoke_test.py                    Quick end-to-end checks (no API key)
 evaluation/
@@ -154,10 +154,10 @@ are machine-specific and will break:
 
 | Copy | Do not copy |
 |---|---|
-| `src/`, `app/`, `knowledge_base/`, `scripts/`, `evaluation/`, `tests/`, `docs/` | `venv/` — recreate it on the new laptop |
+| `src/`, `frontend/`, `knowledge_base/`, `scripts/`, `evaluation/`, `tests/`, `docs/` | `venv/` — recreate it on the new laptop |
 | `requirements.txt`, `README.md`, `.env.example` | `.env` — recreate from `.env.example` (never commit keys) |
-| `run_ui.bat`, `run_api.bat` | `data/vector_store_*` — rebuild with `build_index.py` (optional to copy if you want to skip rebuild) |
-| `.streamlit/` | `__pycache__/`, `.pytest_cache/` |
+| `run_web.bat`, `run_api.bat`, `run_full.bat` | `data/vector_store_*` — rebuild with `build_index.py` (optional to copy if you want to skip rebuild) |
+| `frontend/package.json` | `__pycache__/`, `.pytest_cache/`, `frontend/node_modules/` |
 
 If you use OneDrive, copy the folder locally first (Desktop or `C:\projects\...`)
 so Python is not reading files through a sync lock.
@@ -168,7 +168,7 @@ so Python is not reading files through a sync lock.
 cd "C:\path\to\project MEDICAL DIAGNOSIS ASSISTANT USING LLM AND RAG"
 ```
 
-Confirm you see `requirements.txt` and `app\streamlit_app.py` in that folder.
+Confirm you see `requirements.txt` and `frontend\package.json` in that folder.
 
 ### Step 2 — Create a fresh virtual environment
 
@@ -208,7 +208,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-This installs FastAPI, Streamlit, sentence-transformers, ChromaDB, pandas,
+This installs FastAPI, sentence-transformers, ChromaDB, pandas,
 scikit-learn, pytest, and the other packages listed in `requirements.txt`.
 The first `pip install` can take several minutes (PyTorch is large).
 
@@ -246,7 +246,7 @@ python scripts\build_index.py
 macOS / Linux: `python scripts/build_index.py`
 
 This downloads two Hugging Face models (first time only, ~500 MB) and indexes
-the 20 documents into:
+the 40 documents into:
 
 - `data/vector_store_general/`
 - `data/vector_store_medical/`
@@ -254,19 +254,33 @@ the 20 documents into:
 Keep the terminal open until it finishes. After this, you can run the app
 offline with `LLM_PROVIDER=mock`.
 
-### Step 5 — Run the chat UI
+### Step 5 — Run the website (Node.js + Express)
 
-**Windows, easiest:** double-click `run_ui.bat`
+You need **two** terminals: the Python API, then the website.
 
-**Or from a terminal (venv must be active):**
+**Terminal 1 — API**
 
 ```powershell
-streamlit run app\streamlit_app.py
+uvicorn src.api.main:app --reload --port 8000
 ```
 
-macOS / Linux: `streamlit run app/streamlit_app.py`
+**Terminal 2 — website**
 
-Then open a browser at **http://localhost:8501**
+```powershell
+cd frontend
+npm install
+npm run build:css
+npm start
+```
+
+Then open **http://localhost:3000**
+
+- Sign in with `demo@clinic.local` / `demo123`
+- Or create a new account
+- Example symptoms sit **below** the text box
+- The answer is short; matching conditions are listed under it
+
+Windows shortcut: double-click `run_full.bat` (starts both).
 
 The **first** symptom you type can take 30–90 seconds (embedding model loads
 once). Later queries are faster.
@@ -278,20 +292,15 @@ python scripts\smoke_test.py
 python -m pytest tests\ -v
 ```
 
-### Optional — REST API
+### Optional — REST API notes
 
-The Streamlit UI does **not** need the API. Start the API only if you want
-`/diagnose`:
+The website is **Express on port 3000**. It proxies `/api` to FastAPI on port 8000.
 
-```powershell
-uvicorn src.api.main:app --reload --port 8000
-```
-
-- Docs: http://localhost:8000/docs
-- Health: `GET /health`
-- Diagnose: `POST /diagnose` with `{ "query": "I have a runny nose", "top_k": 4 }`
-
-Windows shortcut: double-click `run_api.bat`
+- Website: http://localhost:3000
+- API docs: http://localhost:8000/docs
+- Health: `GET http://localhost:8000/health`
+- Login: `POST /api/auth/login` with `{ "email": "demo@clinic.local", "password": "demo123" }`
+- Diagnose: `POST /api/diagnose` with header `Authorization: Bearer <token>`
 
 ### LLM options (optional)
 
@@ -309,12 +318,14 @@ falls back to `mock`.
 
 ### Quick checklist
 
-1. Install **Python 3.11** (Add to PATH)
-2. Copy the project folder (**not** `venv/`)
+1. Install **Python 3.11** and **Node.js 18+**
+2. Copy the project folder (**not** `venv/` or `frontend/node_modules/`)
 3. `py -3.11 -m venv venv` → activate → `pip install -r requirements.txt`
 4. `copy .env.example .env` and keep `LLM_PROVIDER=mock`
 5. `python scripts\build_index.py`
-6. `streamlit run app\streamlit_app.py` → http://localhost:8501
+6. Start API: `uvicorn src.api.main:app --port 8000`
+7. Start website: `cd frontend` → `npm install` → `npm run build:css` → `npm start`
+8. Open http://localhost:3000
 
 ### Troubleshooting
 
@@ -322,19 +333,19 @@ falls back to `mock`.
 |---|---|
 | `python` / `pip` not found | Use `py -3.11` and `py -3.11 -m pip`. Reinstall Python 3.11 with **Add to PATH**. |
 | `Activate.ps1` cannot be loaded | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
-| `npm run dev` / no `package.json` | Wrong command. This is Python. Use Streamlit, not npm. |
+| `npm` / Node not found | Install Node.js 18+ from https://nodejs.org then `cd frontend` → `npm install` |
 | `torch` / `chromadb` install error | You are on Python 3.13+. Install 3.11 and recreate `venv`. |
 | UI opens but first answer hangs | Normal. Models are loading. Wait up to ~2 minutes once. |
 | Empty or old-looking UI | Hard-refresh the browser (Ctrl+F5). Confirm venv is active. |
 | `ModuleNotFoundError` | Activate `venv`, then `pip install -r requirements.txt`. Run commands from the **project root**. |
 | Retrieval / Chroma errors | Run `python scripts\build_index.py` again on this laptop. |
-| Port 8501 already in use | Close the other Streamlit window, or run `streamlit run app\streamlit_app.py --server.port 8502` |
+| Port 3000 already in use | Close the other Node window, or run `$env:PORT=3001; npm start` from `frontend/` |
 
 ---
 
 ## How to demo
 
-Try these three queries in the chat UI:
+Try these three queries on **http://localhost:3000**:
 
 | Query | What you should see |
 |---|---|
@@ -365,7 +376,7 @@ python evaluation\evaluate_hallucination.py
 python evaluation\evaluate_e2e.py
 ```
 
-### Latest saved results (20-document starter corpus)
+### Latest saved results (20-query evaluation set; originally measured on the 20-document corpus)
 
 **Objective 3 — retrieval accuracy**
 
@@ -415,7 +426,7 @@ answer is a fixed template. For a stronger claim, rerun
 
 ## Extending the knowledge base
 
-The 20 files in `knowledge_base/sample_documents/` are **starter/demo
+The 40 files in `knowledge_base/sample_documents/` are **starter/demo
 content** written in plain language. They are not verbatim copies of any
 single source. Front matter names the organization whose public guidance
 informed the text, so citations shown to the user are real, checkable
@@ -451,7 +462,7 @@ python scripts\build_index.py
 
 ## Known limitations
 
-- The starter knowledge base has **20 conditions**. A real system needs a
+- The starter knowledge base has **40 conditions**. A real system needs a
   much larger, clinically reviewed corpus.
 - Emergency detection is **rule-based** (regex / keywords) on purpose, so it
   can be audited. It should be extended from missed real cases and validated

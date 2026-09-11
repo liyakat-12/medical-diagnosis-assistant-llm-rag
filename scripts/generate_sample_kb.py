@@ -408,6 +408,369 @@ or your local emergency number) or go to the nearest emergency department right 
 Do not leave the person alone, and remove access to means of self-harm if it is safe to
 do so while waiting for professional help.""",
     ),
+    (
+        "tuberculosis",
+        "Tuberculosis (TB)",
+        "CDC - Tuberculosis Symptoms",
+        "https://www.cdc.gov/tb/signs-symptoms/index.html",
+        "Tuberculosis",
+        "consult_doctor",
+        """Tuberculosis is a bacterial infection that most often affects the lungs. Typical
+symptoms include a cough lasting three weeks or more, coughing up blood or sputum,
+chest pain, night sweats, unexplained weight loss, fever, and tiredness. It spreads
+through the air when a person with active lung TB coughs or speaks.
+
+TB is not a simple cold. A clinician needs to confirm it with tests such as a chest
+X-ray and sputum samples, then prescribe a full course of combination antibiotics.
+Stopping treatment early can make the infection harder to treat.
+
+See a doctor promptly if a cough lasts more than three weeks, especially with night
+sweats or weight loss. Seek emergency care for severe breathing difficulty or coughing
+up large amounts of blood.""",
+    ),
+    (
+        "dengue_fever",
+        "Dengue Fever",
+        "CDC - Dengue Symptoms",
+        "https://www.cdc.gov/dengue/symptoms/index.html",
+        "Dengue Fever",
+        "consult_doctor",
+        """Dengue is a mosquito-borne viral illness. Common symptoms start suddenly and include
+high fever, severe headache, pain behind the eyes, muscle and joint pain, nausea, and
+sometimes a rash. Most people recover with rest and fluids, but a smaller group can
+progress to severe dengue with bleeding, persistent vomiting, or shock.
+
+There is no specific antiviral for dengue. Avoid aspirin and ibuprofen because they
+can increase bleeding risk; paracetamol is usually preferred for fever after a
+clinician advises it. Prevention focuses on mosquito bites.
+
+Consult a doctor if you have high fever after travel to, or living in, a dengue area.
+Seek emergency care for severe abdominal pain, persistent vomiting, bleeding gums,
+or feeling faint.""",
+    ),
+    (
+        "malaria",
+        "Malaria",
+        "WHO - Malaria Fact Sheet",
+        "https://www.who.int/news-room/fact-sheets/detail/malaria",
+        "Malaria",
+        "consult_doctor",
+        """Malaria is a parasite infection spread by Anopheles mosquitoes. Symptoms often include
+fever that comes in waves, chills, sweating, headache, muscle aches, and tiredness.
+They usually start 10 to 15 days after a bite, but can appear later.
+
+Malaria can become life-threatening, especially falciparum malaria, if treatment is
+delayed. Diagnosis needs a blood test. Treatment is prescription antimalarial medicine
+chosen by a clinician based on the parasite type and local resistance.
+
+See a doctor urgently for fever after travel to a malaria region, even if you took
+prevention tablets. Seek emergency care for confusion, seizures, difficulty breathing,
+or jaundice.""",
+    ),
+    (
+        "covid_19",
+        "COVID-19",
+        "CDC - COVID-19 Symptoms",
+        "https://www.cdc.gov/covid/signs-symptoms/index.html",
+        "COVID-19",
+        "consult_doctor",
+        """COVID-19 is a viral respiratory illness. Symptoms range from a mild cold-like illness
+to severe pneumonia. Common features include fever, cough, sore throat, runny nose,
+fatigue, body aches, loss of smell or taste, and shortness of breath.
+
+Many otherwise healthy people recover with rest, fluids, and isolation to protect
+others. People at higher risk, including older adults and those with heart, lung, or
+immune conditions, may need antiviral treatment started early.
+
+Consult a doctor if you are at higher risk or symptoms are not improving. Seek
+emergency care for trouble breathing, persistent chest pain, new confusion, or lips
+or face turning blue.""",
+    ),
+    (
+        "pneumonia",
+        "Pneumonia",
+        "CDC - Pneumonia Symptoms",
+        "https://www.cdc.gov/pneumonia/signs-symptoms.html",
+        "Pneumonia",
+        "consult_doctor",
+        """Pneumonia is an infection of the lung tissue, often causing cough with mucus, fever,
+chills, shortness of breath, and chest pain that worsens when you breathe in. It can
+follow a cold or flu, especially in older adults, young children, or people with
+chronic illness.
+
+A clinician may use a chest exam, oxygen check, and sometimes a chest X-ray.
+Antibiotics help if bacteria are the cause; viral pneumonia is managed supportively.
+
+See a doctor promptly for suspected pneumonia. Seek emergency care if you struggle to
+breathe, have blue lips, a very high fever, or become confused.""",
+    ),
+    (
+        "acute_bronchitis",
+        "Acute Bronchitis",
+        "Mayo Clinic - Bronchitis",
+        "https://www.mayoclinic.org/diseases-conditions/bronchitis/symptoms-causes/syc-20355566",
+        "Acute Bronchitis",
+        "consult_doctor",
+        """Acute bronchitis is inflammation of the large airways, usually after a viral cold.
+The main symptom is a cough that can last two to three weeks, sometimes with mucus,
+wheezing, and mild chest discomfort. Fever is usually low or absent.
+
+Most cases improve with rest, fluids, and steam or a humidifier. Antibiotics are
+rarely needed because viruses cause most acute bronchitis.
+
+Consult a doctor if the cough lasts more than three weeks, you cough up blood, you
+have a high fever, or you have known asthma or COPD and symptoms worsen.""",
+    ),
+    (
+        "chickenpox",
+        "Chickenpox (Varicella)",
+        "CDC - Chickenpox Symptoms",
+        "https://www.cdc.gov/chickenpox/signs-symptoms/index.html",
+        "Chickenpox",
+        "self_care",
+        """Chickenpox causes an itchy blister-like rash that appears in waves, often with fever
+and tiredness. Spots start on the chest, back, and face, then spread. It is very
+contagious until all blisters have crusted.
+
+In healthy children, care is usually rest, fluids, and itch relief. Do not give
+aspirin to children because of Reye syndrome risk. Adults, pregnant people, and those
+with weak immune systems are more likely to have complications.
+
+Stay home until lesions crust. See a doctor if you are pregnant, immunocompromised,
+or develop breathing trouble, a stiff neck, or a rash that looks infected.""",
+    ),
+    (
+        "measles",
+        "Measles",
+        "CDC - Measles Symptoms",
+        "https://www.cdc.gov/measles/symptoms/index.html",
+        "Measles",
+        "consult_doctor",
+        """Measles is a highly contagious viral illness. It usually starts with high fever,
+cough, runny nose, and red eyes, followed by a blotchy rash that starts on the face
+and spreads down the body. Tiny white spots may appear inside the mouth.
+
+There is no specific antiviral for most people; care is supportive. Measles can cause
+pneumonia, ear infections, and brain inflammation. Vaccination is the main protection.
+
+Call a doctor before visiting a clinic if you suspect measles, so they can prevent
+spread. Seek urgent care for trouble breathing, dehydration, or unusual sleepiness.""",
+    ),
+    (
+        "kidney_stones",
+        "Kidney Stones",
+        "NIDDK - Kidney Stones",
+        "https://www.niddk.nih.gov/health-information/urologic-diseases/kidney-stones",
+        "Kidney Stones",
+        "consult_doctor",
+        """Kidney stones are hard mineral deposits that can cause sudden, severe pain in the
+side or back, often radiating to the lower abdomen or groin. Other signs include
+blood in the urine, nausea, and a need to urinate often. Pain may come in waves.
+
+Small stones may pass with extra fluids and pain control advised by a clinician.
+Larger stones may need medication or a procedure. Do not ignore fever with stone
+pain, which can mean an infected blocked kidney.
+
+See a doctor for suspected kidney stone pain. Seek emergency care for fever and
+chills with flank pain, inability to urinate, or vomiting that prevents fluids.""",
+    ),
+    (
+        "conjunctivitis",
+        "Conjunctivitis (Pink Eye)",
+        "CDC - Conjunctivitis (Pink Eye)",
+        "https://www.cdc.gov/conjunctivitis/about/index.html",
+        "Conjunctivitis",
+        "self_care",
+        """Pink eye is inflammation of the thin lining of the eye. It can be viral, bacterial,
+or allergic. Symptoms include redness, itching or grittiness, watering, and sometimes
+sticky discharge that crusts overnight. Vision is usually not badly reduced.
+
+Viral and allergic cases often settle with hygiene and cool compresses. Bacterial
+cases may need antibiotic drops from a clinician. Wash hands often and avoid sharing
+towels.
+
+See a doctor if pain is severe, light hurts the eye, vision drops, or symptoms do not
+improve after a few days, especially in contact-lens wearers.""",
+    ),
+    (
+        "sinusitis",
+        "Sinusitis (Sinus Infection)",
+        "CDC - Sinus Infection (Sinusitis)",
+        "https://www.cdc.gov/sinus-infection/about/index.html",
+        "Sinusitis",
+        "self_care",
+        """Sinusitis is swelling of the sinus lining. It often follows a cold and causes facial
+pressure, blocked nose, thick nasal mucus, reduced smell, and pain in the forehead
+or cheeks that may worsen when you bend forward.
+
+Most sinus infections are viral and improve in 7 to 10 days with rest, fluids, saline
+rinses, and steam. Antibiotics help only when a bacterial infection is likely, such as
+symptoms lasting more than 10 days or a fever that returns after briefly improving.
+
+See a doctor if symptoms last more than 10 days, you have a high fever, swelling
+around the eyes, or a severe headache.""",
+    ),
+    (
+        "ear_infection",
+        "Middle Ear Infection (Otitis Media)",
+        "NIDCD - Ear Infections in Children",
+        "https://www.nidcd.nih.gov/health/ear-infections-children",
+        "Otitis Media",
+        "consult_doctor",
+        """A middle ear infection causes ear pain, fever, fussiness in children, and sometimes
+temporary hearing reduction. It often follows a cold. The eardrum may look red and
+bulging if a clinician examines it.
+
+Many mild cases improve on their own. Pain relief with age-appropriate paracetamol or
+ibuprofen helps. Some children need antibiotics, especially if they are very young or
+symptoms are severe.
+
+See a doctor for ear pain with high fever, discharge from the ear, or symptoms lasting
+more than two to three days. Seek urgent care for a stiff neck, severe swelling behind
+the ear, or a child who is unusually drowsy.""",
+    ),
+    (
+        "eczema",
+        "Atopic Dermatitis (Eczema)",
+        "NIAMS - Atopic Dermatitis",
+        "https://www.niams.nih.gov/health-topics/atopic-dermatitis",
+        "Eczema",
+        "self_care",
+        """Eczema is a long-term itchy skin condition. Patches are often dry, red, and very
+itchy, commonly in the bends of elbows and knees, on the neck, or on the face in
+infants. Scratching can break the skin and lead to infection.
+
+Daily moisturiser, short lukewarm baths, and avoiding known irritants such as harsh
+soaps help most people. A clinician may add steroid creams for flares.
+
+See a doctor if itching disrupts sleep, the rash is spreading, or you see yellow crust,
+pus, or fever, which can mean a skin infection.""",
+    ),
+    (
+        "constipation",
+        "Constipation",
+        "NIDDK - Constipation",
+        "https://www.niddk.nih.gov/health-information/digestive-diseases/constipation",
+        "Constipation",
+        "self_care",
+        """Constipation means bowel movements that are infrequent, hard, or difficult to pass.
+People may feel bloated or that they have not fully emptied. Common triggers include
+low fibre, low fluids, inactivity, some medicines, and ignoring the urge to go.
+
+Self-care includes drinking more water, eating fruit, vegetables, and whole grains,
+and staying active. Over-the-counter fibre or stool softeners can help for a short
+time if a pharmacist or clinician agrees they are suitable.
+
+See a doctor for constipation lasting more than two weeks, blood in the stool,
+unexplained weight loss, or severe abdominal pain.""",
+    ),
+    (
+        "hypothyroidism",
+        "Hypothyroidism (Underactive Thyroid)",
+        "Mayo Clinic - Hypothyroidism",
+        "https://www.mayoclinic.org/diseases-conditions/hypothyroidism/symptoms-causes/syc-20350284",
+        "Hypothyroidism",
+        "consult_doctor",
+        """An underactive thyroid slows many body processes. Symptoms build gradually and may
+include tiredness, feeling cold, weight gain, dry skin, constipation, low mood, and
+a puffy face. In women, periods may become heavier.
+
+Diagnosis needs a blood test for thyroid hormones. Treatment is usually a daily
+thyroid hormone tablet prescribed and adjusted by a clinician. It is not something
+to self-dose.
+
+See a doctor if you have several of these symptoms lasting weeks. Seek urgent care
+for severe drowsiness, very low temperature, or confusion, which are rare but serious.""",
+    ),
+    (
+        "gallstones",
+        "Gallstones",
+        "NIDDK - Gallstones",
+        "https://www.niddk.nih.gov/health-information/digestive-diseases/gallstones",
+        "Gallstones",
+        "consult_doctor",
+        """Gallstones are hard deposits in the gallbladder. Many cause no symptoms. When a stone
+blocks a duct, people get sudden pain in the upper right or middle abdomen, often after
+a fatty meal, sometimes with nausea. Pain may last 30 minutes to several hours.
+
+A clinician confirms gallstones with ultrasound. Recurring attacks may need surgery
+to remove the gallbladder. Do not ignore fever or yellowing of the skin with this pain.
+
+See a doctor for repeated upper abdominal attacks. Seek emergency care for pain with
+fever, yellow skin or eyes, or vomiting that will not stop.""",
+    ),
+    (
+        "heat_stroke",
+        "Heat Stroke",
+        "CDC - Heat Stress - Heat Stroke",
+        "https://www.cdc.gov/niosh/heat-stress/about/heat-stroke.html",
+        "Heat Stroke",
+        "emergency",
+        """Heat stroke is a medical emergency. Body temperature rises quickly, often above 40C
+(104F). Warning signs include confusion, slurred speech, loss of consciousness, hot
+skin that may be dry or wet, and seizures after heavy heat exposure or exertion.
+
+This is not ordinary heat exhaustion. Call emergency services immediately. Move the
+person to shade, cool them with water and fanning, and do not give fluids if they are
+unconscious.
+
+Never leave someone with suspected heat stroke to 'sleep it off'. Delay can cause
+permanent organ damage or death.""",
+    ),
+    (
+        "meningitis",
+        "Meningitis",
+        "CDC - Meningitis Signs and Symptoms",
+        "https://www.cdc.gov/meningitis/about/symptoms.html",
+        "Meningitis",
+        "emergency",
+        """Meningitis is inflammation of the membranes around the brain and spinal cord. Classic
+features include sudden fever, severe headache, stiff neck, dislike of bright light,
+vomiting, and confusion. A rash that does not fade when pressed can appear in some
+bacterial cases.
+
+Bacterial meningitis can become life-threatening within hours. Do not wait to see if
+it settles. Viral meningitis is usually less severe but still needs a clinical
+assessment.
+
+Seek emergency care immediately for fever with stiff neck, severe headache, a
+non-blanching rash, or rapidly worsening confusion.""",
+    ),
+    (
+        "bone_fracture",
+        "Broken Bone (Fracture)",
+        "NHS - Broken Arm or Wrist",
+        "https://www.nhs.uk/conditions/broken-arm-or-wrist/",
+        "Bone Fracture",
+        "emergency",
+        """A fracture is a break in a bone. Signs include sudden pain after a fall or blow,
+swelling, bruising, deformity, and inability to use the limb. The area may look out
+of place or the person may have heard a snap.
+
+Do not try to straighten a deformed limb. Support it, apply ice wrapped in cloth, and
+get urgent in-person care. An X-ray is needed to confirm the break.
+
+Go to emergency care for an open wound over the bone, numbness, a cold or pale limb,
+or any suspected break in the hip, pelvis, spine, or skull.""",
+    ),
+    (
+        "pulmonary_embolism",
+        "Pulmonary Embolism (Blood Clot in the Lung)",
+        "CDC - Venous Thromboembolism",
+        "https://www.cdc.gov/blood-clots/about/index.html",
+        "Pulmonary Embolism",
+        "emergency",
+        """A pulmonary embolism is a blood clot that travels to the lungs. Warning signs include
+sudden shortness of breath, sharp chest pain that worsens with a deep breath, coughing
+(sometimes with blood), a fast heart rate, and feeling faint. Risk is higher after
+surgery, long flights, or with a swollen painful calf (possible DVT).
+
+This is a medical emergency. Clot-dissolving or blood-thinning treatment in hospital
+can be life-saving. Do not wait to see if breathing 'settles'.
+
+Call emergency services for sudden unexplained breathlessness or chest pain, especially
+with a swollen leg.""",
+    ),
 ]
 
 

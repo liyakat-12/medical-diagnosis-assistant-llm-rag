@@ -9,18 +9,12 @@ uvicorn[standard]==0.30.6
 pydantic==2.9.2
 python-dotenv==1.0.1
 
-# Frontend
-streamlit==1.38.0
-
 # Embeddings & vector store
 sentence-transformers==3.2.1
 chromadb==0.5.15
 
 # LLM providers
 openai==1.54.3
-
-# Document processing
-pypdf==5.0.1
 
 # Data & evaluation
 pandas==2.2.3

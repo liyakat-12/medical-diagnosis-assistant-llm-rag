@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from src.api.auth import authenticate, create_session, seed_demo_user, user_from_token
+from app.core.security import hash_password, verify_password
+from app.services.chat_service import make_title
 
 
-def test_demo_account_logs_in(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.config.USERS_PATH", tmp_path / "users.json")
-    monkeypatch.setattr("src.config.DATA_DIR", tmp_path)
-    seed_demo_user()
-    user = authenticate("demo@clinic.local", "demo123")
-    assert user is not None
-    assert user["email"] == "demo@clinic.local"
-    assert authenticate("demo@clinic.local", "wrong-password") is None
+def test_password_hash_roundtrip():
+    digest = hash_password("demo1234")
+    assert digest != "demo1234"
+    assert verify_password("demo1234", digest)
+    assert not verify_password("wrong", digest)
 
 
-def test_session_token_roundtrip():
-    token = create_session({"name": "Asha", "email": "asha@test.local"})
-    user = user_from_token(token)
-    assert user["name"] == "Asha"
-    assert user_from_token("not-a-real-token") is None
+def test_make_title_shortens_symptom_text():
+    title = make_title("I have been having a headache behind my eyes for two days.")
+    assert "Headache" in title or "headache" in title.lower()
+    assert len(title) <= 60

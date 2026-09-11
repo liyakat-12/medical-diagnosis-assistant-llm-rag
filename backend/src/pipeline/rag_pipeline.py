@@ -23,7 +23,7 @@ import re
 from dataclasses import dataclass, field
 
 from src import config
-from src.llm.generator import generate_grounded_answer, generate_ungrounded_answer
+from src.llm.generator import generate_grounded_answer, generate_ungrounded_answer, stream_grounded_answer
 from src.retrieval.retriever import Evidence, retrieve
 from src.safety.citation_faithfulness import FaithfulnessAudit, audit_citation_faithfulness
 from src.safety.guardrails import (
@@ -125,6 +125,113 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
         faithfulness=faithfulness,
         recommendations=_recommendations(triage, evidence),
     )
+
+
+def result_to_dict(result: DiagnosisResponse) -> dict:
+    payload = {
+        "query": result.query,
+        "refused": result.refused,
+        "refusal_reason": result.refusal_reason,
+        "answer": result.answer,
+        "citations": result.citations,
+        "recommendations": result.recommendations,
+        "disclaimer": result.disclaimer,
+        "possible_conditions": [],
+        "triage": None,
+        "faithfulness": None,
+        "provider": config.resolve_llm_provider(),
+    }
+    if result.triage:
+        payload["triage"] = {
+            "level": result.triage.level,
+            "label": result.triage.label,
+            "guidance": result.triage.guidance,
+            "reason": result.triage.reason,
+        }
+    if result.faithfulness is not None:
+        payload["faithfulness"] = result.faithfulness.to_dict()
+    seen: set[str] = set()
+    for item in result.citations:
+        key = (item.get("condition") or item.get("title") or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        payload["possible_conditions"].append(
+            {
+                "condition": item.get("condition") or item.get("title") or "Condition",
+                "title": item.get("title") or "",
+                "source": item.get("source") or "",
+                "url": item.get("url") or "",
+                "relevance_score": item.get("relevance_score") or 0.0,
+            }
+        )
+    return payload
+
+
+def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: str | None = None):
+    """Yield SSE-friendly events while running the same RAG + safety flow."""
+    query = query.strip()
+    yield {"type": "status", "content": "Analyzing your symptoms..."}
+
+    prescription_check = check_prescription_request(query)
+    if prescription_check.triggered:
+        result = DiagnosisResponse(
+            query=query,
+            refused=True,
+            refusal_reason="prescription_or_dosage_request",
+            triage=None,
+            answer=PRESCRIPTION_REFUSAL_MESSAGE,
+            citations=[],
+            faithfulness=None,
+            recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
+        )
+        yield {"type": "token", "content": PRESCRIPTION_REFUSAL_MESSAGE}
+        yield {"type": "done", "result": result_to_dict(result)}
+        return
+
+    yield {"type": "status", "content": "Retrieving medical references..."}
+    evidence = retrieve(query, top_k=top_k, mode=embedding_mode)
+    triage = classify_triage(query, evidence)
+    if triage:
+        yield {
+            "type": "triage",
+            "level": triage.level,
+            "label": triage.label,
+            "guidance": triage.guidance,
+        }
+
+    citations = [
+        {
+            "title": ev.title,
+            "source": ev.source,
+            "url": ev.url,
+            "condition": ev.condition,
+            "relevance_score": round(ev.relevance_score, 4),
+        }
+        for ev in evidence
+    ]
+    yield {"type": "citation", "citations": citations}
+
+    context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
+    chunks: list[str] = []
+    for chunk in stream_grounded_answer(query, context_blocks):
+        chunks.append(chunk)
+        yield {"type": "token", "content": chunk}
+    answer = "".join(chunks).strip()
+    faithfulness = audit_citation_faithfulness(answer, citations)
+    result = DiagnosisResponse(
+        query=query,
+        refused=False,
+        refusal_reason=None,
+        triage=triage,
+        answer=answer,
+        citations=citations,
+        faithfulness=faithfulness,
+        recommendations=_recommendations(triage, evidence),
+    )
+    payload = result_to_dict(result)
+    yield {"type": "metadata", "recommendations": payload["recommendations"], "faithfulness": payload["faithfulness"]}
+    yield {"type": "done", "result": payload}
 
 
 def run_no_rag_baseline(query: str) -> str:

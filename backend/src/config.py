@@ -29,6 +29,31 @@ CHATS_PATH = DATA_DIR / "chats.json"
 EVAL_DATASETS_DIR = ROOT_DIR / "evaluation" / "datasets"
 EVAL_RESULTS_DIR = ROOT_DIR / "evaluation" / "results"
 
+# ---------------------------------------------------------------------------
+# App / auth / MongoDB
+# ---------------------------------------------------------------------------
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+APP_DEBUG = os.getenv("APP_DEBUG", "true").strip().lower() in {"1", "true", "yes"}
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://127.0.0.1:27017")
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "mediassist")
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-change-me")
+JWT_ACCESS_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_EXPIRE_MINUTES", "30"))
+JWT_REFRESH_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_EXPIRE_DAYS", "14"))
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
+COOKIE_SECURE = APP_ENV == "production"
+ACCESS_COOKIE = "mediassist_access"
+REFRESH_COOKIE = "mediassist_refresh"
+DEMO_EMAIL = os.getenv("DEMO_EMAIL", "demo@clinic.local")
+DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "demo123")
+DEMO_NAME = os.getenv("DEMO_NAME", "Demo Patient")
+
 for _dir in (PROCESSED_DIR, VECTOR_STORE_GENERAL_DIR, VECTOR_STORE_MEDICAL_DIR, EVAL_RESULTS_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
 

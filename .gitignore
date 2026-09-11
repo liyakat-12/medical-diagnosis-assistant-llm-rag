@@ -1,4 +1,7 @@
 # Environments
+.env
+.env.*
+!.env.example
 venv/
 .venv/
 env/
@@ -9,9 +12,14 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+coverage/
+htmlcov/
 
-# Secrets
-.env
+# Secrets / local user stores (legacy JSON auth)
 data/users.json
 data/chats.json
 
@@ -36,5 +44,11 @@ Thumbs.db
 # Logs
 *.log
 
-# Node
+# Node / frontend
 frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Build
+dist/
+build/

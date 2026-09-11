@@ -1,0 +1,24 @@
+from src import config as src_config
+
+ROOT_DIR = src_config.ROOT_DIR
+BACKEND_DIR = src_config.BACKEND_DIR
+KNOWLEDGE_BASE_DIR = src_config.KNOWLEDGE_BASE_DIR
+DATA_DIR = src_config.DATA_DIR
+APP_ENV = src_config.APP_ENV
+APP_DEBUG = src_config.APP_DEBUG
+MONGODB_URI = src_config.MONGODB_URI
+MONGODB_DB_NAME = src_config.MONGODB_DB_NAME
+JWT_SECRET = src_config.JWT_SECRET
+JWT_ACCESS_EXPIRE_MINUTES = src_config.JWT_ACCESS_EXPIRE_MINUTES
+JWT_REFRESH_EXPIRE_DAYS = src_config.JWT_REFRESH_EXPIRE_DAYS
+CORS_ORIGINS = src_config.CORS_ORIGINS
+COOKIE_SECURE = src_config.COOKIE_SECURE
+ACCESS_COOKIE = src_config.ACCESS_COOKIE
+REFRESH_COOKIE = src_config.REFRESH_COOKIE
+DEMO_EMAIL = src_config.DEMO_EMAIL
+DEMO_PASSWORD = src_config.DEMO_PASSWORD
+DEMO_NAME = src_config.DEMO_NAME
+DISCLAIMER = src_config.DISCLAIMER
+LLM_PROVIDER = src_config.LLM_PROVIDER
+EMBEDDING_MODE = src_config.EMBEDDING_MODE
+resolve_llm_provider = src_config.resolve_llm_provider

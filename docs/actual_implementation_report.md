@@ -62,7 +62,7 @@ This project builds a working, code-level Medical Diagnosis Assistant that:
   real guideline excerpts.
 - These 40 documents are chunked with a 120-word window (most stay as one
   passage; longer ones split with overlap).
-- A REST API (FastAPI) and a website (Express + Tailwind), both working.
+- A REST API (FastAPI) and a website (React + Vite + Tailwind), both working.
 - An evaluation module producing real metrics (not RAGAS - see Section V).
 
 **Importance**: identical rationale to the synopsis — grounding + citations +
@@ -108,7 +108,7 @@ LLM generator (src/llm/generator.py)
    │  - system prompt requires a citation "(Source: <title>)" on every claim
    │  - calls OpenAI or a local Ollama server, selected by one .env variable
    ▼
-DiagnosisResponse -> FastAPI /diagnose endpoint AND Express website
+DiagnosisResponse -> FastAPI /diagnose and /chats endpoints AND React website
 ```
 
 There is **no separate offline/online split, no message queue, and no
@@ -128,7 +128,7 @@ background indexing job** — indexing is a single manual script
 | LLM | `src/llm/generator.py` | `_call_openai()` / `_call_ollama()`, selected by `LLM_PROVIDER` env var; two system prompts (grounded vs. ungrounded, the latter used only for the hallucination-comparison baseline) |
 | Pipeline | `src/pipeline/rag_pipeline.py` | `run_pipeline()` ties the above together into one `DiagnosisResponse` |
 | API | `src/api/main.py` | FastAPI app, `POST /diagnose`, `GET /health` |
-| UI | `frontend/` | Express + Tailwind website (login + symptom check), proxies `/api` to FastAPI |
+| UI | `frontend/` | React + Vite + Tailwind website (home, login, register, chat), proxies `/api` to FastAPI |
 
 ### Data flow — what actually exists
 
@@ -280,7 +280,8 @@ guide as intentional scope reduction for a project of this size.
 - `pritamdeka/S-PubMedBert-MS-MARCO` model card — https://huggingface.co/pritamdeka/S-PubMedBert-MS-MARCO
 - `sentence-transformers/all-MiniLM-L6-v2` model card — https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
 - FastAPI documentation — https://fastapi.tiangolo.com/
-- Express documentation — https://expressjs.com/
+- Vite documentation — https://vite.dev/
+- React documentation — https://react.dev/
 - Tailwind CSS documentation — https://tailwindcss.com/docs
 - OpenAI API reference — https://platform.openai.com/docs
 - Ollama documentation — https://ollama.com/

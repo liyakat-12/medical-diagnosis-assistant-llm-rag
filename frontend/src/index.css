@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f8f7;
+  --ink: #14323a;
+  --muted: #5b6f76;
+  --line: #d7e4e1;
+  --accent: #0f766e;
+  --accent-dark: #115e59;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.chat-shell {
+  height: calc(100dvh - 4rem);
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

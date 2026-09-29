@@ -11,7 +11,7 @@ This is **not** a medical device and **does not** replace a clinician. It does n
 - React + TypeScript chat UI with persistent conversation history
 - FastAPI backend with JWT authentication in HTTP-only cookies
 - MongoDB storage for users, chats, and messages
-- Retrieval-Augmented Generation over 40 curated medical notes
+- Retrieval-Augmented Generation over 200 curated medical notes
 - Sentence-transformer embeddings and ChromaDB vector search
 - General and medical embedding modes
 - Safety guardrails, emergency detection, and prescription/dosage refusal

@@ -20,7 +20,7 @@ from src.safety.guardrails import check_emergency, check_prescription_request
 
 def test_load_documents_finds_all_sample_docs():
     docs = load_documents()
-    assert len(docs) == 40
+    assert len(docs) == 200
     ids = {d.id for d in docs}
     assert "heart_attack" in ids
     assert "common_cold" in ids

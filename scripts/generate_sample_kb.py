@@ -16,8 +16,14 @@ scripts/ingest_pdf.py to pull in full PDF guideline documents.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
-OUT_DIR = Path(__file__).resolve().parent.parent / "knowledge_base" / "sample_documents"
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from extra_sample_kb import EXTRA_DOCUMENTS
+from extra_sample_kb_2 import MORE_DOCUMENTS
+
+OUT_DIR = SCRIPT_DIR.parent / "knowledge_base" / "sample_documents"
 
 # Each tuple: (id, title, source, url, condition, triage_level, body)
 # triage_level in {"self_care", "consult_doctor", "emergency"}
@@ -791,7 +797,8 @@ triage_level: {triage_level}
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for doc_id, title, source, url, condition, triage_level, body in DOCUMENTS:
+    all_docs = DOCUMENTS + EXTRA_DOCUMENTS + MORE_DOCUMENTS
+    for doc_id, title, source, url, condition, triage_level, body in all_docs:
         text = FRONT_MATTER_TEMPLATE.format(
             id=doc_id,
             title=title,
@@ -805,7 +812,7 @@ def main() -> None:
         path.write_text(text, encoding="utf-8")
         print(f"wrote {path}")
 
-    print(f"\nGenerated {len(DOCUMENTS)} sample knowledge base documents in {OUT_DIR}")
+    print(f"\nGenerated {len(all_docs)} sample knowledge base documents in {OUT_DIR}")
 
 
 if __name__ == "__main__":

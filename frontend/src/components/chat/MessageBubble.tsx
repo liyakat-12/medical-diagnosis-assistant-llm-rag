@@ -4,6 +4,7 @@ import type { ChatMessage } from "../../types";
 import { useApp } from "../../context/AppContext";
 import { cn } from "../../lib/cn";
 import { formatAssistantCopy, formatConditionName, uniqueCitations, withPercents } from "../../utils/report";
+import { EMERGENCY_NUMBER, EMERGENCY_TEL } from "../../utils/emergency";
 
 const URGENCY_COPY: Record<string, string> = {
   self_care: "This looks suitable for home monitoring unless it gets worse.",
@@ -76,6 +77,14 @@ function UrgencyList({ message }: { message: ChatMessage }) {
       <ul className="space-y-1.5 text-sm leading-6">
         <li className="font-extrabold">• {triage.label}</li>
         <li>• {triage.guidance || URGENCY_COPY[triage.level]}</li>
+        {triage.level === "emergency" ? (
+          <li>
+            •{" "}
+            <a href={EMERGENCY_TEL} className="underline">
+              Call {EMERGENCY_NUMBER} now
+            </a>
+          </li>
+        ) : null}
       </ul>
     </div>
   );

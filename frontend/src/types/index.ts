@@ -87,6 +87,23 @@ export interface StreamEvent {
   message?: ChatMessage;
 }
 
+export interface NearbyHospital {
+  name: string;
+  phone: string;
+  address: string;
+  distance_km: number;
+  lat: number;
+  lng: number;
+  maps_url: string;
+  emergency: boolean;
+}
+
+export interface HospitalSearchResponse {
+  hospitals: NearbyHospital[];
+  emergency_number: string;
+  error?: string | null;
+}
+
 export interface ApiError {
   message: string;
   status: number;

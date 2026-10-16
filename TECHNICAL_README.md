@@ -1,5 +1,11 @@
 # MediAssist technical notes
 
+MediAssist is a research and academic medical information assistant. A user describes symptoms in everyday language—by typing, or by tapping a body map and choosing symptom chips—and the system looks up matching notes from a curated knowledge base, then returns grounded information with citations, a triage label (self-care, consult a doctor, or emergency), possible condition matches, and nearby hospitals. It is not a medical device and does not replace a doctor: it does not give a confirmed diagnosis, prescribe medicines, or suggest doses. Emergency wording and prescription/dosage questions are checked with safety rules before the model answers.
+
+The website is built with React 19, TypeScript, Vite, and Tailwind CSS. The chat UI streams answers as they are generated, stores conversations after login, and uses an interactive body map only to describe where the person feels discomfort. The backend is FastAPI. Login uses JWT cookies. MongoDB stores users, chats, and messages (or an in-memory stand-in for local demos). Medical notes stay as markdown files; search uses ChromaDB.
+
+The core method is RAG. Symptom text is turned into vectors with sentence-transformers (`all-MiniLM-L6-v2`, with optional PubMedBERT). ChromaDB finds similar passages; a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) re-ranks them and keeps the best few. An LLM (mock, Groq, OpenAI, or Ollama) may write only from those retrieved notes. After that, the system adds citations, checks that claims match the sources, labels urgency, and can list nearby hospitals through OpenStreetMap. Quality is measured with project evaluation scripts—not with RAGAS.
+
 This document describes the **implemented** architecture. RAG, safety, evaluation, and the knowledge base live in `backend/src` and remain the source of truth for medical behavior. The HTTP API, MongoDB, and auth live in `backend/app`.
 
 ---
@@ -97,8 +103,8 @@ SSE event types: `status`, `token`, `citation`, `triage`, `metadata`, `done`.
 `run_pipeline` / `iter_pipeline_stream` in `backend/src/pipeline/rag_pipeline.py`:
 
 1. `check_prescription_request` — refuse and skip retrieval when triggered
-2. `retrieve` from Chroma (`general` or `medical` collection)
-3. `classify_triage` with emergency override from `check_emergency`
+2. `retrieve` from Chroma (`general` or `medical` collection), then optional cross-encoder re-rank (`src/retrieval/reranker.py`; default on)
+3. `classify_triage` with emergency override from `check_emergency``
 4. `stream_grounded_answer` / `generate_grounded_answer` via the provider registry
 5. `audit_citation_faithfulness`
 6. Package `DiagnosisResponse` (`result_to_dict` for APIs)
@@ -146,6 +152,10 @@ frontend/src/
 
 Auth bootstrap: full-page spinner until `/auth/me` finishes. Guest routes redirect to `/chat` when signed in. Protected routes redirect to `/login`.
 
+Body map: `frontend/src/components/chat/BodyMap.tsx` is presentational. Selection state lives in `ChatInput.tsx`. Query construction is in `frontend/src/utils/bodyMap.ts` (`buildBodyMapQuery`). Selected regions and symptoms are extra query text; they do not rebuild the Chroma index or override triage on their own.
+
+Nearby hospitals: `backend/app/services/hospital_service.py` queries Overpass mirrors, falls back to Nominatim, and returns a short list plus an embeddable map.
+
 ---
 
 ## Tests
@@ -153,10 +163,13 @@ Auth bootstrap: full-page spinner until `/auth/me` finishes. Guest routes redire
 | File | Coverage |
 |---|---|
 | `tests/test_pipeline.py` | ingestion, chunking, emergency, dosage refusal, faithfulness |
+| `tests/test_body_map_context.py` | body-map query text does not bypass emergency or prescription rules |
+| `tests/test_hospitals.py` | Overpass/Nominatim parsing and friendly errors |
 | `tests/test_auth.py` | password hashing, title generation |
 | `tests/test_chats.py` | register/login/logout, demo user, ownership, rename, delete |
 | `tests/test_messages.py` | persist messages, stream save, cross-user 404 |
 | `tests/test_ai.py` | provider registry + mock grounded answer |
+| `frontend/tests/bodyMap.test.ts` | selection, duplicate prevention, review line, keyboard/collapse markup |
 
 `tests/conftest.py` swaps Motor for `mongomock-motor` and skips a live Mongo ping.
 

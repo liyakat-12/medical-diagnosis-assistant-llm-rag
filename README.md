@@ -1,18 +1,22 @@
 # MediAssist — Medical Diagnosis Assistant using LLM + RAG
 
-MediAssist is a research and academic medical information assistant. It takes a **plain-language symptom description**, retrieves matching passages from a curated markdown knowledge base, applies **safety and triage rules**, and returns a **grounded answer with citations**.
+MediAssist is a research and academic medical information assistant. A user describes symptoms in everyday language—by typing, or by tapping a body map and choosing symptom chips—and the system looks up matching notes from a curated knowledge base, then returns grounded information with citations, a triage label (self-care, consult a doctor, or emergency), possible condition matches, and nearby hospitals. It is **not** a medical device and does **not** replace a doctor: it does not give a confirmed diagnosis, prescribe medicines, or suggest doses. Emergency wording and prescription/dosage questions are checked with safety rules before the model answers.
 
-This is **not** a medical device and **does not** replace a clinician. It does not make a definitive diagnosis, prescribe medication, or give drug doses.
+The website is built with **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS**. The chat UI streams answers as they are generated, stores conversations after login, and uses an interactive body map only to describe where the person feels discomfort. The backend is **FastAPI**. Login uses **JWT cookies**. **MongoDB** stores users, chats, and messages (or an in-memory stand-in for local demos). Medical notes stay as markdown files; search uses **ChromaDB**.
+
+The core method is **RAG (Retrieval-Augmented Generation)**. Symptom text is turned into vectors with **sentence-transformers** (`all-MiniLM-L6-v2`, with optional PubMedBERT). ChromaDB finds similar passages; a **cross-encoder** re-ranks them and keeps the best few. An LLM (mock, Groq, OpenAI, or Ollama) may write only from those retrieved notes. After that, the system adds citations, checks that claims match the sources, labels urgency, and can list nearby hospitals through OpenStreetMap. Quality is measured with project evaluation scripts for retrieval, triage, hallucination, and end-to-end answers—not with RAGAS.
 
 ---
 
 ## Features
 
 - React + TypeScript chat UI with persistent conversation history
+- Interactive body map to describe discomfort (not a diagnosis)
 - FastAPI backend with JWT authentication in HTTP-only cookies
 - MongoDB storage for users, chats, and messages
 - Retrieval-Augmented Generation over 400 curated medical notes
 - Sentence-transformer embeddings, ChromaDB vector search, and cross-encoder re-ranking
+- Nearby hospitals via OpenStreetMap (Overpass) with a Nominatim fallback
 - General and medical embedding modes
 - Safety guardrails, emergency detection, and prescription/dosage refusal
 - Triage labels: self-care, consult a doctor, emergency
@@ -29,8 +33,8 @@ Add product screenshots here after a local run:
 
 - Landing page
 - Login / register
-- Chat with triage banner and citations
-- Conversation sidebar on desktop and mobile
+- Chat with body map, triage banner, and citations
+- Nearby hospitals and conversation sidebar on desktop and mobile
 
 ---
 
@@ -47,9 +51,9 @@ FastAPI (http://localhost:8000/api/v1)
             │
             ▼
         RAG pipeline (backend/src)
-            user query
+            user query (typed text + optional body-map context)
             → safety checks
-            → ChromaDB retrieval
+            → ChromaDB retrieval + cross-encoder re-rank
             → triage
             → LLM provider (mock | groq | openai | ollama)
             → citations
@@ -67,7 +71,9 @@ The application never answers from the model alone in the live chat. Retrieval, 
 
 **Backend:** FastAPI, Pydantic, Motor (async MongoDB), bcrypt, PyJWT
 
-**AI / RAG:** ChromaDB, sentence-transformers, existing retrieval + safety modules, provider registry
+**AI / RAG:** ChromaDB, sentence-transformers (MiniLM / optional PubMedBERT), cross-encoder re-ranker (`ms-marco-MiniLM-L-6-v2`), safety modules, provider registry
+
+**Maps:** OpenStreetMap Overpass API, Nominatim fallback, embedded map for nearby hospitals
 
 **Database:** MongoDB for accounts and conversations; ChromaDB on disk for vectors
 
@@ -140,6 +146,8 @@ Indexes exist on email (unique), `user_id`, `chat_id`, and recency fields.
 
 Creating a chat stores an empty conversation. The first user message generates a short title (deterministic, not an extra model call). The sidebar groups chats by Today / Yesterday / Previous 7 days / Older. Rename and delete are per-owner. Deleting a chat also deletes its messages.
 
+The body map lives in the chat composer. Selected regions and symptoms are turned into structured query text (`locations` and `symptoms`) and sent with any typed detail. Changing a selection replaces that context instead of appending duplicates. The map only records discomfort; it does not name a disease or change triage on its own.
+
 Historical messages are loaded from MongoDB. Previous answers are not regenerated.
 
 ---
@@ -163,6 +171,7 @@ Providers that cannot natively stream still emit reasonable chunks (the mock pro
 - Emergency language forces an emergency triage banner even if retrieval continues for context.
 - Answers must not claim certainty or replace a clinician.
 - The UI labels the product as an information assistant, not a doctor.
+- The body map never suppresses emergency checks; red-flag text in the sent message still forces emergency guidance.
 - Chat content is not written to application logs by default.
 
 ---
@@ -246,6 +255,13 @@ python -m pytest tests/ -v
 ```
 
 Auth/chat tests use an in-memory Mongo mock. Pipeline tests cover ingestion, guardrails, triage, and faithfulness without calling a paid LLM.
+
+Body-map query helpers (frontend):
+
+```bash
+cd frontend
+npm test
+```
 
 ---
 

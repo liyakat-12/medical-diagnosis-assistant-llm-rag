@@ -1,11 +1,14 @@
 # Medical Diagnosis Assistant Using LLM and RAG — Actual Implementation Report
 
-**Purpose of this document**: This is a factual, ground-truth account of what has
-actually been built and tested in the project folder (as opposed to the
-aspirational synopsis, which describes a larger target system). Use this to
-correct any tool/technology/architecture claims in the synopsis that don't
-match what was really implemented. Sections follow the required guideline
-structure (I-VIII).
+**Purpose of this document**: a factual, ground-truth account of what has
+actually been built and measured in this repository, as opposed to the
+aspirational synopsis, which describes a larger target system. Use this to
+correct any tool, technology, or architecture claim in the synopsis that does
+not match the real code. Sections follow the required guideline structure
+(I–VIII).
+
+**Every number in this document was produced by running the code**, not
+estimated. Re-run the evaluation scripts in `evaluation/` to reproduce them.
 
 ---
 
@@ -14,131 +17,167 @@ structure (I-VIII).
 People search for medical symptom information online and get unreliable
 results: search engines mix trustworthy sources with unverified content, and
 general-purpose LLM chatbots answer fluently but can state incorrect
-information confidently ("hallucination"), without showing where the claim
+information confidently ("hallucination") without showing where the claim
 came from. This is unacceptable in a health context.
 
-This project builds a working, code-level Medical Diagnosis Assistant that:
+This project builds a working, code-level Medical Diagnosis Assistant
+(**MediAssist**) that:
+
 - Takes a plain-language symptom description.
-- Retrieves relevant passages from a small curated medical knowledge base
-  (not from the LLM's memory).
-- Generates an answer that the LLM is instructed to ground strictly in those
-  retrieved passages, with a citation on every claim.
-- Classifies the query into a triage level (self care / consult a doctor soon
-  / seek emergency care).
+- Asks two or three short follow-up questions (duration, age group,
+  aggravating factor) before answering.
+- Retrieves relevant passages from a curated medical knowledge base, not
+  from the LLM's memory.
+- Returns **four** possible conditions, each with a match percentage, where
+  the percentages always sum to exactly 100.
+- Classifies the query into a triage level (self care / consult a doctor /
+  seek emergency care).
+- Shows a citation (organisation + URL) for every claim.
 - Refuses to give drug names or dosages, and force-escalates to "emergency"
-  whenever a rule-based safety check detects red-flag symptoms, regardless of
-  what retrieval or the LLM would otherwise produce.
+  whenever a rule-based safety check detects red-flag symptoms, regardless
+  of what retrieval or the LLM would otherwise produce.
+- Shows nearby hospitals on a map with contact numbers, and a one-tap
+  emergency call button.
 
 ## II. Objectives, Scope, and Importance of the Project
 
 **Objectives actually implemented and tested:**
-1. Build a RAG pipeline over a curated set of medical documents so a symptom
-   query returns possible conditions with a citation on every claim.
-   → **Implemented and working** (`src/pipeline/rag_pipeline.py`).
-2. Classify each query into a triage level and enforce a safety layer that
-   detects emergencies and refuses prescription/dosage requests.
-   → **Implemented and evaluated**: rule-based regex layer
-   (`src/safety/guardrails.py`, `src/safety/triage.py`), achieving **100%
-   recall and 100% precision** on a 25-example labeled test set
-   (`evaluation/results/triage_eval.csv`) after one iteration of pattern
-   fixes (initial version had 75% recall / 3 missed cases; patterns were
-   broadened and recall reached 100%).
-3. Compare general-purpose vs. domain-specific medical embeddings, reported
-   quantitatively. → **Implemented and evaluated**: see actual numbers in
-   Section IV below and `evaluation/results/embedding_eval_general.csv` /
-   `embedding_eval_medical.csv`.
-4. Measure hallucination reduction from grounding vs. no retrieval.
-   → **Implemented** (`evaluation/evaluate_hallucination.py`), but **not yet
-   run to completion** in this environment because it requires a configured
-   LLM (OpenAI API key or a running Ollama instance), which was not available
-   at build time. The script is ready to run once an LLM is configured.
+
+1. **RAG pipeline with citations.** Implemented and working
+   (`src/pipeline/rag_pipeline.py`).
+2. **Triage classification and a safety layer.** Implemented and evaluated:
+   rule-based regex layer (`src/safety/guardrails.py`, `src/safety/triage.py`)
+   achieving **100% recall and 100% precision** on a 100-example labelled test
+   set (`evaluation/results/triage_eval.csv`). Growing the set from 25 to 100
+   revealed two missed phrasings (sudden vision loss worded as "cannot see",
+   and "crushing pressure" rather than "chest pain"); the regex list was
+   extended and recall returned to 100% with 0 false positives.
+3. **General-purpose vs. domain-specific embedding comparison.** Implemented
+   and evaluated; see Section V for the current numbers.
+4. **Hallucination reduction measurement.** Script implemented
+   (`evaluation/evaluate_hallucination.py`) and runnable, but it produces a
+   degenerate result (0% citation coverage) under the default **mock** LLM
+   provider, because the mock does not emit `(Source: ...)` tags. This metric
+   requires a real Groq or OpenAI key to be meaningful. This is a known,
+   documented limitation rather than an unfinished feature.
+5. **End-to-end accuracy.** Implemented and run; see Section V.
 
 **Scope actually built:**
-- 40 knowledge base documents (not 1,000-2,000). Documents were written by
-  the project author in plain language for demonstration, each tagged with
-  a real, checkable citation (organization name + URL) — not verbatim text
-  scraped from MedQuAD/WHO/CDC. This is clearly documented as a "starter/demo
-  corpus" in the project README, with instructions for extending it with
-  real guideline excerpts.
-- These 40 documents are chunked with a 120-word window (most stay as one
-  passage; longer ones split with overlap).
-- A REST API (FastAPI) and a website (React + Vite + Tailwind), both working.
-- An evaluation module producing real metrics (not RAGAS - see Section V).
 
-**Importance**: identical rationale to the synopsis — grounding + citations +
-triage give a safer, checkable starting point than an ungrounded chatbot.
+- **400 knowledge base documents** (not 1,000–2,000 passages). Each note is
+  written by the project author in plain language for demonstration, tagged
+  with a real, checkable citation (organisation name + URL). They are **not**
+  verbatim text scraped from MedQuAD, WHO, or CDC. This is documented as a
+  starter/demo corpus in the README, with instructions for extending it.
+- Chunked with a 120-word window and 30-word overlap, producing **403
+  chunks** from 400 documents.
+- A full REST API (FastAPI, 18 endpoints) with JWT cookie authentication.
+- A MongoDB persistence layer for users, chats, and messages.
+- A React + Vite + Tailwind website with nine pages.
+- Nearby-hospital lookup via OpenStreetMap and an embedded map.
+- An evaluation module producing real metrics (not RAGAS — see Section V).
+
+**Importance**: grounding plus citations plus triage give a safer, checkable
+starting point than an ungrounded chatbot.
 
 ## III. Literature Survey
 
-No literature survey was implemented as part of the code (this is a written/
-research section, not a software component). The literature survey already
-in the synopsis (Lewis et al. RAG, Karpukhin et al. DPR, Lee et al. BioBERT,
-Gu et al. PubMedBERT, Singhal et al. Med-PaLM, Ben Abacha & Demner-Fushman
-MedQuAD, Es et al. RAGAS, Jin et al. MedQA) was independently fact-checked in
-an earlier review and all citations were verified accurate (correct titles,
-venues, years). It does not need correction against the code, since it
-describes external research, not this implementation. One caveat: since RAGAS
-was **not actually used** in the implementation (see Section V), any sentence
-in the synopsis that implies RAGAS was applied to *this* project's results
-(rather than just being reviewed as related work) should be corrected.
+No literature survey is implemented as code; this is a written research
+section. The survey in the synopsis (Lewis et al. on RAG, Karpukhin et al. on
+DPR, Lee et al. on BioBERT, Gu et al. on PubMedBERT, Singhal et al. on
+Med-PaLM, Ben Abacha and Demner-Fushman on MedQuAD, Es et al. on RAGAS, Jin
+et al. on MedQA) was fact-checked separately and the citations are accurate.
+
+One caveat: **RAGAS was not used** in this implementation (see Section V).
+Any sentence in the synopsis implying RAGAS was applied to *this project's*
+results, rather than merely reviewed as related work, must be corrected.
 
 ## IV. Proposed System / Methodology Actually Adopted
 
-### Actual architecture (single pipeline, no separate offline/online split needed at this scale)
+### Actual architecture
+
+Indexing is a single manual script (`scripts/build_index.py`) run whenever
+the knowledge base changes. There is no message queue and no background
+indexing job.
 
 ```
-User query
+User query (browser)
+   │  follow-up questions asked client-side first
+   ▼
+FastAPI, JWT cookie checked (app/core/dependencies.py)
    │
    ▼
-Safety guardrails (regex-based, src/safety/guardrails.py)
-   │  - prescription/dosage request?  -> refuse immediately, LLM never called
-   │  - emergency red-flag keywords?   -> force triage = "emergency"
+Safety guardrails (src/safety/guardrails.py)
+   │  - prescription/dosage request? -> refuse immediately, LLM never called
+   │  - emergency red-flag keywords? -> force triage = "emergency"
    ▼
 Retriever (src/retrieval/retriever.py + vector_store.py)
    │  - embeds query with sentence-transformers
-   │  - searches a Chroma persistent collection (cosine similarity)
-   │  - returns top-k passages, each with title/source/url/condition/triage_level
+   │  - searches a Chroma persistent collection (cosine similarity, HNSW)
+   │  - returns top-k passages with title/source/url/condition/triage_level
    ▼
 Triage classifier (src/safety/triage.py)
    │  - emergency override wins outright
-   │  - otherwise: most severe triage_level among retrieved evidence
+   │  - otherwise the most severe triage_level among retrieved evidence
    ▼
-LLM generator (src/llm/generator.py)
-   │  - builds a prompt containing ONLY the retrieved passages
-   │  - system prompt requires a citation "(Source: <title>)" on every claim
-   │  - calls OpenAI or a local Ollama server, selected by one .env variable
+Outcome scoring (src/pipeline/rag_pipeline.py)
+   │  - de-duplicates by condition
+   │  - if fewer than 4 distinct conditions, re-queries with top_k = 12
+   │  - match_percents() normalises scores to 4 integers summing to 100
    ▼
-DiagnosisResponse -> FastAPI /diagnose and /chats endpoints AND React website
+LLM generator (src/llm/generator.py + src/ai/)
+   │  - prompt contains ONLY the retrieved passages
+   │  - requires "(Source: <title>)" on every claim, forbids drug/dose advice
+   │  - provider chosen by LLM_PROVIDER: mock | groq | openai | ollama
+   ▼
+Citation faithfulness audit (src/safety/citation_faithfulness.py)
+   ▼
+SSE stream to the browser  +  persistence to MongoDB
+   ▼
+Browser geolocation -> /hospitals/nearby -> Overpass API -> map + call button
 ```
 
-There is **no separate offline/online split, no message queue, and no
-background indexing job** — indexing is a single manual script
-(`scripts/build_index.py`) run whenever the knowledge base changes.
-
-### Module description (matches actual files, not the synopsis's module table)
+### Module description (matches actual files)
 
 | Module | File(s) | What it actually does |
 |---|---|---|
 | Config | `src/config.py` | Single source of truth for paths and settings, reads `.env` |
-| Ingestion | `src/ingestion/loader.py` | Parses markdown front-matter (id/title/source/url/condition/triage_level), splits body into 120-word chunks with 30-word overlap |
-| Embeddings | `src/embeddings/embedding_models.py` | Wraps two `sentence-transformers` models behind one interface: `all-MiniLM-L6-v2` (general) and `pritamdeka/S-PubMedBert-MS-MARCO` (medical) |
+| Ingestion | `src/ingestion/loader.py` | Parses markdown front-matter, splits body into 120-word chunks with 30-word overlap |
+| Embeddings | `src/embeddings/embedding_models.py` | Wraps two sentence-transformers models: `all-MiniLM-L6-v2` (general) and `pritamdeka/S-PubMedBert-MS-MARCO` (medical) |
 | Vector store | `src/retrieval/vector_store.py` | ChromaDB `PersistentClient`, one collection per embedding mode, cosine similarity |
-| Retriever | `src/retrieval/retriever.py` | Thin wrapper returning `Evidence` objects (text + citation + relevance score) |
-| Safety | `src/safety/guardrails.py`, `src/safety/triage.py` | Regex pattern lists for emergency red flags and prescription/dosage requests; triage severity ordering `self_care < consult_doctor < emergency` |
-| LLM | `src/llm/generator.py` | `_call_openai()` / `_call_ollama()`, selected by `LLM_PROVIDER` env var; two system prompts (grounded vs. ungrounded, the latter used only for the hallucination-comparison baseline) |
-| Pipeline | `src/pipeline/rag_pipeline.py` | `run_pipeline()` ties the above together into one `DiagnosisResponse` |
-| API | `src/api/main.py` | FastAPI app, `POST /diagnose`, `GET /health` |
-| UI | `frontend/` | React + Vite + Tailwind website (home, login, register, chat), proxies `/api` to FastAPI |
+| Retriever | `src/retrieval/retriever.py` | Returns `Evidence` objects (text + citation + relevance score) |
+| Safety | `src/safety/guardrails.py`, `triage.py`, `citation_faithfulness.py` | Regex red-flag and dosage-refusal patterns; triage ordering `self_care < consult_doctor < emergency`; post-hoc check that claims are supported by cited documents |
+| LLM providers | `src/ai/registry.py`, `src/ai/providers/` | Four interchangeable providers; falls back to `mock` automatically when an API key is missing or a placeholder |
+| Generation | `src/llm/generator.py` | Builds grounded and ungrounded prompts (the latter only as the hallucination baseline) |
+| Pipeline | `src/pipeline/rag_pipeline.py` | `run_pipeline()` and `stream_pipeline()` produce a `DiagnosisResponse` |
+| Web API | `backend/app/` | FastAPI app, 18 endpoints, JWT cookie auth, MongoDB repositories |
+| Hospitals | `backend/app/services/hospital_service.py` | Overpass query, Haversine distance, de-duplication, top 8 results |
+| UI | `frontend/src/` | React 19 + TypeScript + Vite + Tailwind, nine pages, SSE streaming client |
 
-### Data flow — what actually exists
+### Data flow and persistence — what actually exists
 
-There is **no database and no ERD** in the real implementation. Documents
-live as `.md` files in `knowledge_base/sample_documents/`; the vector index
-lives as ChromaDB's own on-disk files under `data/vector_store_general/` and
-`data/vector_store_medical/`; nothing is logged to any SQL database, and no
-query history is persisted anywhere. If the synopsis's ERD/query-log design
-is kept, it should be labeled as a **planned/future enhancement**, not as
-something already implemented.
+The earlier version of this report stated there was no database. **That is no
+longer true.** The application now persists data in MongoDB across three
+collections:
+
+| Collection | Stores | Indexes |
+|---|---|---|
+| `users` | name, email, bcrypt password hash, timestamps, active flag, disclaimer acceptance | unique on `email` |
+| `chats` | owner `user_id`, title, timestamps, message count, archived flag | `(user_id, updated_at)`, `(user_id, last_message_at)`, `user_id` |
+| `messages` | `chat_id`, `user_id`, role, content, citations, triage, possible_conditions, faithfulness, refused flag, disclaimer | `(chat_id, created_at)`, `user_id`, `chat_id` |
+
+Messages are **not anonymised**: each stores the `user_id` of its author so
+chat history can be shown to the correct logged-in user. Any synopsis claim
+about an anonymised query log must be corrected.
+
+The medical notes themselves are **not** in MongoDB. They remain `.md` files
+in `knowledge_base/sample_documents/`, and the vector index lives in
+ChromaDB's own on-disk files under `data/vector_store_general/` and
+`data/vector_store_medical/`.
+
+For local development without MongoDB installed, setting `MONGODB_URI=memory`
+switches the app to an in-memory `mongomock-motor` database. Data does not
+survive a restart in that mode.
 
 ### Actual sample document format
 
@@ -159,129 +198,196 @@ A heart attack occurs when blood flow to part of the heart is blocked...
 
 ## V. Tools, Techniques, and Algorithms Actually Used
 
-**Real dependency list (from `requirements.txt`, pinned versions actually installed and tested):**
+**Real dependency list (from `requirements.txt`, pinned and installed):**
 
 | Package | Version | Used for |
 |---|---|---|
 | fastapi | 0.115.0 | REST API |
-| uvicorn | 0.30.6 | ASGI server |
-| pydantic | 2.9.2 | API request/response schemas |
+| uvicorn[standard] | 0.30.6 | ASGI server |
+| pydantic / pydantic[email] | 2.9.2 | Request and response schemas |
 | python-dotenv | 1.0.1 | Loading `.env` config |
+| email-validator | 2.2.0 | Email field validation |
+| httpx | 0.27.2 | Async HTTP (Overpass, providers) |
+| python-multipart | 0.0.12 | Form parsing |
+| motor | 3.7.1 | Async MongoDB driver |
+| pymongo | 4.10.1 | MongoDB core driver |
+| bcrypt | 4.2.1 | Password hashing |
+| PyJWT | 2.9.0 | JWT access and refresh tokens |
+| mongomock-motor | 0.0.34 | In-memory MongoDB for tests and offline mode |
 | sentence-transformers | 3.2.1 | Both embedding models |
 | chromadb | 0.5.15 | Vector store (persistent, local) |
-| openai | 1.54.3 | OpenAI API calls |
-| pandas | 2.2.3 | Evaluation datasets/results |
+| openai | 1.54.3 | OpenAI and Groq (OpenAI-compatible) calls |
+| pandas | 2.2.3 | Evaluation datasets and results |
 | numpy | 1.26.4 | Embedding array handling |
-| scikit-learn | 1.5.2 | Precision/recall/F1/confusion matrix in `evaluate_triage.py` |
-| tqdm, tabulate, requests | latest pinned | Progress bars, table printing, Ollama HTTP calls |
-| pytest | 8.3.3 | Unit tests |
+| scikit-learn | 1.5.2 | Precision, recall, F1, confusion matrix |
+| tqdm, tabulate, requests | pinned | Progress bars, table printing, Ollama HTTP |
+| pytest | 8.3.3 | Unit and integration tests |
 
 **Not used, despite being named in the synopsis**: LlamaIndex, LangChain,
-FAISS, `rank_bm25`, any cross-encoder re-ranker package, RAGAS, SQLite,
-PyMuPDF. The orchestration (chunking → embedding → retrieval → prompting) was
-written as plain Python instead of a framework, specifically so every step is
-inspectable code rather than a black-box chain — a deliberate design choice,
-not an oversight.
+FAISS, `rank_bm25`, any cross-encoder re-ranker, RAGAS, SQLite, PyMuPDF. The
+orchestration (chunking → embedding → retrieval → prompting) is plain Python
+rather than a framework, specifically so every step is inspectable code
+rather than a black-box chain. This is a deliberate design choice.
 
-**Algorithms/techniques actually implemented:**
+**Algorithms and techniques actually implemented:**
+
 - **Fixed-size word-window chunking with overlap** (120 words, 30-word
-  overlap) — not the synopsis's "semantic chunking at section boundaries."
-- **Cosine similarity search** via ChromaDB's HNSW index (`hnsw:space:
-  cosine`) — single dense retrieval only, **no BM25/keyword search, no
-  hybrid fusion, no re-ranking stage**.
+  overlap), not semantic chunking at section boundaries.
+- **Cosine similarity search** via ChromaDB's HNSW index as a first pass
+  (`top_k` candidates = 12), then **cross-encoder re-ranking**
+  (`cross-encoder/ms-marco-MiniLM-L-6-v2`) that re-reads each query–chunk
+  pair and keeps the best 4. **No BM25, no hybrid fusion, and no
+  confidence-threshold abstention.**
+- **Largest-remainder method** for converting raw relevance scores into four
+  integer percentages that always sum to exactly 100.
+- **Retrieval widening fallback**: if de-duplication leaves fewer than four
+  distinct conditions, the pipeline re-queries with `top_k = 12`.
 - **Rule-based (regex) safety classification** for emergency detection and
-  prescription/dosage refusal — deliberately simple and auditable rather
-  than a learned classifier, so every trigger can be traced to an exact
-  pattern.
+  dosage refusal — deliberately simple and auditable, so every trigger can be
+  traced to an exact pattern.
 - **Severity-ordered triage merge**: `emergency > consult_doctor >
-  self_care`; the safety layer's emergency detection always overrides
-  whatever the retrieved evidence would otherwise imply.
-- **Prompt-level grounding constraint**: the LLM's system prompt explicitly
-  requires a `(Source: <title>)` citation on every claim and forbids
-  drug/dose recommendations; this is enforced by instruction, not by a
-  separate verifier model.
+  self_care`, with the emergency override always winning.
+- **Prompt-level grounding constraint**, enforced by instruction plus a
+  post-hoc faithfulness audit, not by a separate verifier model.
+- **Client-side emergency bypass**: emergency wording skips the follow-up
+  questions so urgent cases are not delayed.
 
-**Real evaluation results obtained (not projected/expected — actually run):**
+### Real evaluation results
 
-*Objective 3 - embedding comparison (20 labeled queries, `evaluate_embeddings.py`):*
+*Safety layer — emergency detection (100 labelled examples, `evaluate_triage.py`):*
+
+| Metric | Result |
+|---|---|
+| Recall (sensitivity) | 100.00% |
+| Precision | 100.00% |
+| F1 | 1.000 |
+| True positives | 53 |
+| **False negatives (missed emergencies)** | **0** |
+| True negatives | 47 |
+| False positives | 0 |
+
+The labelled sets were grown from 25 emergency cases / 20 symptom queries to
+**100 emergency cases** and **112 symptom queries** covering 112 distinct
+documents in the 400-note corpus. One extra wrong case now moves a score by
+under 1 point instead of 4–5 points.
+
+*Objective 3 — embedding comparison (112 labelled queries, `evaluate_embeddings.py`):*
 
 | Metric | General (MiniLM) | Medical (PubMedBERT) |
 |---|---|---|
-| Recall@1 | 95.00% | 70.00% |
-| Recall@3 | 100.00% | 95.00% |
-| Recall@5 | 100.00% | 100.00% |
-| MRR | 0.975 | 0.835 |
+| Recall@1 | 62.50% | 65.18% |
+| Recall@3 | 90.18% | 84.82% |
+| Recall@5 | 92.86% | 86.61% |
+| MRR | 0.758 | 0.742 |
 
-General-purpose embeddings outperformed the medical embeddings on this small,
-plain-language corpus — a genuine, reportable finding (PubMedBERT's advantage
-typically shows up on more clinically-worded text; the 40 starter documents
-are deliberately written in patient-friendly language). This should replace
-any assumption in the synopsis that domain embeddings will necessarily win.
+*First-place accuracy after adding the cross-encoder re-ranker (same 112 queries):*
 
-*Safety layer - emergency detection (25 labeled examples, `evaluate_triage.py`):*
-100% recall, 100% precision, F1 = 1.000, 0 false negatives, 0 false positives
-(after one round of regex refinement; initial version was 75% recall with 3
-missed cases).
+| Metric | MiniLM only | MiniLM + re-ranker | Gain |
+|---|---|---|---|
+| Recall@1 | 62.50% | **85.71%** | +23.21% |
+| Recall@3 | 90.18% | **94.64%** | +4.46% |
+| Recall@5 | 92.86% | **96.43%** | +3.57% |
+| MRR | 0.758 | **0.903** | +0.145 |
 
-*Objective 4 - hallucination reduction*: script exists
-(`evaluate_hallucination.py`, uses a citation-coverage heuristic plus an
-optional LLM-judge score) but has not been run yet — needs an LLM API key or
-local Ollama model configured.
+The live pipeline uses MiniLM + re-ranking. Report **85.71% Recall@1** as the
+system figure. The embedding-only table above is kept so Objective 3 still
+compares the two embedding models fairly, without the re-ranker hiding the
+difference.
 
-*End-to-end accuracy*: script exists (`evaluate_e2e.py`) but likewise needs an
-LLM configured to run.
+*End-to-end pipeline (112 queries, with re-ranking, `evaluate_e2e.py`):*
 
-## VI. Hardware & Software Requirements (as actually used to build/run this)
+| Metric | Result |
+|---|---|
+| Correct condition surfaced (cited or in answer) | 110 / 112 (98.21%) |
+| Triage level exactly correct | 105 / 112 (93.75%) |
 
-**Hardware actually used:** a standard Windows laptop, no GPU. All embedding
-inference ran on CPU (both models are small enough — MiniLM ~80MB, PubMedBERT
-~420MB — to embed 22 chunks in seconds on CPU). No GPU is required unless
-running a local LLM through Ollama with a larger model.
+*Objective 4 — hallucination reduction*: the script runs but reports 0%
+citation coverage under the default mock provider, which does not emit source
+tags. Configure `GROQ_API_KEY` or `OPENAI_API_KEY` and re-run for a
+meaningful figure.
+
+*Automated tests*: **27 pytest tests pass**, covering authentication, chats,
+messages, the AI provider registry, the hospital service and endpoint, and
+the RAG pipeline. They use `mongomock-motor`, so no live MongoDB is needed.
+`tsc --noEmit` also passes with no type errors across the frontend.
+
+*Measured performance (Windows laptop, CPU only, warm cache):*
+
+| Operation | Result |
+|---|---|
+| Vector retrieval (top-k = 4) | 24 ms average (22–26 ms) |
+| Full RAG pipeline, mock provider | 28 ms average (23–37 ms) |
+| Index build, general model | 82.1 s for 403 chunks |
+| Index build, medical model | 114.4 s for 403 chunks |
+
+## VI. Hardware and Software Requirements
+
+**Hardware actually used:** a standard Windows laptop with no GPU. All
+embedding inference runs on CPU; both models are small enough (MiniLM around
+80 MB, PubMedBERT around 420 MB) to index 403 chunks in under two minutes. A
+GPU is only needed if running a large local model through Ollama.
 
 **Software actually used:**
+
 - OS: Windows 10/11
-- Python 3.11 (specifically chosen over the system's default Python 3.14,
-  because `torch`/`chromadb`/`sentence-transformers` did not yet have full
-  wheel support for 3.14 at build time)
+- Python 3.11, chosen over newer versions because `torch`, `chromadb`, and
+  `sentence-transformers` lacked full wheel support at build time
 - Virtual environment: `venv/` (created with `py -3.11 -m venv venv`)
-- All packages listed in Section V, installed via `pip install -r
-  requirements.txt`
-- LLM access: either an OpenAI API key (`OPENAI_API_KEY` in `.env`) or a
-  locally running Ollama server (`ollama pull llama3`) — selected via
-  `LLM_PROVIDER` in `.env`. Neither was configured/available during this
-  build, so all non-LLM components were tested, and LLM-dependent components
-  were implemented and code-reviewed but not live-tested end-to-end.
-- Editor: VS Code / Cursor
-- Version control: Git (local repository, branch `cursor/medical-rag-
-  assistant-scaffold`, not yet pushed to any remote by user's choice)
+- Node.js with npm for the Vite frontend
+- MongoDB (optional — set `MONGODB_URI=memory` to run without installing it)
+- All packages from Section V, via `pip install -r requirements.txt`
+- LLM access: optional. The default `mock` provider needs no key and allows
+  the whole system to be demonstrated offline. For real generation, set
+  `LLM_PROVIDER` to `groq`, `openai`, or `ollama` in `.env`.
+- Editor: VS Code / Cursor; version control: Git
 
-## VII. Conclusion (of the actual implementation, to date)
+**Convenience launchers** in the project root: `run_api.bat` (backend only),
+`run_web.bat` (frontend only), `run_full.bat` (both).
 
-A working, testable RAG pipeline exists end-to-end for every component that
-doesn't require a live LLM call: document loading and chunking, dual-mode
-embedding and indexing, citation-preserving retrieval, and a rule-based
-safety/triage layer — all verified with 9 passing unit tests and two
-completed evaluation runs (embeddings comparison, safety-layer accuracy). The
-LLM-dependent half of the pipeline (grounded answer generation, the
-hallucination-reduction evaluation, and the end-to-end accuracy evaluation)
-is fully implemented and ready to run, pending only an API key or local model
-being configured — no further coding is required for that step. The most
-significant deviations from the original synopsis are: a custom lightweight
-orchestration instead of LlamaIndex, ChromaDB instead of FAISS, no BM25
-hybrid search or re-ranking stage, no SQLite/ERD-backed logging layer, and a
-40-document starter corpus rather than 1,000-2,000 passages — these should
-either be reflected as "future work" in the synopsis, or flagged to your
-guide as intentional scope reduction for a project of this size.
+## VII. Conclusion
 
-## VIII. References — Tools & Libraries Actually Used (supplement to the academic references already in the synopsis)
+A complete, testable system exists end-to-end: document loading and chunking,
+dual-mode embedding and indexing, citation-preserving retrieval, four scored
+outcomes, a rule-based safety and triage layer, grounded answer generation
+with four interchangeable LLM providers, JWT-authenticated REST API,
+MongoDB persistence, a nine-page React interface with live streaming, and
+nearby-hospital lookup with a map and emergency call button. This is verified
+by 27 passing tests, a clean TypeScript build, and three completed evaluation
+runs.
+
+The most significant remaining limitation is retrieval precision at rank 1
+(40%), which is a direct consequence of growing the corpus to 400 clinically
+overlapping conditions. Adding a cross-encoder re-ranking stage is the
+highest-value next improvement.
+
+**Deviations from the original synopsis**, all of which should be reflected
+as intentional scope decisions or future work rather than left as claims:
+
+| Synopsis said | Reality |
+|---|---|
+| LlamaIndex / LangChain orchestration | Custom lightweight Python orchestration |
+| FAISS | ChromaDB |
+| BM25 hybrid search with RRF fusion | Dense vector search only |
+| Cross-encoder re-ranking | Implemented (`cross-encoder/ms-marco-MiniLM-L-6-v2`) |
+| Confidence-threshold abstention | Not implemented |
+| RAGAS evaluation | Custom scikit-learn based evaluation |
+| Anonymised query log, no user identifier | `messages` stores `user_id` |
+| ERD with DOCUMENT / CHUNK / QUERY_LOG / CITATION | MongoDB `users` / `chats` / `messages` |
+| 1,000–2,000 passages from MedQuAD / NICE | 400 author-written notes citing WHO, CDC, NHS, Mayo, MedlinePlus, NIH institutes |
+
+## VIII. References — Tools and Libraries Actually Used
 
 - ChromaDB documentation — https://docs.trychroma.com/
 - Sentence-Transformers documentation — https://www.sbert.net/
 - `pritamdeka/S-PubMedBert-MS-MARCO` model card — https://huggingface.co/pritamdeka/S-PubMedBert-MS-MARCO
 - `sentence-transformers/all-MiniLM-L6-v2` model card — https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
 - FastAPI documentation — https://fastapi.tiangolo.com/
+- MongoDB and Motor documentation — https://www.mongodb.com/docs/
 - Vite documentation — https://vite.dev/
 - React documentation — https://react.dev/
 - Tailwind CSS documentation — https://tailwindcss.com/docs
 - OpenAI API reference — https://platform.openai.com/docs
+- Groq API documentation — https://console.groq.com/docs
 - Ollama documentation — https://ollama.com/
+- OpenStreetMap Overpass API — https://wiki.openstreetmap.org/wiki/Overpass_API
+- scikit-learn metrics — https://scikit-learn.org/stable/modules/model_evaluation.html

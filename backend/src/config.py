@@ -79,6 +79,9 @@ EMBEDDING_MODE = os.getenv("EMBEDDING_MODE", "general").strip().lower()  # "gene
 # Retrieval
 # ---------------------------------------------------------------------------
 TOP_K = int(os.getenv("TOP_K", "4"))
+RERANK_ENABLED = os.getenv("RERANK_ENABLED", "true").strip().lower() in {"1", "true", "yes"}
+RERANK_CANDIDATES = int(os.getenv("RERANK_CANDIDATES", "12"))
+RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 # ---------------------------------------------------------------------------
 # LLM

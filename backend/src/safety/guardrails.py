@@ -27,8 +27,8 @@ from dataclasses import dataclass
 # Grouped by theme purely for readability/maintainability.
 _EMERGENCY_PHRASES: list[str] = [
     # Cardiac
-    r"chest pain", r"crushing (chest|pain)", r"tight(ness)? in (my|the) chest",
-    r"pain (radiating|spreading) (to|down) (my )?(arm|jaw|neck|back)",
+    r"chest pain", r"crushing (chest|pain|pressure)", r"tight(ness)? in (my|the) chest",
+    r"pain (radiating|spreading) (to|down) (my )?(left |right )?(arm|jaw|neck|back)",
     r"heart attack",
     # Respiratory
     r"can'?t breathe", r"cannot breathe", r"difficulty breathing",
@@ -38,7 +38,7 @@ _EMERGENCY_PHRASES: list[str] = [
     r"face (is )?droop", r"slurred speech", r"can'?t speak properly",
     r"sudden (weakness|numbness)", r"one side of (my )?(body|face)",
     r"worst headache of my life", r"sudden severe headache",
-    r"loss of (vision|balance)", r"can'?t see", r"seizure", r"convulsion",
+    r"loss of (vision|balance)", r"can'?t see", r"cannot see", r"seizure", r"convulsion",
     r"unconscious", r"unresponsive", r"passed out", r"fainted",
     r"stroke",
     # Bleeding / trauma

@@ -61,6 +61,9 @@ export function Register() {
               Sign in
             </Link>
           </p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            Want to try first? Use the demo login on the sign-in page: demo@clinic.local / demo123
+          </p>
         </div>
     </PageShell>
   );

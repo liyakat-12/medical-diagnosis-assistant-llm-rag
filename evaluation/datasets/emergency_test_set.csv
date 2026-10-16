@@ -1,26 +1,101 @@
 text,is_emergency
-"I've had a crushing pain in my chest for the last 20 minutes and it's spreading to my left arm",1
-"My face suddenly drooped on one side and I can't speak properly",1
-"My child swallowed a bottle of pills and is now very drowsy",1
-"I can't breathe properly and my lips are turning blue",1
-"I was stung by a bee and now my throat feels like it's closing up",1
-"My grandmother has a very high fever and is confused and not making sense",1
-"There's blood in my vomit and I feel extremely weak",1
-"I fell off a ladder and there's a bone sticking out of my leg",1
-"I feel hopeless and I've been thinking about ending my life",1
+I've had a crushing pain in my chest for the last 20 minutes and it's spreading to my left arm,1
+My face suddenly drooped on one side and I can't speak properly,1
+My child swallowed a bottle of pills and is now very drowsy,1
+I can't breathe properly and my lips are turning blue,1
+I was stung by a bee and now my throat feels like it's closing up,1
+My grandmother has a very high fever and is confused and not making sense,1
+There's blood in my vomit and I feel extremely weak,1
+I fell off a ladder and there's a bone sticking out of my leg,1
+I feel hopeless and I've been thinking about ending my life,1
 "I have a seizure happening right now for my neighbor, he's shaking uncontrollably",1
 "Sudden severe headache, worst I've ever had, along with blurry vision",1
-"I have severe abdominal pain and my stomach feels hard and rigid",1
-"I have a mild runny nose and sneezing since yesterday",0
-"I've had a dull headache after staring at my screen all day",0
-"My knee is a bit sore after going for a run this morning",0
+I have severe abdominal pain and my stomach feels hard and rigid,1
+I have a mild runny nose and sneezing since yesterday,0
+I've had a dull headache after staring at my screen all day,0
+My knee is a bit sore after going for a run this morning,0
 "I have an itchy throat and watery eyes, seems like allergies",0
-"I've been feeling a bit tired and thirsty for the past week",0
-"I have a burning feeling when I urinate and go to the bathroom often",0
-"I get heartburn after eating spicy food most evenings",0
+I've been feeling a bit tired and thirsty for the past week,0
+I have a burning feeling when I urinate and go to the bathroom often,0
+I get heartburn after eating spicy food most evenings,0
 "I have a red, warm patch of skin near a small cut on my arm",0
-"I've been feeling low and unmotivated for the past two weeks",0
-"My blood pressure reading at home was 145 over 92 today",0
-"I have a mild stomach ache and went to the bathroom twice today",0
-"I get wheezy sometimes when I exercise but my inhaler usually helps",0
-"I have joint stiffness in the morning that goes away after a while",0
+I've been feeling low and unmotivated for the past two weeks,0
+My blood pressure reading at home was 145 over 92 today,0
+I have a mild stomach ache and went to the bathroom twice today,0
+I get wheezy sometimes when I exercise but my inhaler usually helps,0
+I have joint stiffness in the morning that goes away after a while,0
+I have chest pain that started while I was climbing stairs,1
+There is tightness in my chest and I am sweating,1
+"Pain radiating to my jaw and left arm, I think this is a heart attack",1
+I cannot breathe and I am gasping for air,1
+I am struggling to breathe after the smoke from the fire,1
+My lips are blue and I feel like I am turning blue,1
+Face droop on the left side and sudden weakness in my right arm,1
+Slurred speech and I cannot speak properly since ten minutes ago,1
+Sudden numbness down one side of my body,1
+"This is the worst headache of my life, it came on in seconds",1
+He had a convulsion in the playground and is still unresponsive,1
+She passed out and is still unconscious on the floor,1
+"I think my father is having a stroke, one side of his face is down",1
+Severe bleeding from a deep wound that will not stop bleeding,1
+He is coughing up blood after the chest injury,1
+I have vomiting blood after drinking heavily for days,1
+"This looks like a compound fracture, the bone is sticking out",1
+"Severe allergic reaction, swelling of my tongue and throat",1
+I used my epipen but I still feel the anaphylaxis coming back,1
+"Rigid abdomen after the pain started, I can barely stand",1
+"Confusion and fever in my elderly father, he is not making sense",1
+"The doctor said this might be sepsis, he has a very high fever",1
+"Accidental overdose of sleeping tablets, he is very drowsy",1
+She drank bleach from under the sink and is vomiting,1
+I want to die and I have a plan to kill myself tonight,1
+I have been thinking about hurting myself for days,1
+"Heavy bleeding in pregnancy, I am soaking pads every hour",1
+I fainted during exercise and my chest still hurts,1
+Loss of vision in one eye that started suddenly with a severe headache,1
+He is unresponsive after the electric shock,1
+I have a deep wound on my thigh with heavy blood loss,1
+My toddler swallowed bleach and is crying and drooling,1
+She has self-harm cuts and says there is no point in living,1
+I have a fever of 105 and I feel very confused,1
+"Cannot see out of my right eye since this morning, it went black suddenly",1
+Pain spreading down my left arm with crushing pressure in the centre of my chest,1
+He poisoned himself with tablets and will not wake up,1
+"Swelling of my face after the prawn curry, and I cannot breathe",1
+I just had a seizure in the bathroom and bit my tongue,1
+Blood in my vomit and I feel like I might collapse,1
+"Sudden severe headache with loss of balance, I cannot walk straight",1
+I have a stuffy nose and a mild cough for three days,0
+My throat is scratchy and I have been sneezing,0
+Dull ache in my lower back after gardening,0
+I twisted my ankle slightly and it is a bit swollen,0
+Itchy scalp and flakes on my shoulders,0
+A small canker sore on the inside of my lip,0
+My baby is teething and drooling more than usual,0
+I get heartburn if I lie down too soon after dinner,0
+Mild nausea on long bus rides,0
+Dry skin on my legs in winter that feels tight,0
+A hangover headache the morning after a wedding,0
+I snore according to my partner but I feel fine in the day,0
+Occasional hiccups after fizzy drinks,0
+A cold sore forming on my lip,0
+Ingrown toenail that is a little tender,0
+I have dandruff that comes back every winter,0
+Sore muscles the day after starting a new gym routine,0
+A small bruise on my shin from bumping the table,0
+Watery eyes during pollen season,0
+I need reading glasses now that I am forty-five,0
+Mild constipation after a low-fibre week,0
+A stye on my eyelid that is a bit sore,0
+Tooth sensitivity to cold water for a second then it stops,0
+"Jet lag after a long flight, I feel sleepy at the wrong time",0
+A plantar wart on the bottom of my foot,0
+"Menstrual cramps on day one of my period, same as usual",0
+Athlete's foot between my toes that itches,0
+I have acne on my chin before my period,0
+"A blocked ear after swimming, it feels muffled",0
+Mild sunburn on my shoulders after a day outside,0
+I grind my teeth at night and my jaw is a bit stiff,0
+Occasional palpitations when I drink too much coffee,0
+A small lipoma lump on my back that has been there for years,0
+I have hay fever every April,0

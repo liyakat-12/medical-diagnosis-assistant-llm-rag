@@ -1,0 +1,280 @@
+"""One-shot writer for the expanded evaluation CSVs. Run from repo root."""
+from __future__ import annotations
+
+import csv
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+
+SYMPTOM_ROWS: list[tuple[str, str, str, str]] = [
+    # Original 20
+    ("I've got a stuffy nose, sneezing a lot, and a scratchy throat since yesterday", "common_cold", "Common Cold", "self_care"),
+    ("My eyes are itchy and watery and I keep sneezing every spring", "seasonal_allergies", "Allergic Rhinitis", "self_care"),
+    ("There's a dull pressure squeezing around my whole head after a stressful day at work", "tension_headache", "Tension Headache", "self_care"),
+    ("I pulled something in my calf while jogging and it hurts to move it", "muscle_strain", "Muscle Strain", "self_care"),
+    ("I've been throwing up and have watery diarrhea since last night", "mild_gastroenteritis", "Gastroenteritis", "self_care"),
+    ("I get throbbing pain on one side of my head with nausea and bright lights bother me", "migraine", "Migraine", "consult_doctor"),
+    ("It burns when I pee and I feel like I constantly need to go to the bathroom", "urinary_tract_infection", "Urinary Tract Infection", "consult_doctor"),
+    ("I'm always thirsty, urinating a lot, and my vision has been blurry lately", "type2_diabetes", "Type 2 Diabetes", "consult_doctor"),
+    ("My home blood pressure monitor keeps showing high numbers like 148 over 95", "hypertension", "Hypertension", "consult_doctor"),
+    ("I wheeze and get short of breath whenever I exercise or it's cold outside", "asthma_mild", "Asthma", "consult_doctor"),
+    ("I get a burning feeling in my chest after meals and a sour taste in my mouth", "gerd", "GERD", "consult_doctor"),
+    ("I've felt sad and empty most days for weeks and don't enjoy anything anymore", "depression", "Depression", "consult_doctor"),
+    ("I feel exhausted all the time, look pale, and get dizzy standing up", "anemia", "Anemia", "consult_doctor"),
+    ("There's a red, warm, swollen patch spreading on my leg near a cut", "cellulitis_mild", "Cellulitis", "consult_doctor"),
+    ("I have crushing chest pressure spreading to my jaw and I'm sweating heavily", "heart_attack", "Heart Attack", "emergency"),
+    ("My arm suddenly went weak and my speech is slurred", "stroke", "Stroke", "emergency"),
+    ("Sharp pain moved from around my belly button to my lower right side and I have a fever", "appendicitis", "Appendicitis", "emergency"),
+    ("After eating peanuts my lips swelled up and I'm having trouble breathing", "anaphylaxis", "Anaphylaxis", "emergency"),
+    ("I have a very high fever with chills and I feel confused and my heart is racing", "sepsis", "Sepsis", "emergency"),
+    ("I keep thinking about hurting myself and feel like there's no way out", "mental_health_crisis", "Mental Health Crisis", "emergency"),
+    # Extra 80
+    ("I have a high fever, severe headache, pain behind my eyes, and joint pain after mosquito bites", "dengue_fever", "Dengue Fever", "consult_doctor"),
+    ("I came back from a malaria area and now I have waves of fever with chills and sweating", "malaria", "Malaria", "consult_doctor"),
+    ("I lost my sense of smell, have a dry cough, fever, and feel very tired", "covid_19", "COVID-19", "consult_doctor"),
+    ("I have a cough with mucus, fever, chills, and chest pain when I breathe in", "pneumonia", "Pneumonia", "consult_doctor"),
+    ("Sudden severe pain in my side and back shooting to the groin, and my urine looks pink", "kidney_stones", "Kidney Stones", "consult_doctor"),
+    ("My face feels blocked and heavy, thick mucus, and pain in my cheeks when I bend forward", "sinusitis", "Sinusitis", "self_care"),
+    ("Dry itchy red patches in the bends of my elbows and behind my knees that I keep scratching", "eczema", "Eczema", "self_care"),
+    ("I have not had a bowel movement for several days and the stools are hard and painful to pass", "constipation", "Constipation", "self_care"),
+    ("I feel cold all the time, have gained weight, my skin is dry, and I am always tired", "hypothyroidism", "Hypothyroidism", "consult_doctor"),
+    ("Pain in the upper right abdomen after a fatty meal, with nausea that lasts an hour", "gallstones", "Gallstones", "consult_doctor"),
+    ("I was working in extreme heat and now I am confused, my skin is hot, and I feel like collapsing", "heat_stroke", "Heat Stroke", "emergency"),
+    ("Sudden high fever, a very stiff neck, severe headache, and bright light hurts my eyes", "meningitis", "Meningitis", "emergency"),
+    ("I fell on my wrist, it is swollen and deformed, and I cannot use the hand at all", "bone_fracture", "Bone Fracture", "emergency"),
+    ("Sudden shortness of breath and sharp chest pain that gets worse when I take a deep breath, after a long flight", "pulmonary_embolism", "Pulmonary Embolism", "emergency"),
+    ("I have been coughing for more than three weeks, have night sweats, and I am losing weight", "tuberculosis", "Tuberculosis", "consult_doctor"),
+    ("Itchy blister rash starting on the chest and face, with a mild fever, in my child", "chickenpox", "Chickenpox", "self_care"),
+    ("High fever, cough, red eyes, then a blotchy rash that started on the face and spread down", "measles", "Measles", "consult_doctor"),
+    ("Both eyes are red, watery, and crusted shut in the morning, and they feel gritty", "conjunctivitis", "Conjunctivitis", "self_care"),
+    ("My toddler has ear pain, a fever, and is pulling at one ear after a cold", "ear_infection", "Otitis Media", "consult_doctor"),
+    ("A cough that has lasted two weeks after a cold, with mucus, but only a low fever", "acute_bronchitis", "Acute Bronchitis", "consult_doctor"),
+    ("I have a barky cough and a hoarse voice, and my toddler sounds like a seal when they cough", "croup", "Croup", "consult_doctor"),
+    ("Painful swollen big toe that started overnight, the joint is red hot and I cannot even put a sheet on it", "gout", "Gout", "consult_doctor"),
+    ("My knee and finger joints are stiff for over an hour every morning and both sides are swollen", "rheumatoid_arthritis", "Rheumatoid Arthritis", "consult_doctor"),
+    ("Sharp pain down the back of one leg when I cough or sit, after lifting a heavy box", "sciatica", "Sciatica", "consult_doctor"),
+    ("The first step out of bed in the morning feels like a knife in my heel, then it eases a bit", "plantar_fasciitis", "Plantar Fasciitis", "consult_doctor"),
+    ("One side of my face is drooping, I cannot close that eyelid, and the forehead will not wrinkle", "bells_palsy", "Bell Palsy", "consult_doctor"),
+    ("The room is spinning badly, I feel sick, and one ear feels full after a cold", "labyrinthitis", "Labyrinthitis", "consult_doctor"),
+    ("Attacks of spinning dizziness lasting hours, with ringing and hearing dropping in one ear", "menieres_disease", "Meniere Disease", "consult_doctor"),
+    ("A painful red eye, strong discomfort in bright light, and blurred vision in that one eye", "uveitis", "Uveitis", "consult_doctor"),
+    ("A scratchy feeling in my eye after a fingernail poke, watering, and light hurts", "corneal_abrasion", "Corneal Abrasion", "consult_doctor"),
+    ("I have a toothache that is worse with sweet drinks, and I can see a dark hole in the tooth", "tooth_decay", "Tooth Decay", "consult_doctor"),
+    ("My gums bleed every time I brush, my breath is bad, and a tooth feels loose", "periodontitis", "Periodontitis", "consult_doctor"),
+    ("Burning pain in the upper stomach that eases a little with food, plus bloating and burping", "gastritis", "Gastritis", "consult_doctor"),
+    ("Sharp pain when I pass stool, then a streak of bright red blood on the paper", "anal_fissure", "Anal Fissure", "self_care"),
+    ("Watery diarrhoea for over a week after drinking untreated water, greasy stools and lots of wind", "giardiasis", "Giardiasis", "consult_doctor"),
+    ("Watery diarrhoea during or just after a course of antibiotics, with a strong smell and cramping", "c_difficile", "C. difficile Infection", "consult_doctor"),
+    ("I have had heartburn for years and now food feels like it sticks when I swallow", "barretts_esophagus", "Barrett Esophagus", "consult_doctor"),
+    ("Chest tightness that comes on when I walk uphill and goes away after a few minutes of rest", "angina_stable", "Stable Angina", "consult_doctor"),
+    ("Sharp central chest pain that is worse lying flat and better sitting forward, after a viral illness", "pericarditis", "Pericarditis", "consult_doctor"),
+    ("A fast regular heartbeat that starts and stops suddenly, over 150 beats, with dizziness", "supraventricular_tachycardia", "Supraventricular Tachycardia", "consult_doctor"),
+    ("I get dizzy for a few seconds every time I stand up quickly from sitting", "postural_hypotension", "Postural Hypotension", "self_care"),
+    ("My fingers turn white then blue then red and tingle painfully in the cold", "raynauds", "Raynaud Phenomenon", "self_care"),
+    ("Numbness and burning in both feet that is worse at night, and I have had diabetes for years", "diabetic_neuropathy", "Diabetic Neuropathy", "consult_doctor"),
+    ("My eyelids droop and I get double vision that is worse by evening, then better after rest", "myasthenia_gravis", "Myasthenia Gravis", "consult_doctor"),
+    ("Weakness starting in both feet and climbing up my legs over a few days after a stomach bug", "guillain_barre", "Guillain-Barre Syndrome", "emergency"),
+    ("I fall asleep during conversations and my legs go weak when I laugh", "narcolepsy", "Narcolepsy", "consult_doctor"),
+    ("Stroke-like face droop and arm weakness that lasted twenty minutes then fully went away", "transient_ischemic_attack", "Transient Ischaemic Attack", "emergency"),
+    ("A new headache that is worse in the morning and when I cough, plus repeated vomiting", "brain_tumour_warning", "Brain Tumour Warning Signs", "consult_doctor"),
+    ("Leg pain and heaviness after walking a set distance that eases when I sit and lean forward", "spinal_stenosis", "Spinal Stenosis", "consult_doctor"),
+    ("I have purple stretch marks, a round face, a large waist, and thin easily bruised skin from long-term steroids", "cushings_syndrome", "Cushing Syndrome", "consult_doctor"),
+    ("Extreme tiredness, weight loss, dizziness on standing, salt craving, and darkening of my skin creases", "addisons_disease", "Addison Disease", "consult_doctor"),
+    ("A swelling at the front of my neck that moves when I swallow, and my clothes feel tight there", "goiter", "Goitre", "consult_doctor"),
+    ("Weight loss despite eating well, a racing heartbeat, heat intolerance, and shaky hands", "graves_disease", "Graves Disease", "consult_doctor"),
+    ("Puffy eyelids in the morning, swollen legs, frothy urine, and sudden weight gain from fluid", "nephrotic_syndrome", "Nephrotic Syndrome", "consult_doctor"),
+    ("Cola-coloured urine, a puffy face, and high blood pressure a week after a sore throat", "glomerulonephritis", "Glomerulonephritis", "consult_doctor"),
+    ("I leak urine when I cough, sneeze, or laugh, especially since having a baby", "stress_incontinence", "Stress Incontinence", "consult_doctor"),
+    ("I saw pink blood in my urine once even though it did not hurt", "hematuria", "Haematuria", "consult_doctor"),
+    ("I am soaking a pad every hour during my period, passing large clots, and feel very tired", "heavy_menstrual_bleeding", "Heavy Menstrual Bleeding", "consult_doctor"),
+    ("Painful blisters in the genital area, tingling before they appear, and painful urination", "genital_herpes", "Genital Herpes", "consult_doctor"),
+    ("A hard painless lump in my breast, and the skin over it looks dimpled like orange peel", "breast_cancer_warning", "Breast Cancer Warning Signs", "consult_doctor"),
+    ("My baby cries for hours every evening, clenches fists, and draws the knees up, but feeds well", "infant_colic", "Infant Colic", "self_care"),
+    ("Red sore skin in the nappy area that stings at each change", "diaper_rash", "Nappy Rash", "self_care"),
+    ("Painful mouth ulcers plus small spots on the hands and feet after a short fever in my child", "hand_foot_mouth_disease", "Hand, Foot and Mouth Disease", "self_care"),
+    ("Sore throat, fever, then a fine sandpaper rash and a strawberry tongue", "scarlet_fever", "Scarlet Fever", "consult_doctor"),
+    ("My newborn looks yellow on day two, starting on the face", "neonatal_jaundice", "Newborn Jaundice", "consult_doctor"),
+    ("A painful red lump around a hair follicle that came to a yellow head", "boil", "Boil", "self_care"),
+    ("A changing mole with an uneven border, more than one colour, and it has grown", "skin_cancer_warning", "Skin Cancer Warning Signs", "consult_doctor"),
+    ("Pain on the outer elbow when I grip a cup or shake hands", "tennis_elbow", "Tennis Elbow", "self_care"),
+    ("I heard a snap in the back of my ankle during sport and now I cannot stand on tiptoe", "achilles_rupture", "Achilles Tendon Rupture", "emergency"),
+    ("My knee popped, swelled within hours, and now it gives way when I turn", "acl_injury", "ACL Injury", "consult_doctor"),
+    ("My shoulder looks square after a fall, is extremely painful, and I cannot move it", "dislocated_shoulder", "Dislocated Shoulder", "emergency"),
+    ("Back pain and morning stiffness for months that is worse after rest and better with exercise, I am 32", "ankylosing_spondylitis", "Ankylosing Spondylitis", "consult_doctor"),
+    ("New severe temple headache, jaw aching when I chew, and my scalp is sore, I am 72", "temporal_arteritis", "Giant Cell Arteritis", "emergency"),
+    ("I have a pounding heart, sweating, and a feeling of losing control that peaks in ten minutes then eases", "panic_disorder", "Panic Disorder", "consult_doctor"),
+    ("Low mood every autumn, oversleeping, craving carbs, then I feel better in spring", "seasonal_affective_disorder", "Seasonal Affective Disorder", "consult_doctor"),
+    ("I snore loudly, stop breathing in my sleep, and I am very sleepy in the daytime", "sleep_apnea", "Sleep Apnea", "consult_doctor"),
+    ("A pale skin patch that has lost feeling, and my hands feel numb", "leprosy", "Leprosy", "consult_doctor"),
+    ("Fever, severe headache, and intense calf muscle pain after wading through flood water", "leptospirosis", "Leptospirosis", "consult_doctor"),
+    ("Painless swollen glands in my neck for a month, night sweats, and unexplained weight loss", "lymphoma_warning", "Lymphoma Warning Signs", "consult_doctor"),
+    ("A swollen painful calf after surgery, and now I feel breathless", "deep_vein_thrombosis", "Deep Vein Thrombosis", "emergency"),
+    ("I cannot pass urine at all, my lower abdomen is painfully full", "urinary_retention", "Urinary Retention", "emergency"),
+    ("One-sided lower abdominal pain that started suddenly with vomiting, I have an ovarian cyst", "ovarian_torsion", "Ovarian Torsion", "emergency"),
+    ("Sudden painless bright red bleeding in late pregnancy", "placenta_previa", "Placenta Praevia", "emergency"),
+    ("I am 28 weeks pregnant with a new severe headache, swelling of the face, and high blood pressure", "preeclampsia", "Preeclampsia", "emergency"),
+    ("A painful boil-like lump in the armpit that keeps coming back and leaking", "hidradenitis_suppurativa", "Hidradenitis Suppurativa", "consult_doctor"),
+    ("Silvery scaly patches on my elbows and knees that itch", "psoriasis", "Psoriasis", "consult_doctor"),
+    ("I grind my teeth at night, wake with jaw ache and a headache", "bruxism", "Bruxism", "self_care"),
+    ("Hoarse voice for a week after shouting at a match, and it hurts to talk", "laryngitis", "Laryngitis", "self_care"),
+    ("I have hiccups that have lasted more than two days and they stop me sleeping", "hiccups", "Hiccups", "self_care"),
+    ("A sudden tight painful knot in my calf at night that I have to stretch out", "muscle_cramp", "Muscle Cramp", "self_care"),
+    ("My eyes burn and feel dry after long hours on the computer, and near vision blurs", "eye_strain", "Eye Strain", "self_care"),
+    ("Small itchy bumps on my neck and chest after sweating in hot weather", "heat_rash", "Heat Rash", "self_care"),
+]
+
+EMERGENCY_ROWS: list[tuple[str, int]] = [
+    # Original 25
+    ("I've had a crushing pain in my chest for the last 20 minutes and it's spreading to my left arm", 1),
+    ("My face suddenly drooped on one side and I can't speak properly", 1),
+    ("My child swallowed a bottle of pills and is now very drowsy", 1),
+    ("I can't breathe properly and my lips are turning blue", 1),
+    ("I was stung by a bee and now my throat feels like it's closing up", 1),
+    ("My grandmother has a very high fever and is confused and not making sense", 1),
+    ("There's blood in my vomit and I feel extremely weak", 1),
+    ("I fell off a ladder and there's a bone sticking out of my leg", 1),
+    ("I feel hopeless and I've been thinking about ending my life", 1),
+    ("I have a seizure happening right now for my neighbor, he's shaking uncontrollably", 1),
+    ("Sudden severe headache, worst I've ever had, along with blurry vision", 1),
+    ("I have severe abdominal pain and my stomach feels hard and rigid", 1),
+    ("I have a mild runny nose and sneezing since yesterday", 0),
+    ("I've had a dull headache after staring at my screen all day", 0),
+    ("My knee is a bit sore after going for a run this morning", 0),
+    ("I have an itchy throat and watery eyes, seems like allergies", 0),
+    ("I've been feeling a bit tired and thirsty for the past week", 0),
+    ("I have a burning feeling when I urinate and go to the bathroom often", 0),
+    ("I get heartburn after eating spicy food most evenings", 0),
+    ("I have a red, warm patch of skin near a small cut on my arm", 0),
+    ("I've been feeling low and unmotivated for the past two weeks", 0),
+    ("My blood pressure reading at home was 145 over 92 today", 0),
+    ("I have a mild stomach ache and went to the bathroom twice today", 0),
+    ("I get wheezy sometimes when I exercise but my inhaler usually helps", 0),
+    ("I have joint stiffness in the morning that goes away after a while", 0),
+    # Extra emergency positives
+    ("I have chest pain that started while I was climbing stairs", 1),
+    ("There is tightness in my chest and I am sweating", 1),
+    ("Pain radiating to my jaw and left arm, I think this is a heart attack", 1),
+    ("I cannot breathe and I am gasping for air", 1),
+    ("I am struggling to breathe after the smoke from the fire", 1),
+    ("My lips are blue and I feel like I am turning blue", 1),
+    ("Face droop on the left side and sudden weakness in my right arm", 1),
+    ("Slurred speech and I cannot speak properly since ten minutes ago", 1),
+    ("Sudden numbness down one side of my body", 1),
+    ("This is the worst headache of my life, it came on in seconds", 1),
+    ("He had a convulsion in the playground and is still unresponsive", 1),
+    ("She passed out and is still unconscious on the floor", 1),
+    ("I think my father is having a stroke, one side of his face is down", 1),
+    ("Severe bleeding from a deep wound that will not stop bleeding", 1),
+    ("He is coughing up blood after the chest injury", 1),
+    ("I have vomiting blood after drinking heavily for days", 1),
+    ("This looks like a compound fracture, the bone is sticking out", 1),
+    ("Severe allergic reaction, swelling of my tongue and throat", 1),
+    ("I used my epipen but I still feel the anaphylaxis coming back", 1),
+    ("Rigid abdomen after the pain started, I can barely stand", 1),
+    ("Confusion and fever in my elderly father, he is not making sense", 1),
+    ("The doctor said this might be sepsis, he has a very high fever", 1),
+    ("Accidental overdose of sleeping tablets, he is very drowsy", 1),
+    ("She drank bleach from under the sink and is vomiting", 1),
+    ("I want to die and I have a plan to kill myself tonight", 1),
+    ("I have been thinking about hurting myself for days", 1),
+    ("Heavy bleeding in pregnancy, I am soaking pads every hour", 1),
+    ("I fainted during exercise and my chest still hurts", 1),
+    ("Loss of vision in one eye that started suddenly with a severe headache", 1),
+    ("He is unresponsive after the electric shock", 1),
+    ("I have a deep wound on my thigh with heavy blood loss", 1),
+    ("My toddler swallowed bleach and is crying and drooling", 1),
+    ("She has self-harm cuts and says there is no point in living", 1),
+    ("I have a fever of 105 and I feel very confused", 1),
+    ("Cannot see out of my right eye since this morning, it went black suddenly", 1),
+    ("Pain spreading down my left arm with crushing pressure in the centre of my chest", 1),
+    ("He poisoned himself with tablets and will not wake up", 1),
+    ("Swelling of my face after the prawn curry, and I cannot breathe", 1),
+    ("I just had a seizure in the bathroom and bit my tongue", 1),
+    ("Blood in my vomit and I feel like I might collapse", 1),
+    ("Sudden severe headache with loss of balance, I cannot walk straight", 1),
+    # Extra non-emergency
+    ("I have a stuffy nose and a mild cough for three days", 0),
+    ("My throat is scratchy and I have been sneezing", 0),
+    ("Dull ache in my lower back after gardening", 0),
+    ("I twisted my ankle slightly and it is a bit swollen", 0),
+    ("Itchy scalp and flakes on my shoulders", 0),
+    ("A small canker sore on the inside of my lip", 0),
+    ("My baby is teething and drooling more than usual", 0),
+    ("I get heartburn if I lie down too soon after dinner", 0),
+    ("Mild nausea on long bus rides", 0),
+    ("Dry skin on my legs in winter that feels tight", 0),
+    ("A hangover headache the morning after a wedding", 0),
+    ("I snore according to my partner but I feel fine in the day", 0),
+    ("Occasional hiccups after fizzy drinks", 0),
+    ("A cold sore forming on my lip", 0),
+    ("Ingrown toenail that is a little tender", 0),
+    ("I have dandruff that comes back every winter", 0),
+    ("Sore muscles the day after starting a new gym routine", 0),
+    ("A small bruise on my shin from bumping the table", 0),
+    ("Watery eyes during pollen season", 0),
+    ("I need reading glasses now that I am forty-five", 0),
+    ("Mild constipation after a low-fibre week", 0),
+    ("A stye on my eyelid that is a bit sore", 0),
+    ("Tooth sensitivity to cold water for a second then it stops", 0),
+    ("Jet lag after a long flight, I feel sleepy at the wrong time", 0),
+    ("A plantar wart on the bottom of my foot", 0),
+    ("Menstrual cramps on day one of my period, same as usual", 0),
+    ("Athlete's foot between my toes that itches", 0),
+    ("I have acne on my chin before my period", 0),
+    ("A blocked ear after swimming, it feels muffled", 0),
+    ("Mild sunburn on my shoulders after a day outside", 0),
+    ("I grind my teeth at night and my jaw is a bit stiff", 0),
+    ("Occasional palpitations when I drink too much coffee", 0),
+    ("A small lipoma lump on my back that has been there for years", 0),
+    ("I have hay fever every April", 0),
+]
+
+HALLUCINATION_QUERIES = [row[0] for row in SYMPTOM_ROWS]
+
+
+def write_csv(path: Path, fieldnames: list[str], rows: list[dict]) -> None:
+    path.write_text("", encoding="utf-8")
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"wrote {path.name}: {len(rows)} rows")
+
+
+def main() -> None:
+    ids = [row[1] for row in SYMPTOM_ROWS]
+    if len(ids) != len(set(ids)):
+        dupes = sorted({item for item in ids if ids.count(item) > 1})
+        raise SystemExit(f"duplicate expected_doc_id: {dupes}")
+
+    write_csv(
+        HERE / "symptom_condition_testset.csv",
+        ["query", "expected_doc_id", "expected_condition", "expected_triage_level"],
+        [
+            {
+                "query": query,
+                "expected_doc_id": doc_id,
+                "expected_condition": condition,
+                "expected_triage_level": triage,
+            }
+            for query, doc_id, condition, triage in SYMPTOM_ROWS
+        ],
+    )
+    write_csv(
+        HERE / "emergency_test_set.csv",
+        ["text", "is_emergency"],
+        [{"text": text, "is_emergency": flag} for text, flag in EMERGENCY_ROWS],
+    )
+    write_csv(
+        HERE / "hallucination_test_questions.csv",
+        ["query"],
+        [{"query": query} for query in HALLUCINATION_QUERIES],
+    )
+    pos = sum(flag for _, flag in EMERGENCY_ROWS)
+    print(f"emergency split: {pos} positive, {len(EMERGENCY_ROWS) - pos} negative")
+    print(f"symptom set: {len(SYMPTOM_ROWS)}")
+    print(f"hallucination set: {len(HALLUCINATION_QUERIES)}")
+
+
+if __name__ == "__main__":
+    main()

@@ -20,7 +20,7 @@ from src.safety.guardrails import check_emergency, check_prescription_request
 
 def test_load_documents_finds_all_sample_docs():
     docs = load_documents()
-    assert len(docs) == 200
+    assert len(docs) == 400
     ids = {d.id for d in docs}
     assert "heart_attack" in ids
     assert "common_cold" in ids
@@ -113,6 +113,26 @@ def test_match_percents_sum_to_100():
     assert sum(percents) == 100
     assert len(percents) == 4
     assert percents[0] >= percents[-1]
+
+
+def test_rerank_puts_best_chunk_first(monkeypatch):
+    from src.retrieval.reranker import rerank_chunks
+    from src.retrieval.vector_store import RetrievedChunk
+
+    chunks = [
+        RetrievedChunk("a", "wrong passage", 0.1, {"doc_id": "a"}),
+        RetrievedChunk("b", "correct passage", 0.4, {"doc_id": "b"}),
+        RetrievedChunk("c", "other passage", 0.2, {"doc_id": "c"}),
+    ]
+
+    class FakeModel:
+        def predict(self, pairs, show_progress_bar=False):
+            return [0.1, 4.0, 0.2]
+
+    monkeypatch.setattr("src.retrieval.reranker._load_model", lambda: FakeModel())
+    ranked = rerank_chunks("symptoms", chunks, top_k=2)
+    assert ranked[0].chunk_id == "b"
+    assert len(ranked) == 2
 
 
 def test_build_possible_conditions_returns_four_unique():

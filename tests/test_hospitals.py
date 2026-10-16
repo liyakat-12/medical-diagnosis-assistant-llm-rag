@@ -31,6 +31,30 @@ def test_haversine_and_parse_hospitals():
     assert "maps.google.com" in rows[0]["maps_url"] or "google.com/maps" in rows[0]["maps_url"]
 
 
+def test_parse_nominatim_hospitals():
+    from app.services.hospital_service import parse_nominatim
+
+    rows = parse_nominatim(
+        [
+            {
+                "name": "Bowring Hospital",
+                "lat": "12.98",
+                "lon": "77.60",
+                "display_name": "Bowring Hospital, Shivajinagar, Bengaluru",
+                "address": {"road": "Shivajinagar", "city": "Bengaluru", "state": "Karnataka"},
+                "extratags": {"phone": "080-25591362", "emergency": "yes"},
+            },
+            {"name": "Bowring Hospital", "lat": "12.99", "lon": "77.61"},
+        ],
+        12.99,
+        77.59,
+    )
+    assert len(rows) == 1
+    assert rows[0]["name"] == "Bowring Hospital"
+    assert rows[0]["phone"] == "080-25591362"
+    assert rows[0]["emergency"] is True
+
+
 def test_nearby_hospitals_endpoint(client, monkeypatch):
     monkeypatch.setattr(
         "app.api.routes.hospitals.find_nearby_hospitals",

@@ -84,7 +84,7 @@ export function Chat() {
               <div className="m-auto max-w-lg rounded-3xl border border-dashed border-teal-200 bg-white/80 px-6 py-10 text-center shadow-sm">
                 <h2 className="text-xl font-extrabold text-slate-900">Describe your symptoms</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  I will ask three short questions, then show matches, urgency, citations, and hospitals near you.
+                  Tap the body map where it hurts, choose matching symptoms, or type extra detail. The map only helps describe discomfort — it is not a diagnosis. I will then show matches, urgency, citations, and hospitals near you.
                 </p>
               </div>
             ) : null}

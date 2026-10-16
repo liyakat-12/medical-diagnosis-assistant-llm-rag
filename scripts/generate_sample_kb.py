@@ -1,17 +1,19 @@
 """
-One-time generator for the STARTER sample knowledge base.
+One-time generator for the STARTER sample knowledge base (400 notes).
 
-IMPORTANT: The text in DOCUMENTS below is written in plain language for
-demonstration purposes only. It is general medical knowledge (the kind
-found in any patient-education leaflet) written by the project author,
-NOT a verbatim copy of any single source. The "source" field names the
-organization whose public guidance informed the summary, so every chunk
-retrieved at query time can show a real, checkable citation.
+IMPORTANT: The text below is written in plain language for demonstration
+purposes only. It is general medical knowledge (the kind found in any
+patient-education leaflet) written by the project author, NOT a verbatim
+copy of any single source. The "source" field names the organization whose
+public guidance informed the summary, so every chunk retrieved at query
+time can show a real, checkable citation.
 
-For a real submission, replace/extend these files with verified excerpts
-from actual guideline documents (WHO, CDC, NICE, Mayo Clinic, MedlinePlus,
-PubMed review articles, etc.) using the same front-matter format, or use
-scripts/ingest_pdf.py to pull in full PDF guideline documents.
+The 400 notes are split across this file and scripts/extra_sample_kb*.py
+purely to keep each file readable. To extend the corpus, add tuples to a
+new extra_sample_kb_N.py module, import it here, and append it to
+`all_docs` in main(); duplicate ids are rejected at generation time.
+
+Run scripts/build_index.py afterwards so the new notes become searchable.
 """
 from __future__ import annotations
 
@@ -22,6 +24,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from extra_sample_kb import EXTRA_DOCUMENTS
 from extra_sample_kb_2 import MORE_DOCUMENTS
+from extra_sample_kb_3 import MORE_DOCUMENTS_3
+from extra_sample_kb_4 import MORE_DOCUMENTS_4
 
 OUT_DIR = SCRIPT_DIR.parent / "knowledge_base" / "sample_documents"
 
@@ -797,7 +801,19 @@ triage_level: {triage_level}
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    all_docs = DOCUMENTS + EXTRA_DOCUMENTS + MORE_DOCUMENTS
+    all_docs = (
+        DOCUMENTS
+        + EXTRA_DOCUMENTS
+        + MORE_DOCUMENTS
+        + MORE_DOCUMENTS_3
+        + MORE_DOCUMENTS_4
+    )
+    seen: set[str] = set()
+    for doc in all_docs:
+        if doc[0] in seen:
+            raise SystemExit(f"duplicate document id: {doc[0]}")
+        seen.add(doc[0])
+
     for doc_id, title, source, url, condition, triage_level, body in all_docs:
         text = FRONT_MATTER_TEMPLATE.format(
             id=doc_id,

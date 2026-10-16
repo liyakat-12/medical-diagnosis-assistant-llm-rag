@@ -11,8 +11,8 @@ This is **not** a medical device and **does not** replace a clinician. It does n
 - React + TypeScript chat UI with persistent conversation history
 - FastAPI backend with JWT authentication in HTTP-only cookies
 - MongoDB storage for users, chats, and messages
-- Retrieval-Augmented Generation over 200 curated medical notes
-- Sentence-transformer embeddings and ChromaDB vector search
+- Retrieval-Augmented Generation over 400 curated medical notes
+- Sentence-transformer embeddings, ChromaDB vector search, and cross-encoder re-ranking
 - General and medical embedding modes
 - Safety guardrails, emergency detection, and prescription/dosage refusal
 - Triage labels: self-care, consult a doctor, emergency
@@ -102,7 +102,7 @@ project-root/
 ## AI / RAG flow
 
 1. Safety pre-check on the raw query (prescription/dosage refusal; emergency flags).
-2. Retrieve top-k passages from ChromaDB using the configured embedding mode.
+2. Retrieve 12 candidate passages from ChromaDB, then re-rank them with a cross-encoder and keep the top 4.
 3. Classify triage from the query and retrieved evidence (emergency override when red flags fire).
 4. Generate an answer that may only use retrieved context.
 5. Attach citations and run the citation-faithfulness audit.

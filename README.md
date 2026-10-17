@@ -10,8 +10,10 @@ The core method is **RAG (Retrieval-Augmented Generation)**. Symptom text is tur
 
 ## Features
 
-- React + TypeScript chat UI with persistent conversation history
-- Interactive body map to describe discomfort (not a diagnosis)
+- React + TypeScript chat UI: sidebar, scrolling conversation, pinned composer
+- Collapsible / resizable chat sidebar; overlay drawer on small screens
+- Interactive body map on a new chat and from the **Body** button (not a diagnosis)
+- Demo login on the sign-in page (`demo@clinic.local` / `demo123`)
 - FastAPI backend with JWT authentication in HTTP-only cookies
 - MongoDB storage for users, chats, and messages
 - Retrieval-Augmented Generation over 400 curated medical notes
@@ -20,6 +22,7 @@ The core method is **RAG (Retrieval-Augmented Generation)**. Symptom text is tur
 - General and medical embedding modes
 - Safety guardrails, emergency detection, and prescription/dosage refusal
 - Triage labels: self-care, consult a doctor, emergency
+- Answers shown as urgency, recommendations, explanation, possible matches, then sources
 - Citation generation and citation-faithfulness auditing
 - Pluggable LLM providers: mock, Groq, OpenAI, Ollama
 - Token/chunk streaming over Server-Sent Events
@@ -33,7 +36,7 @@ Add product screenshots here after a local run:
 
 - Landing page
 - Login / register
-- Chat with body map, triage banner, and citations
+- Chat with body map, urgency banner, recommendations, and citations
 - Nearby hospitals and conversation sidebar on desktop and mobile
 
 ---
@@ -144,9 +147,11 @@ Indexes exist on email (unique), `user_id`, `chat_id`, and recency fields.
 
 ## Chat architecture
 
-Creating a chat stores an empty conversation. The first user message generates a short title (deterministic, not an extra model call). The sidebar groups chats by Today / Yesterday / Previous 7 days / Older. Rename and delete are per-owner. Deleting a chat also deletes its messages.
+Creating a chat stores an empty conversation. The first user message generates a short title (deterministic, not an extra model call). The layout is a full-height chat shell: history sidebar, independently scrolling messages, and a composer that stays at the bottom. The sidebar can collapse to a narrow rail, be drag-resized on desktop (about 240–380 px), and becomes an overlay drawer on phones. Chats are grouped by Today / Yesterday / Previous 7 days / Older. Rename and delete are per-owner. Deleting a chat also deletes its messages.
 
-The body map lives in the chat composer. Selected regions and symptoms are turned into structured query text (`locations` and `symptoms`) and sent with any typed detail. Changing a selection replaces that context instead of appending duplicates. The map only records discomfort; it does not name a disease or change triage on its own.
+A new conversation shows a clickable body figure (“Tap where it hurts”) plus region buttons. The composer also has a **Body** control. The user can switch Front / Back, tap a region, and see only that region’s symptom chips. A **Will send** review line shows the typed text plus selected locations and symptoms before submit. Helpers live in `frontend/src/utils/bodyMap.ts` (`buildBodyMapQuery`, `formatReviewLine`). Changing a selection replaces that context instead of appending duplicates. The map only records discomfort; it does not name a disease, improve retrieval by itself, or change triage on its own.
+
+Assistant replies are arranged as: **urgency → recommendations → explanation → possible matches → sources**. Match percentages are normalized retrieval scores that sum to 100, not the chance of a diagnosis.
 
 Historical messages are loaded from MongoDB. Previous answers are not regenerated.
 
@@ -201,7 +206,7 @@ See `.env.example`. Important groups:
 - `JWT_SECRET`, cookie lifetimes
 - `CORS_ORIGINS` (include `http://localhost:5173`)
 - `LLM_PROVIDER`, provider keys / Ollama URL
-- `EMBEDDING_MODE`, `TOP_K`
+- `EMBEDDING_MODE`, `TOP_K`, `RERANK_ENABLED`, `RERANK_CANDIDATES`
 
 Do not put real secrets in `.env.example`.
 
@@ -254,7 +259,7 @@ set PYTHONPATH=backend
 python -m pytest tests/ -v
 ```
 
-Auth/chat tests use an in-memory Mongo mock. Pipeline tests cover ingestion, guardrails, triage, and faithfulness without calling a paid LLM.
+The repository has **32** pytest tests under `tests/` and **16** frontend body-map tests (`npm test`). Auth/chat tests use an in-memory Mongo mock. Pipeline tests cover ingestion, guardrails, triage, and faithfulness without calling a paid LLM. Do not claim the full suite passed unless you re-run it in this project’s venv.
 
 Body-map query helpers (frontend):
 
@@ -274,7 +279,21 @@ python evaluation/evaluate_hallucination.py
 python evaluation/evaluate_e2e.py
 ```
 
-Datasets live in `evaluation/datasets/`. These scripts still import `src.*` and the original RAG pipeline.
+Datasets live in `evaluation/datasets/`: **112** symptom–condition queries, **100** emergency cases (53 emergency / 47 non-emergency), and **112** hallucination questions. Scripts import `src.*` and the live RAG path.
+
+Documented results (expanded sets, MiniLM live path with re-ranking unless noted):
+
+| Test | Result |
+|---|---|
+| Emergency safety layer | 53/53 detected; 0 missed; 0 false alarms (100 cases) |
+| MiniLM only, 112 queries | Recall@1 62.50%; Recall@3 90.18%; Recall@5 92.86%; MRR 0.758 |
+| PubMedBERT only, 112 queries | Recall@1 65.18%; Recall@3 84.82%; Recall@5 86.61%; MRR 0.742 |
+| **Live MiniLM + re-ranker** | Recall@1 **85.71%**; Recall@3 94.64%; Recall@5 96.43%; MRR 0.903 |
+| End-to-end (same 112 queries) | Condition surfaced 110/112 (**98.21%**); exact triage 105/112 (93.75%) |
+
+PubMedBERT is slightly better at Recall@1 **without** the re-ranker; MiniLM is better at Recall@3, Recall@5, and MRR in that fair compare. The running app uses MiniLM **with** re-ranking.
+
+**98.21%** and **Recall@5 (96.43%)** are different tests: the first is end-to-end condition surfacing in the answer or citations (`evaluate_e2e.py`); the second is whether the expected document is in the top 5 retrieved chunks (`evaluate_embeddings.py`). Warm-cache timings still documented: about **24 ms** retrieval, **28 ms** mock pipeline, **82.1 s** / **114.4 s** to build the general / medical indexes.
 
 ---
 
@@ -284,7 +303,9 @@ Datasets live in `evaluation/datasets/`. These scripts still import `src.*` and 
 |---|---|
 | `LLM_PROVIDER` | `mock`, `groq`, `openai`, or `ollama` |
 | `EMBEDDING_MODE` | `general` (MiniLM) or `medical` (PubMedBERT) |
-| `TOP_K` | Retrieved passage count |
+| `TOP_K` | Passages kept after re-ranking (default 4) |
+| `RERANK_ENABLED` | Cross-encoder second stage (default `true`) |
+| `RERANK_CANDIDATES` | Chroma hits scored before keeping `TOP_K` (default 12) |
 | Missing cloud keys | Provider resolver falls back to `mock` |
 
 Add a new model by implementing `generate` / `stream` in `backend/src/ai/providers/` and registering it in `backend/src/ai/registry.py`.
@@ -294,7 +315,8 @@ Add a new model by implementing `generate` / `stream` in `backend/src/ai/provide
 ## Limitations
 
 - Knowledge is limited to the bundled sample documents, not the whole medical literature.
-- Retrieval and generation can miss or under-rank a condition.
+- Without re-ranking, first-place retrieval was 62.50% on 112 queries; with the cross-encoder it was 85.71%. A condition that is not in the 400-note set cannot be suggested.
+- The body map only adds location and symptom words to the query. It does not diagnose and is not claimed to raise Recall@1.
 - Mock mode answers from retrieved passages only; it is not a frontier clinical model.
 - MongoDB and Chroma are local-process defaults, not a production clinical deployment.
 - Cookie `Secure` is enabled only when `APP_ENV=production`.

@@ -104,7 +104,7 @@ SSE event types: `status`, `token`, `citation`, `triage`, `metadata`, `done`.
 
 1. `check_prescription_request` — refuse and skip retrieval when triggered
 2. `retrieve` from Chroma (`general` or `medical` collection), then optional cross-encoder re-rank (`src/retrieval/reranker.py`; default on)
-3. `classify_triage` with emergency override from `check_emergency``
+3. `classify_triage` with emergency override from `check_emergency`
 4. `stream_grounded_answer` / `generate_grounded_answer` via the provider registry
 5. `audit_citation_faithfulness`
 6. Package `DiagnosisResponse` (`result_to_dict` for APIs)
@@ -152,7 +152,11 @@ frontend/src/
 
 Auth bootstrap: full-page spinner until `/auth/me` finishes. Guest routes redirect to `/chat` when signed in. Protected routes redirect to `/login`.
 
-Body map: `frontend/src/components/chat/BodyMap.tsx` is presentational. Selection state lives in `ChatInput.tsx`. Query construction is in `frontend/src/utils/bodyMap.ts` (`buildBodyMapQuery`). Selected regions and symptoms are extra query text; they do not rebuild the Chroma index or override triage on their own.
+Chat shell (`pages/Chat.tsx`): viewport height; sidebar + message scroller + composer. Sidebar collapse/width persist in `localStorage` (`AppContext`). Desktop drag-resize is pointer-only (not on touch). Mobile uses an overlay drawer (close control, overlay click, Escape).
+
+Body map: `frontend/src/components/chat/BodyMap.tsx` is presentational (`BodyFigure` is the SVG). Selection state lives in `ChatInput.tsx`. A new empty chat shows the figure in the message column; the composer **Body** button opens the same front/back panel. Query construction is in `frontend/src/utils/bodyMap.ts` (`buildBodyMapQuery`, `formatReviewLine`). The composer **Will send** line previews typed text plus selected regions/symptoms. Selected regions and symptoms are extra query text; they do not rebuild the Chroma index or override triage on their own.
+
+Assistant message layout (`MessageBubble.tsx`): urgency, then recommendations, then explanation, then possible matches, then sources. Match percentages are normalized retrieval scores summing to 100.
 
 Nearby hospitals: `backend/app/services/hospital_service.py` queries Overpass mirrors, falls back to Nominatim, and returns a short list plus an embeddable map.
 
@@ -171,7 +175,23 @@ Nearby hospitals: `backend/app/services/hospital_service.py` queries Overpass mi
 | `tests/test_ai.py` | provider registry + mock grounded answer |
 | `frontend/tests/bodyMap.test.ts` | selection, duplicate prevention, review line, keyboard/collapse markup |
 
-`tests/conftest.py` swaps Motor for `mongomock-motor` and skips a live Mongo ping.
+There are **32** pytest functions under `tests/` and **16** cases in `frontend/tests/bodyMap.test.ts`. `tests/conftest.py` swaps Motor for `mongomock-motor` and skips a live Mongo ping. Do not claim the full suite passed unless it was re-run in this venv.
+
+---
+
+## Documented evaluation figures
+
+Sets: `symptom_condition_testset.csv` (112), `emergency_test_set.csv` (100: 53 / 47), `hallucination_test_questions.csv` (112).
+
+| Metric | Value |
+|---|---|
+| Emergency recall / precision / F1 | 100% / 100% / 1.000 (0 missed, 0 false alarms) |
+| MiniLM only Recall@1 / @3 / @5 / MRR | 62.50% / 90.18% / 92.86% / 0.758 |
+| PubMedBERT only Recall@1 / @3 / @5 / MRR | 65.18% / 84.82% / 86.61% / 0.742 |
+| MiniLM + re-ranker Recall@1 / @3 / @5 / MRR | **85.71%** / 94.64% / 96.43% / 0.903 |
+| E2E condition surfaced / exact triage | 110/112 (98.21%) / 105/112 (93.75%) |
+
+`98.21%` (e2e: expected condition in the answer or citations) is not the same test as Recall@5 `96.43%` (expected document in the top 5 chunks). PubMedBERT was compared **without** the re-ranker. The live app uses MiniLM **with** re-ranking (`RERANK_ENABLED` default true, `RERANK_CANDIDATES` default 12). Chunking: 120-word windows, 30-word overlap. Timings (warm CPU cache): ~24 ms retrieval, ~28 ms mock pipeline, 82.1 s / 114.4 s index builds.
 
 ---
 

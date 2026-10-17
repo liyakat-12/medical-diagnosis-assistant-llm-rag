@@ -32,7 +32,7 @@ function ChoiceRow({
             key={option}
             type="button"
             className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-bold",
+              "min-h-11 rounded-full border px-3 py-1.5 text-xs font-bold",
               value === option ? "border-teal-700 bg-teal-700 text-white" : "border-teal-100 bg-teal-50 text-teal-900 hover:bg-teal-100",
             )}
             onClick={() => onChange(option)}
@@ -66,7 +66,7 @@ export function FollowUpCard({
         <p className="mt-1 text-sm leading-6 text-slate-600">
           Answer these three questions, then I will show four possible matches, urgency, and nearby hospitals.
         </p>
-        <p className="mt-3 rounded-2xl bg-teal-50 px-3 py-2 text-sm text-slate-700">“{symptoms}”</p>
+        <p className="mt-3 max-h-32 overflow-y-auto rounded-2xl bg-teal-50 px-3 py-2 text-sm leading-6 break-anywhere text-slate-700">“{symptoms}”</p>
         <div className="mt-4 space-y-4">
           <ChoiceRow label="1. How long has this been going on?" options={DURATION} value={duration} onChange={setDuration} />
           <ChoiceRow label="2. What is your age group?" options={AGES} value={age} onChange={setAge} />

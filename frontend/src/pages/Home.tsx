@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { ShieldCheck, BookOpen, Activity, Lock } from "lucide-react";
+import { ShieldCheck, BookOpen, Activity, Lock, MapPin } from "lucide-react";
 import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/common/Button";
@@ -8,13 +8,14 @@ import { PageShell } from "../components/common/PageShell";
 
 const features = [
   { icon: BookOpen, title: "Evidence-grounded answers", body: "Symptoms are matched to curated medical notes before a response is generated." },
+  { icon: MapPin, title: "Body map for location", body: "Tap a body region when it is hard to describe symptoms in words. The map helps locate discomfort; it does not diagnose." },
   { icon: ShieldCheck, title: "Safety-first triage", body: "Emergency wording is flagged and prescription or dosage requests are refused." },
   { icon: Activity, title: "Transparent sources", body: "Each answer can show supporting documents so you can see where the information came from." },
   { icon: Lock, title: "Private conversations", body: "Chats are stored per account. Other users cannot open your history." },
 ];
 
 const steps = [
-  "Describe symptoms in everyday language.",
+  "Describe symptoms in everyday language, or mark a body region.",
   "Retrieve matching passages from the knowledge base.",
   "Apply safety rules and triage.",
   "Generate a grounded response.",
@@ -39,7 +40,7 @@ export function Home() {
               Understand your symptoms with grounded medical AI
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
-              Describe what you are experiencing and receive evidence-based information, possible explanations, urgency guidance, and supporting sources. MediAssist is not a diagnosis and does not replace a clinician.
+              Describe symptoms in your own words, or tap a body map to mark where it hurts. MediAssist retrieves matching notes from a curated medical collection, then shows possible explanations, urgency guidance, and sources. It is not a diagnosis and does not replace a clinician.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to={user ? "/chat" : "/register"}>
@@ -61,7 +62,7 @@ export function Home() {
           <img src="/images/hero-rag.png" alt="Symptom description matched to medical documents" className="w-full rounded-[2rem] object-cover shadow-xl shadow-teal-900/10" />
         </section>
 
-        <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-16 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-16 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {features.map((item) => (
             <article key={item.title} className="rounded-3xl border border-teal-100 bg-white p-5 shadow-sm">
               <item.icon className="text-teal-700" size={22} />

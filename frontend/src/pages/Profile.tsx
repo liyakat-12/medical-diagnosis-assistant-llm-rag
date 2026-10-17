@@ -51,7 +51,11 @@ export function Profile() {
           </dl>
           <form className="mt-6 space-y-4" onSubmit={(event) => void onSubmit(event)}>
             <Input label="Display name" value={name} onChange={(event) => setName(event.target.value)} />
-            {message ? <p className="text-sm font-semibold text-teal-800">{message}</p> : null}
+            {message ? (
+              <p className={`text-sm font-semibold ${message === "Profile updated." ? "text-teal-800" : "text-rose-700"}`} role={message === "Profile updated." ? "status" : "alert"}>
+                {message}
+              </p>
+            ) : null}
             <Button type="submit" disabled={busy}>
               {busy ? "Saving..." : "Save changes"}
             </Button>

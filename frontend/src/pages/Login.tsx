@@ -68,7 +68,11 @@ export function Login() {
           <form className="mt-6 space-y-4" onSubmit={(event) => void onSubmit(event)}>
             <Input label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} error={errors.email} autoComplete="email" />
             <Input label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} error={errors.password} autoComplete="current-password" />
-            {serverError ? <p className="text-sm font-semibold text-rose-600">{serverError}</p> : null}
+            {serverError ? (
+              <p className="text-sm font-semibold text-rose-600" role="alert">
+                {serverError}
+              </p>
+            ) : null}
             <Button className="w-full" type="submit" disabled={busy}>
               {busy ? "Signing in..." : "Sign in"}
             </Button>

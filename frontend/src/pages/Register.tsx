@@ -50,7 +50,11 @@ export function Register() {
             <Input label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} error={errors.email} autoComplete="email" />
             <Input label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} error={errors.password} autoComplete="new-password" />
             <Input label="Confirm password" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} error={errors.confirm} autoComplete="new-password" />
-            {serverError ? <p className="text-sm font-semibold text-rose-600">{serverError}</p> : null}
+            {serverError ? (
+              <p className="text-sm font-semibold text-rose-600" role="alert">
+                {serverError}
+              </p>
+            ) : null}
             <Button className="w-full" type="submit" disabled={busy}>
               {busy ? "Creating account..." : "Get started"}
             </Button>

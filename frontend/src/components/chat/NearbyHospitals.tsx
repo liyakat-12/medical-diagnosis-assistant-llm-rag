@@ -80,7 +80,7 @@ export function NearbyHospitals({ active }: { active: boolean }) {
   const embedSrc = googleEmbedSrc(origin, selected);
 
   return (
-    <section className="rounded-3xl border border-teal-100 bg-white px-4 py-4 shadow-sm">
+    <section className="min-w-0 rounded-3xl border border-teal-100 bg-white px-4 py-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-extrabold text-slate-900">Nearby hospitals</p>
@@ -88,7 +88,7 @@ export function NearbyHospitals({ active }: { active: boolean }) {
         </div>
         <a
           href={EMERGENCY_TEL}
-          className="shrink-0 rounded-full bg-red-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-red-700"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-red-600 px-3 text-xs font-extrabold text-white hover:bg-red-700"
         >
           Call {EMERGENCY_NUMBER}
         </a>
@@ -134,7 +134,7 @@ export function NearbyHospitals({ active }: { active: boolean }) {
                     : "border-teal-100 hover:bg-teal-50/70",
                 )}
               >
-                <p className="text-sm font-extrabold text-slate-900">
+                <p className="break-anywhere text-sm font-extrabold text-slate-900">
                   • {item.name}
                   {item.emergency ? <span className="ml-2 text-xs font-bold text-red-700">Emergency</span> : null}
                 </p>

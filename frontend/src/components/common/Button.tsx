@@ -15,9 +15,9 @@ export function Button({ className, variant = "primary", size = "md", ...props }
         variant === "secondary" && "border border-teal-200 bg-white text-teal-900 hover:bg-teal-50",
         variant === "ghost" && "text-slate-700 hover:bg-teal-50",
         variant === "danger" && "bg-rose-600 text-white hover:bg-rose-700",
-        size === "sm" && "px-3 py-1.5 text-xs",
-        size === "md" && "px-5 py-2.5 text-sm",
-        size === "lg" && "px-6 py-3 text-sm",
+        size === "sm" && "min-h-9 px-3 py-1.5 text-xs",
+        size === "md" && "min-h-11 px-5 py-2.5 text-sm",
+        size === "lg" && "min-h-12 px-6 py-3 text-sm",
         className,
       )}
       {...props}

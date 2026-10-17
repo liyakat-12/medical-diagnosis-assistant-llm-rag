@@ -18,6 +18,8 @@ export function Input({ label, error, className, type, id, ...props }: InputProp
         <input
           id={inputId}
           type={isPassword && show ? "text" : type}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${inputId}-error` : undefined}
           className={cn(
             "w-full rounded-2xl border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100",
             error ? "border-rose-400" : "border-teal-100",
@@ -29,7 +31,7 @@ export function Input({ label, error, className, type, id, ...props }: InputProp
         {isPassword ? (
           <button
             type="button"
-            className="absolute inset-y-0 right-3 text-slate-500 hover:text-teal-800"
+            className="absolute inset-y-0 right-1 grid w-11 place-items-center text-slate-500 hover:text-teal-800"
             onClick={() => setShow((value) => !value)}
             aria-label={show ? "Hide password" : "Show password"}
           >
@@ -37,7 +39,11 @@ export function Input({ label, error, className, type, id, ...props }: InputProp
           </button>
         ) : null}
       </span>
-      {error ? <span className="mt-1 block text-xs font-semibold text-rose-600">{error}</span> : null}
+      {error ? (
+        <span id={`${inputId}-error`} className="mt-1 block text-xs font-semibold text-rose-600" role="alert">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

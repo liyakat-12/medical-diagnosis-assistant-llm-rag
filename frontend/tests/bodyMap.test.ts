@@ -114,6 +114,7 @@ describe("accessibility and collapse markup", () => {
     assert.match(bodyMapSource, /aria-pressed=\{selected\}/);
     assert.match(bodyMapSource, /Or choose with buttons/);
     assert.match(bodyMapSource, /aria-expanded=\{open\}/);
+    assert.match(chatInputSource, /aria-expanded=\{mapOpen\}/);
   });
 
   it("keeps selection state in ChatInput instead of duplicating it", () => {

@@ -17,7 +17,7 @@ export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const hideOnChat = location.pathname.startsWith("/chat");
+  const hideOnChat = location.pathname.startsWith("/chat") || location.pathname === "/history";
 
   function goToHowItWorks(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
@@ -48,20 +48,20 @@ export function Navbar() {
                 {link.label}
               </a>
             ) : (
-              <NavLink key={link.to} to={link.to} className="hover:text-teal-800">
+              <NavLink key={link.to} to={link.to} className={({ isActive }) => cn("hover:text-teal-800", isActive && "text-teal-800")}>
                 {link.label}
               </NavLink>
             ),
           )}
           {user ? (
             <>
-              <NavLink to="/chat" className="hover:text-teal-800">
+              <NavLink to="/chat" className={({ isActive }) => cn("hover:text-teal-800", isActive && "text-teal-800")}>
                 Chat
               </NavLink>
-              <NavLink to="/history" className="hover:text-teal-800">
+              <NavLink to="/history" className={({ isActive }) => cn("hover:text-teal-800", isActive && "text-teal-800")}>
                 History
               </NavLink>
-              <NavLink to="/profile" className="hover:text-teal-800">
+              <NavLink to="/profile" className={({ isActive }) => cn("hover:text-teal-800", isActive && "text-teal-800")}>
                 Profile
               </NavLink>
               <Button variant="secondary" size="sm" onClick={() => void logout()}>
@@ -70,7 +70,7 @@ export function Navbar() {
             </>
           ) : (
             <>
-              <NavLink to="/login" className="hover:text-teal-800">
+              <NavLink to="/login" className={({ isActive }) => cn("hover:text-teal-800", isActive && "text-teal-800")}>
                 Login
               </NavLink>
               <NavLink to="/register" className="rounded-full bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800">
@@ -79,7 +79,7 @@ export function Navbar() {
             </>
           )}
         </nav>
-        <button className="md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle navigation">
+        <button className="grid h-11 w-11 place-items-center rounded-xl md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Toggle navigation" aria-expanded={open}>
           {open ? <X /> : <Menu />}
         </button>
       </div>

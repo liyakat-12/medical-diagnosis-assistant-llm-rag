@@ -28,7 +28,7 @@ class OllamaProvider:
             ],
             "stream": False,
         }
-        resp = requests.post(f"{config.OLLAMA_BASE_URL}/api/chat", json=payload, timeout=120)
+        resp = requests.post(f"{config.OLLAMA_BASE_URL}/api/chat", json=payload, timeout=45)
         resp.raise_for_status()
         return (resp.json().get("message") or {}).get("content", "").strip()
 
@@ -52,7 +52,7 @@ class OllamaProvider:
         with requests.post(
             f"{config.OLLAMA_BASE_URL}/api/chat",
             json=payload,
-            timeout=120,
+            timeout=45,
             stream=True,
         ) as resp:
             resp.raise_for_status()

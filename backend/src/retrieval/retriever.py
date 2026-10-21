@@ -34,20 +34,7 @@ def _get_store(mode: str) -> VectorStore:
     return VectorStore(mode)
 
 
-def retrieve(query: str, top_k: int | None = None, mode: str | None = None, rerank: bool | None = None) -> list[Evidence]:
-    from src.retrieval.reranker import rerank_chunks
-
-    mode = (mode or config.EMBEDDING_MODE).strip().lower()
-    top_k = top_k or config.TOP_K
-    use_rerank = config.RERANK_ENABLED if rerank is None else rerank
-    store = _get_store(mode)
-    fetch_k = max(top_k, config.RERANK_CANDIDATES) if use_rerank else top_k
-    results = store.search(query, top_k=fetch_k)
-    if use_rerank:
-        results = rerank_chunks(query, results, top_k)
-    else:
-        results = results[:top_k]
-
+def _to_evidence(results) -> list[Evidence]:
     evidence = []
     for r in results:
         if r.rerank_score is not None:
@@ -67,3 +54,28 @@ def retrieve(query: str, top_k: int | None = None, mode: str | None = None, rera
             )
         )
     return evidence
+
+
+def retrieve_candidates(
+    query: str,
+    top_k: int | None = None,
+    mode: str | None = None,
+    rerank: bool | None = None,
+) -> tuple[list[Evidence], list[Evidence]]:
+    """One vector search. Returns (top hits for the answer, full pool for match %)."""
+    from src.retrieval.reranker import rerank_chunks
+
+    mode = (mode or config.EMBEDDING_MODE).strip().lower()
+    top_k = top_k or config.TOP_K
+    use_rerank = config.RERANK_ENABLED if rerank is None else rerank
+    store = _get_store(mode)
+    fetch_k = max(top_k, config.RERANK_CANDIDATES) if use_rerank else max(top_k, 12)
+    results = store.search(query, top_k=fetch_k)
+    if use_rerank:
+        results = rerank_chunks(query, results, top_k=len(results))
+    return _to_evidence(results[:top_k]), _to_evidence(results)
+
+
+def retrieve(query: str, top_k: int | None = None, mode: str | None = None, rerank: bool | None = None) -> list[Evidence]:
+    top, _pool = retrieve_candidates(query, top_k=top_k, mode=mode, rerank=rerank)
+    return top

@@ -9,12 +9,21 @@ from src.ai.base import BaseAIProvider
 class GroqProvider:
     name = "groq"
 
+    def __init__(self) -> None:
+        self._cached_client = None
+
     def _client(self):
         from openai import OpenAI
 
         if config._looks_like_placeholder(config.GROQ_API_KEY):
             raise RuntimeError("GROQ_API_KEY is not set.")
-        return OpenAI(api_key=config.GROQ_API_KEY, base_url=config.GROQ_BASE_URL)
+        if self._cached_client is None:
+            self._cached_client = OpenAI(
+                api_key=config.GROQ_API_KEY,
+                base_url=config.GROQ_BASE_URL,
+                timeout=20.0,
+            )
+        return self._cached_client
 
     def generate(
         self,

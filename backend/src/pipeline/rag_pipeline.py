@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 
 from src import config
 from src.llm.generator import generate_grounded_answer, generate_ungrounded_answer, stream_grounded_answer
-from src.retrieval.retriever import Evidence, retrieve
+from src.retrieval.retriever import Evidence, retrieve_candidates
 from src.safety.citation_faithfulness import FaithfulnessAudit, audit_citation_faithfulness
 from src.safety.guardrails import (
     PRESCRIPTION_REFUSAL_MESSAGE,
@@ -33,7 +33,6 @@ from src.safety.guardrails import (
 from src.safety.triage import TriageResult, classify_triage
 
 OUTCOME_LIMIT = 4
-OUTCOME_SEARCH_K = 12
 
 
 _REC_HINT = re.compile(
@@ -153,12 +152,20 @@ def build_possible_conditions(citations: list[dict], limit: int = OUTCOME_LIMIT)
     return rows
 
 
-def outcomes_for_query(query: str, citations: list[dict], embedding_mode: str | None = None) -> list[dict]:
-    rows = build_possible_conditions(citations)
-    if len(rows) >= OUTCOME_LIMIT:
-        return rows
-    extra = retrieve(query, top_k=OUTCOME_SEARCH_K, mode=embedding_mode)
-    return build_possible_conditions(citations_from_evidence(extra))
+def outcomes_for_query(
+    query: str,
+    citations: list[dict],
+    embedding_mode: str | None = None,
+    pool: list[dict] | None = None,
+) -> list[dict]:
+    """Build match rows from the retrieval already done for this query.
+
+    A second vector search used to run when fewer than four unique conditions
+    appeared. That doubled embedding + Chroma + rerank cost without new
+    evidence, so the existing candidate pool is reused instead.
+    """
+    del query, embedding_mode
+    return build_possible_conditions(pool or citations)
 
 
 def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | None = None) -> DiagnosisResponse:
@@ -178,8 +185,8 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
             recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
         )
 
-    # --- Retrieval ---
-    evidence = retrieve(query, top_k=top_k, mode=embedding_mode)
+    # --- Retrieval (one search; pool is reused for the four match percentages) ---
+    evidence, pool = retrieve_candidates(query, top_k=top_k, mode=embedding_mode)
 
     # --- Triage classification (emergency override happens here) ---
     triage = classify_triage(query, evidence)
@@ -200,7 +207,9 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
         citations=citations,
         faithfulness=faithfulness,
         recommendations=_recommendations(triage, evidence),
-        possible_conditions=outcomes_for_query(query, citations, embedding_mode),
+        possible_conditions=outcomes_for_query(
+            query, citations, embedding_mode, citations_from_evidence(pool)
+        ),
     )
 
 
@@ -252,7 +261,7 @@ def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: s
         return
 
     yield {"type": "status", "content": "Retrieving medical references..."}
-    evidence = retrieve(query, top_k=top_k, mode=embedding_mode)
+    evidence, pool = retrieve_candidates(query, top_k=top_k, mode=embedding_mode)
     triage = classify_triage(query, evidence)
     if triage:
         yield {
@@ -260,10 +269,13 @@ def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: s
             "level": triage.level,
             "label": triage.label,
             "guidance": triage.guidance,
+            "reason": triage.reason,
         }
 
     citations = citations_from_evidence(evidence)
-    possible_conditions = outcomes_for_query(query, citations, embedding_mode)
+    possible_conditions = outcomes_for_query(
+        query, citations, embedding_mode, citations_from_evidence(pool)
+    )
     yield {"type": "citation", "citations": citations, "possible_conditions": possible_conditions}
 
     context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]

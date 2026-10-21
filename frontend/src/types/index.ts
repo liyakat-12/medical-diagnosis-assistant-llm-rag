@@ -81,6 +81,7 @@ export interface StreamEvent {
   level?: TriageLevel;
   label?: string;
   guidance?: string;
+  reason?: string;
   recommendations?: string[];
   faithfulness?: Faithfulness | null;
   result?: Record<string, unknown>;
@@ -102,6 +103,7 @@ export interface HospitalSearchResponse {
   hospitals: NearbyHospital[];
   emergency_number: string;
   error?: string | null;
+  origin?: { lat: number; lng: number; label?: string | null };
 }
 
 export interface ApiError {

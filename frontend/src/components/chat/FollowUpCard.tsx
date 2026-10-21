@@ -88,3 +88,52 @@ export function FollowUpCard({
 export function formatFollowUpQuery(symptoms: string, answers: FollowUpAnswers): string {
   return `${symptoms.trim()}\n\nExtra detail: lasting ${answers.duration}; age group ${answers.age}; worse with ${answers.worse}.`;
 }
+
+export function buildSuggestedFollowUps(userText: string, conditions: { condition?: string }[]): string[] {
+  const cleaned = userText
+    .replace(/\n\nExtra detail:[\s\S]*$/, "")
+    .replace(/Body map context \(user-described discomfort, not a diagnosis\):[\s\S]*$/, "")
+    .trim();
+  const first = conditions.find((item) => item.condition)?.condition;
+  const topic = first || (cleaned.length > 72 ? "these symptoms" : cleaned || "these symptoms");
+  const seen = new Set<string>();
+  return [
+    `When should I see a doctor for ${topic}?`,
+    `What warning signs should I watch for with ${topic}?`,
+    `What self-care is usually suggested for ${topic}?`,
+  ].filter((item) => {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return Boolean(item.trim());
+  });
+}
+
+export function SuggestedFollowUps({
+  questions,
+  disabled,
+  onPick,
+}: {
+  questions: string[];
+  disabled?: boolean;
+  onPick: (question: string) => void;
+}) {
+  if (!questions.length) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-400">Follow-up questions</p>
+      <div className="flex flex-wrap gap-2">
+        {questions.map((question) => (
+          <button
+            key={question}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(question)}
+            className="min-h-11 rounded-full border border-teal-100 bg-white px-3 text-xs font-bold text-teal-900 hover:bg-teal-50 disabled:opacity-50"
+          >
+            {question}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

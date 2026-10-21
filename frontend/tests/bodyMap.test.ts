@@ -10,9 +10,11 @@ import {
   toggleItem,
 } from "../src/utils/bodyMap.ts";
 import { looksEmergency } from "../src/utils/emergency.ts";
+import { buildSuggestedFollowUps, formatFollowUpQuery } from "../src/components/chat/FollowUpCard.tsx";
 
 const bodyMapSource = readFileSync(new URL("../src/components/chat/BodyMap.tsx", import.meta.url), "utf8");
 const chatInputSource = readFileSync(new URL("../src/components/chat/ChatInput.tsx", import.meta.url), "utf8");
+const chatPageSource = readFileSync(new URL("../src/pages/Chat.tsx", import.meta.url), "utf8");
 
 describe("toggleItem", () => {
   it("adds a missing region and removes a selected one", () => {
@@ -117,6 +119,35 @@ describe("accessibility and collapse markup", () => {
     assert.match(chatInputSource, /aria-expanded=\{mapOpen\}/);
   });
 
+  it("keeps the pre-send follow-up card for ordinary symptoms", () => {
+    assert.match(chatPageSource, /setPendingSymptoms\(value\)/);
+    assert.match(chatPageSource, /<FollowUpCard/);
+    assert.match(chatPageSource, /looksEmergency/);
+  });
+});
+
+describe("follow-up helpers", () => {
+  it("appends duration, age, and trigger to the same query", () => {
+    const query = formatFollowUpQuery("I have a cough", {
+      duration: "1-2 days",
+      age: "18-40",
+      worse: "Breathing",
+    });
+    assert.match(query, /I have a cough/);
+    assert.match(query, /lasting 1-2 days/);
+    assert.match(query, /age group 18-40/);
+    assert.match(query, /worse with Breathing/);
+  });
+
+  it("builds clickable follow-ups from the current answer without an extra model call", () => {
+    const questions = buildSuggestedFollowUps("I have a cough", [{ condition: "common cold" }]);
+    assert.equal(questions.length, 3);
+    assert.match(questions[0], /common cold/);
+    assert.ok(questions.every((item) => item.trim()));
+  });
+});
+
+describe("selection state", () => {
   it("keeps selection state in ChatInput instead of duplicating it", () => {
     assert.match(chatInputSource, /const \[regions, setRegions\]/);
     assert.match(chatInputSource, /const \[symptoms, setSymptoms\]/);

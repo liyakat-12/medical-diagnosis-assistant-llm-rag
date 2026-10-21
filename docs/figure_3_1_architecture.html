@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Figure 3.1 — General architecture of MediAssist</title>
+  <style>
+    html, body { margin: 0; background: #fff; }
+    .wrap { width: 1400px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <svg viewBox="0 0 1400 820" width="1400" height="820" role="img" aria-label="Figure 3.1 General architecture of MediAssist">
+      <defs>
+        <marker id="aBlue" markerUnits="userSpaceOnUse" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="16" markerHeight="16" orient="auto">
+          <path d="M0,1 L14,7 L0,13 z" fill="#1d4f7a"/>
+        </marker>
+        <marker id="aPurple" markerUnits="userSpaceOnUse" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="16" markerHeight="16" orient="auto">
+          <path d="M0,1 L14,7 L0,13 z" fill="#5b4a86"/>
+        </marker>
+        <marker id="aBrown" markerUnits="userSpaceOnUse" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="16" markerHeight="16" orient="auto">
+          <path d="M0,1 L14,7 L0,13 z" fill="#9a5b16"/>
+        </marker>
+      </defs>
+
+      <text x="700" y="36" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="24" font-weight="700" fill="#111">Figure 3.1  General architecture of MediAssist</text>
+      <text x="700" y="58" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="14" fill="#555">Solid arrows = request. Dashed arrows = reply. User talks only to the frontend.</text>
+
+      <!-- USER sits only above Frontend -->
+      <rect x="80" y="78" width="260" height="50" rx="25" fill="#dbebff" stroke="#1d4f7a" stroke-width="2.5"/>
+      <text x="210" y="99" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="17" font-weight="700" fill="#163a5a">User</text>
+      <text x="210" y="117" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" fill="#333">types symptoms or taps body map</text>
+
+      <line x1="210" y1="128" x2="210" y2="168" stroke="#1d4f7a" stroke-width="3.5" marker-end="url(#aBlue)"/>
+      <rect x="226" y="138" width="52" height="18" rx="4" fill="#fff"/>
+      <text x="252" y="151" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#1d4f7a">HTTPS</text>
+
+      <!-- COL 1 -->
+      <rect x="40" y="176" width="340" height="400" rx="14" fill="#eef6fc" stroke="#1d4f7a" stroke-width="2.6"/>
+      <text x="210" y="206" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="16" font-weight="700" fill="#163a5a">1. FRONTEND  ·  React</text>
+      <line x1="58" y1="218" x2="362" y2="218" stroke="#9bb8d0"/>
+
+      <rect x="58" y="232" width="304" height="96" rx="10" fill="#fff" stroke="#7aa0bf" stroke-width="1.6"/>
+      <text x="74" y="258" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">Chat screen</text>
+      <text x="74" y="280" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Landing, login, body map</text>
+      <text x="74" y="300" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Follow-up questions</text>
+
+      <rect x="58" y="340" width="304" height="96" rx="10" fill="#fff" stroke="#7aa0bf" stroke-width="1.6"/>
+      <text x="74" y="366" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">Answer display</text>
+      <text x="74" y="388" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Urgency, 4 matches, sources</text>
+      <text x="74" y="408" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Call 108 button</text>
+
+      <rect x="58" y="448" width="304" height="108" rx="10" fill="#fff" stroke="#7aa0bf" stroke-width="1.6"/>
+      <text x="74" y="476" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">Hospitals map</text>
+      <text x="74" y="498" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Nearby list and Google Maps</text>
+      <text x="74" y="518" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Shown after the answer</text>
+
+      <!-- COL 2 -->
+      <rect x="530" y="176" width="340" height="400" rx="14" fill="#eef8f4" stroke="#2a6b55" stroke-width="2.6"/>
+      <text x="700" y="206" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="16" font-weight="700" fill="#1c4a3a">2. BACKEND  ·  FastAPI</text>
+      <line x1="548" y1="218" x2="852" y2="218" stroke="#9cc4b4"/>
+
+      <rect x="548" y="232" width="304" height="96" rx="10" fill="#fff" stroke="#8bb8a6" stroke-width="1.6"/>
+      <text x="564" y="258" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">Web API</text>
+      <text x="564" y="280" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Auth, chats, messages</text>
+      <text x="564" y="300" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Diagnosis, hospitals</text>
+
+      <rect x="548" y="340" width="304" height="96" rx="10" fill="#fff" stroke="#8bb8a6" stroke-width="1.6"/>
+      <text x="564" y="366" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">Safety layer</text>
+      <text x="564" y="388" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Emergency override</text>
+      <text x="564" y="408" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Medicine refusal, triage</text>
+
+      <rect x="548" y="448" width="304" height="108" rx="10" fill="#fff" stroke="#8bb8a6" stroke-width="1.6"/>
+      <text x="564" y="476" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">RAG pipeline</text>
+      <text x="564" y="498" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Retrieve notes, re-rank</text>
+      <text x="564" y="518" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Ask LLM, then stream answer</text>
+
+      <!-- COL 3 -->
+      <rect x="1020" y="176" width="340" height="400" rx="14" fill="#f4f1fb" stroke="#5b4a86" stroke-width="2.6"/>
+      <text x="1190" y="206" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="16" font-weight="700" fill="#3d2f62">3. DATA AND AI</text>
+      <line x1="1038" y1="218" x2="1342" y2="218" stroke="#c3b7dc"/>
+
+      <rect x="1038" y="232" width="304" height="96" rx="10" fill="#fff" stroke="#b3a6d4" stroke-width="1.6"/>
+      <text x="1054" y="258" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">MongoDB</text>
+      <text x="1054" y="280" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Users, chats, messages</text>
+      <text x="1054" y="300" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Citations and triage saved</text>
+
+      <rect x="1038" y="340" width="304" height="96" rx="10" fill="#fff" stroke="#b3a6d4" stroke-width="1.6"/>
+      <text x="1054" y="366" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">ChromaDB + MiniLM</text>
+      <text x="1054" y="388" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Vector search of 400 notes</text>
+      <text x="1054" y="408" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Find the closest medical text</text>
+
+      <rect x="1038" y="448" width="304" height="108" rx="10" fill="#fff" stroke="#b3a6d4" stroke-width="1.6"/>
+      <text x="1054" y="476" font-family="Calibri, Segoe UI, Arial" font-size="15" font-weight="700">Re-ranker + LLM</text>
+      <text x="1054" y="498" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Cross-encoder keeps best 4</text>
+      <text x="1054" y="518" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Mock / Groq / OpenAI / Ollama</text>
+
+      <!-- Gap 1: 380 to 530 = 150px. Request at y=280, reply at y=502 -->
+      <line x1="380" y1="280" x2="514" y2="280" stroke="#1d4f7a" stroke-width="3.5" marker-end="url(#aBlue)"/>
+      <rect x="398" y="248" width="98" height="22" rx="4" fill="#fff"/>
+      <text x="447" y="264" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#1d4f7a">REST + SSE</text>
+
+      <line x1="530" y1="502" x2="396" y2="502" stroke="#1d4f7a" stroke-width="3.5" stroke-dasharray="8 5" marker-end="url(#aBlue)"/>
+      <rect x="408" y="512" width="94" height="22" rx="4" fill="#fff"/>
+      <text x="455" y="528" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#1d4f7a">answer</text>
+
+      <!-- Gap 2: 870 to 1020 = 150px -->
+      <line x1="870" y1="280" x2="1004" y2="280" stroke="#5b4a86" stroke-width="3.5" marker-end="url(#aPurple)"/>
+      <rect x="910" y="248" width="54" height="22" rx="4" fill="#fff"/>
+      <text x="937" y="264" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#5b4a86">save</text>
+
+      <line x1="870" y1="388" x2="1004" y2="388" stroke="#5b4a86" stroke-width="3.5" marker-end="url(#aPurple)"/>
+      <rect x="902" y="356" width="70" height="22" rx="4" fill="#fff"/>
+      <text x="937" y="372" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#5b4a86">search</text>
+
+      <line x1="1020" y1="502" x2="886" y2="502" stroke="#5b4a86" stroke-width="3.5" stroke-dasharray="8 5" marker-end="url(#aPurple)"/>
+      <rect x="888" y="512" width="98" height="22" rx="4" fill="#fff"/>
+      <text x="937" y="528" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#5b4a86">notes + LLM</text>
+
+      <!-- Bottom boxes -->
+      <rect x="40" y="640" width="340" height="140" rx="12" fill="#fff8f0" stroke="#9a5b16" stroke-width="2.2"/>
+      <text x="210" y="670" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="13" font-weight="700" fill="#6b4a16">HOSPITAL FINDER</text>
+      <text x="210" y="696" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">OpenStreetMap Overpass API</text>
+      <text x="210" y="716" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">Nominatim fallback · Google Maps</text>
+      <text x="210" y="744" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" fill="#6b4a16">used only for nearby hospitals</text>
+
+      <rect x="1020" y="640" width="340" height="140" rx="12" fill="#fff8f0" stroke="#9a5b16" stroke-width="2.2"/>
+      <text x="1190" y="670" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="13" font-weight="700" fill="#6b4a16">KNOWLEDGE BASE</text>
+      <text x="1190" y="696" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">400 medical notes (markdown)</text>
+      <text x="1190" y="716" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="13" fill="#333">WHO, CDC, NHS, Mayo, MedlinePlus</text>
+      <text x="1190" y="744" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" fill="#6b4a16">offline index: scripts/build_index.py</text>
+
+      <!-- Backend -> Hospital: down, left, down. Label sits above the horizontal run, not on it. -->
+      <polyline points="700,576 700,608 210,608 210,630" fill="none" stroke="#9a5b16" stroke-width="3.5" marker-end="url(#aBrown)"/>
+      <rect x="248" y="584" width="170" height="20" rx="4" fill="#fff"/>
+      <text x="333" y="599" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#9a5b16">GET /hospitals/nearby</text>
+
+      <!-- Knowledge -> Data/AI. Label to the right of the vertical arrow. -->
+      <line x1="1190" y1="640" x2="1190" y2="588" stroke="#9a5b16" stroke-width="3.5" marker-end="url(#aBrown)"/>
+      <rect x="1204" y="604" width="46" height="20" rx="4" fill="#fff"/>
+      <text x="1227" y="619" text-anchor="middle" font-family="Calibri, Segoe UI, Arial" font-size="12" font-weight="700" fill="#9a5b16">index</text>
+    </svg>
+  </div>
+</body>
+</html>

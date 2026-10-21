@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowDown, Menu, PanelLeft } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
@@ -6,8 +6,7 @@ import { ChatInput, type ChatInputHandle } from "../components/chat/ChatInput";
 import { BodyFigure } from "../components/chat/BodyMap";
 import { REGION_LABELS, REGION_ORDER, type BodyRegion } from "../utils/bodyMap";
 import { MessageBubble } from "../components/chat/MessageBubble";
-import { FollowUpCard, formatFollowUpQuery, type FollowUpAnswers } from "../components/chat/FollowUpCard";
-import { NearbyHospitals } from "../components/chat/NearbyHospitals";
+import { FollowUpCard, SuggestedFollowUps, buildSuggestedFollowUps, formatFollowUpQuery, type FollowUpAnswers } from "../components/chat/FollowUpCard";
 import { EmergencyCallButton } from "../components/chat/EmergencyCallButton";
 import { Spinner } from "../components/common/Spinner";
 import { Button } from "../components/common/Button";
@@ -15,13 +14,16 @@ import { useChat } from "../context/ChatContext";
 import { useApp } from "../context/AppContext";
 import { looksEmergency } from "../utils/emergency";
 
+const NearbyHospitals = lazy(() => import("../components/chat/NearbyHospitals").then((mod) => ({ default: mod.NearbyHospitals })));
+
 export function Chat() {
   const { chatId } = useParams();
-  const { loadChats, openChat, showBlankChat, activeChatId, messages, messagesLoading, sendMessage, stopGeneration, sending, streaming, status, error, clearError } = useChat();
+  const { loadChats, openChat, showBlankChat, activeChatId, messages, messagesLoading, sendMessage, stopGeneration, retryLast, sending, streaming, status, error, clearError } = useChat();
   const { setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useApp();
   const composerRef = useRef<ChatInputHandle>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const lastChatId = useRef<string | undefined>(undefined);
   const [pendingSymptoms, setPendingSymptoms] = useState<string | null>(null);
   const [showJump, setShowJump] = useState(false);
 
@@ -33,10 +35,13 @@ export function Chat() {
     if (chatId) {
       if (chatId === activeChatId && (sending || streaming)) return;
       void openChat(chatId);
-    } else {
+    } else if (!sending && !streaming) {
       showBlankChat();
     }
-    setPendingSymptoms(null);
+    if (lastChatId.current !== chatId) {
+      setPendingSymptoms(null);
+      lastChatId.current = chatId;
+    }
   }, [chatId, activeChatId, sending, streaming, openChat, showBlankChat]);
 
   useEffect(() => {
@@ -52,8 +57,8 @@ export function Chat() {
     setShowJump(!nearBottom && node.scrollHeight > node.clientHeight + 120);
   }
 
-  function handleSend(value: string) {
-    if (looksEmergency(value)) {
+  function handleSend(value: string, options?: { skipFollowUp?: boolean }) {
+    if (options?.skipFollowUp || looksEmergency(value)) {
       setPendingSymptoms(null);
       void sendMessage(value);
       return;
@@ -148,7 +153,21 @@ export function Chat() {
                   }}
                 />
               ) : null}
-              {showHospitals && latest ? <NearbyHospitals key={latest.id} active /> : null}
+              {showHospitals && latest ? (
+                <Suspense fallback={<p className="text-sm font-semibold text-teal-800">Loading nearby hospitals...</p>}>
+                  <NearbyHospitals active />
+                </Suspense>
+              ) : null}
+              {latest && !latest.refused && !pendingSymptoms && !sending && !streaming ? (
+                <SuggestedFollowUps
+                  questions={buildSuggestedFollowUps(
+                    [...messages].reverse().find((item) => item.role === "user")?.content || "",
+                    latest.possible_conditions,
+                  )}
+                  disabled={sending}
+                  onPick={(question) => handleSend(question, { skipFollowUp: true })}
+                />
+              ) : null}
               {streaming && status ? (
                 <p className="pl-12 text-sm font-semibold text-teal-800" aria-live="polite">
                   {status}
@@ -157,9 +176,14 @@ export function Chat() {
               {error ? (
                 <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3" role="alert">
                   <p className="text-sm font-semibold text-rose-800">{error}</p>
-                  <Button variant="secondary" size="sm" className="mt-2" onClick={() => clearError()}>
-                    Dismiss
-                  </Button>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => void retryLast()}>
+                      Try again
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => clearError()}>
+                      Dismiss
+                    </Button>
+                  </div>
                 </div>
               ) : null}
             </div>

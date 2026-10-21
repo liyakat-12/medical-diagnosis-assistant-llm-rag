@@ -16,11 +16,26 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("mediassist")
 
 
+def _warmup_rag() -> None:
+    """Load MiniLM, the re-ranker, and Chroma once so the first chat is not a 2–4 minute wait."""
+    import time
+
+    started = time.perf_counter()
+    try:
+        from src.retrieval.retriever import retrieve
+
+        retrieve("headache", top_k=4)
+        logger.info("RAG models warmed in %.1fs", time.perf_counter() - started)
+    except Exception:
+        logger.exception("RAG warmup skipped")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await connect()
     await ensure_indexes()
     await seed_demo_user()
+    _warmup_rag()
     logger.info("MediAssist API ready")
     yield
     await disconnect()

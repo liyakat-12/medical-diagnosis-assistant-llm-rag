@@ -135,6 +135,25 @@ def test_rerank_puts_best_chunk_first(monkeypatch):
     assert len(ranked) == 2
 
 
+def test_outcomes_for_query_reuses_pool_without_second_retrieve(monkeypatch):
+    from src.pipeline import rag_pipeline as rp
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("should not run a second retrieve")
+
+    monkeypatch.setattr(rp, "retrieve", boom, raising=False)
+    rows = rp.outcomes_for_query(
+        "I have a cough",
+        [{"condition": "cold", "title": "Cold", "source": "CDC", "url": "", "relevance_score": 0.9}],
+        pool=[
+            {"condition": "cold", "title": "Cold", "source": "CDC", "url": "", "relevance_score": 0.9},
+            {"condition": "flu", "title": "Flu", "source": "CDC", "url": "", "relevance_score": 0.5},
+        ],
+    )
+    assert [row["condition"] for row in rows] == ["cold", "flu"]
+    assert sum(row["match_percent"] for row in rows) == 100
+
+
 def test_build_possible_conditions_returns_four_unique():
     from src.pipeline.rag_pipeline import build_possible_conditions
 

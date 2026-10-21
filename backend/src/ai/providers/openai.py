@@ -9,12 +9,17 @@ from src.ai.base import BaseAIProvider
 class OpenAIProvider:
     name = "openai"
 
+    def __init__(self) -> None:
+        self._cached_client = None
+
     def _client(self):
         from openai import OpenAI
 
         if config._looks_like_placeholder(config.OPENAI_API_KEY):
             raise RuntimeError("OPENAI_API_KEY is not set.")
-        return OpenAI(api_key=config.OPENAI_API_KEY)
+        if self._cached_client is None:
+            self._cached_client = OpenAI(api_key=config.OPENAI_API_KEY, timeout=20.0)
+        return self._cached_client
 
     def generate(
         self,

@@ -14,11 +14,29 @@ from src import config
 from src.retrieval.vector_store import RetrievedChunk
 
 
+def _device() -> str:
+    try:
+        import torch
+
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        return "cpu"
+
+
 @lru_cache(maxsize=1)
 def _load_model():
     from sentence_transformers import CrossEncoder
 
-    return CrossEncoder(config.RERANK_MODEL)
+    device = _device()
+    try:
+        return CrossEncoder(config.RERANK_MODEL, device=device, automodel_args={"local_files_only": True})
+    except TypeError:
+        try:
+            return CrossEncoder(config.RERANK_MODEL, device=device, local_files_only=True)
+        except TypeError:
+            return CrossEncoder(config.RERANK_MODEL, device=device)
+    except Exception:
+        return CrossEncoder(config.RERANK_MODEL, device=device)
 
 
 def rerank_chunks(query: str, chunks: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:

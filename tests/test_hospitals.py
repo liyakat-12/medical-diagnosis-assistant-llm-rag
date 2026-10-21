@@ -55,6 +55,49 @@ def test_parse_nominatim_hospitals():
     assert rows[0]["emergency"] is True
 
 
+def test_parse_elements_skips_invalid_coordinates():
+    from app.services.hospital_service import parse_elements
+
+    rows = parse_elements(
+        [
+            {"lat": 0, "lon": 0, "tags": {"name": "Null Island Hospital"}},
+            {"lat": 28.62, "lon": 77.22, "tags": {"name": "Valid Hospital"}},
+        ],
+        28.61,
+        77.21,
+    )
+    assert [row["name"] for row in rows] == ["Valid Hospital"]
+
+
+def test_nearby_cache_reuses_same_area(monkeypatch):
+    from app.services import hospital_service as hs
+
+    hs._NEARBY_CACHE.clear()
+    calls = {"n": 0}
+
+    def fake_overpass(lat, lng, radius):
+        calls["n"] += 1
+        return [
+            {
+                "name": "Cached Hospital",
+                "phone": "",
+                "address": "Main Road",
+                "distance_km": 1.0,
+                "lat": lat,
+                "lng": lng,
+                "maps_url": "https://www.google.com/maps",
+                "emergency": False,
+            }
+        ]
+
+    monkeypatch.setattr(hs, "_fetch_overpass", fake_overpass)
+    first = hs.find_nearby_hospitals(12.971, 77.594)
+    second = hs.find_nearby_hospitals(12.9712, 77.5944)
+    assert calls["n"] == 1
+    assert first["hospitals"][0]["name"] == "Cached Hospital"
+    assert second["hospitals"][0]["name"] == "Cached Hospital"
+
+
 def test_nearby_hospitals_endpoint(client, monkeypatch):
     monkeypatch.setattr(
         "app.api.routes.hospitals.find_nearby_hospitals",

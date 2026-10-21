@@ -18,8 +18,9 @@ interface ChatContextValue {
   openChat: (chatId: string) => Promise<void>;
   showBlankChat: () => void;
   startNewChat: () => Promise<Chat>;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, options?: { reuseFailed?: boolean }) => Promise<void>;
   stopGeneration: () => void;
+  retryLast: () => Promise<void>;
   renameChat: (chatId: string, title: string) => Promise<void>;
   removeChat: (chatId: string) => Promise<void>;
   clearError: () => void;
@@ -58,6 +59,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const failedContentRef = useRef<string | null>(null);
+
+  const stopActiveStream = () => {
+    if (!abortRef.current) return;
+    abortRef.current.abort();
+    abortRef.current = null;
+    setStreaming(false);
+    setSending(false);
+    setStatus("");
+  };
 
   const loadChats = useCallback(async (query?: string) => {
     setChatsLoading(true);
@@ -71,8 +82,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openChat = useCallback(async (chatId: string) => {
+    if (abortRef.current) {
+      if (activeChatId && activeChatId !== chatId) stopActiveStream();
+      else return;
+    }
     setActiveChatId(chatId);
-    if (abortRef.current) return;
     setMessagesLoading(true);
     setError("");
     try {
@@ -83,7 +97,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } finally {
       setMessagesLoading(false);
     }
-  }, []);
+  }, [activeChatId]);
 
   const showBlankChat = useCallback(() => {
     if (abortRef.current) return;
@@ -103,18 +117,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [navigate, setSidebarOpen]);
 
   const stopGeneration = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setStreaming(false);
-    setSending(false);
-    setStatus("");
+    stopActiveStream();
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, options?: { reuseFailed?: boolean }) => {
       const text = content.trim();
       if (!text || sending) return;
       setError("");
+      failedContentRef.current = null;
       setSending(true);
       setStreaming(true);
       setStatus("Analyzing your symptoms...");
@@ -156,7 +167,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           refused: false,
           streaming: true,
         };
-        setMessages((current) => [...current, userMsg, assistantMsg]);
+        setMessages((current) => {
+          if (!options?.reuseFailed) return [...current, userMsg, assistantMsg];
+          const next = [...current];
+          if (next.at(-1)?.role === "assistant") next.pop();
+          if (next.at(-1)?.role === "user" && next.at(-1)?.content === text) return [...next, assistantMsg];
+          return [...next, userMsg, assistantMsg];
+        });
 
         const controller = new AbortController();
         abortRef.current = controller;
@@ -195,6 +212,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                           level: event.level || "consult_doctor",
                           label: event.label || "Urgency",
                           guidance: event.guidance || "",
+                          reason: event.reason,
                         },
                       }
                     : item,
@@ -228,6 +246,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           setStatus("");
           return;
         }
+        failedContentRef.current = text;
         setError(err instanceof Error ? err.message : "Unable to send your message. Please try again.");
       } finally {
         abortRef.current = null;
@@ -239,25 +258,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [activeChatId, loadChats, navigate, sending],
   );
 
+  const retryLast = useCallback(async () => {
+    const text = failedContentRef.current;
+    if (!text || sending) return;
+    await sendMessage(text, { reuseFailed: true });
+  }, [sendMessage, sending]);
+
   const renameChat = useCallback(
     async (chatId: string, title: string) => {
-      const updated = await chatApi.updateChat(chatId, { title });
-      setChats((current) => current.map((item) => (item.id === chatId ? updated : item)));
-      toast("Conversation renamed.");
+      try {
+        const updated = await chatApi.updateChat(chatId, { title });
+        setChats((current) => current.map((item) => (item.id === chatId ? updated : item)));
+        toast("Conversation renamed.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to rename this conversation.");
+      }
     },
     [toast],
   );
 
   const removeChat = useCallback(
     async (chatId: string) => {
-      await chatApi.deleteChat(chatId);
-      setChats((current) => current.filter((item) => item.id !== chatId));
-      if (activeChatId === chatId) {
-        setActiveChatId(null);
-        setMessages([]);
-        navigate("/chat");
+      try {
+        await chatApi.deleteChat(chatId);
+        setChats((current) => current.filter((item) => item.id !== chatId));
+        if (activeChatId === chatId) {
+          setActiveChatId(null);
+          setMessages([]);
+          navigate("/chat");
+        }
+        toast("Conversation deleted.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to delete this conversation.");
       }
-      toast("Conversation deleted.");
     },
     [activeChatId, navigate, toast],
   );
@@ -279,6 +312,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       startNewChat,
       sendMessage,
       stopGeneration,
+      retryLast,
       renameChat,
       removeChat,
       clearError: () => setError(""),
@@ -299,6 +333,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       startNewChat,
       sendMessage,
       stopGeneration,
+      retryLast,
       renameChat,
       removeChat,
     ],

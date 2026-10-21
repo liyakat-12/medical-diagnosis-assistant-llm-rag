@@ -1,6 +1,7 @@
 import type { ApiError } from "../types";
 
 const API_BASE = "/api/v1";
+const AUTH_SKIP_REFRESH = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
 
 export class HttpError extends Error implements ApiError {
   status: number;
@@ -20,7 +21,36 @@ function parseDetail(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+function parseJson(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function shouldRefresh(path: string): boolean {
+  return !AUTH_SKIP_REFRESH.some((item) => path.startsWith(item));
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshOnce(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then((response) => response.ok)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+export async function apiFetch<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -32,8 +62,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   });
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
+  const data = parseJson(text);
   if (!response.ok) {
+    if (response.status === 401 && !retried && shouldRefresh(path)) {
+      const refreshed = await refreshOnce();
+      if (refreshed) return apiFetch<T>(path, init, true);
+    }
     const fallback =
       response.status === 401
         ? "Your session has expired. Please sign in again."
@@ -48,6 +82,7 @@ export async function readSse(
   body: unknown,
   onEvent: (event: Record<string, unknown>) => void,
   signal?: AbortSignal,
+  retried = false,
 ): Promise<void> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -58,13 +93,11 @@ export async function readSse(
   });
   if (!response.ok || !response.body) {
     const text = await response.text();
-    let data: unknown = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      data = null;
+    if (response.status === 401 && !retried) {
+      const refreshed = await refreshOnce();
+      if (refreshed) return readSse(path, body, onEvent, signal, true);
     }
-    throw new HttpError(parseDetail(data, "Something went wrong while generating the response."), response.status);
+    throw new HttpError(parseDetail(parseJson(text), "Something went wrong while generating the response."), response.status);
   }
 
   const reader = response.body.getReader();
@@ -85,7 +118,8 @@ export async function readSse(
       if (!line) continue;
       const payload = line.replace(/^data:\s?/, "");
       if (!payload) continue;
-      onEvent(JSON.parse(payload) as Record<string, unknown>);
+      const parsed = parseJson(payload);
+      if (parsed && typeof parsed === "object") onEvent(parsed as Record<string, unknown>);
     }
   }
 }

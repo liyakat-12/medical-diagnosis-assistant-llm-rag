@@ -8,7 +8,7 @@ import { useApp } from "../context/AppContext";
 import { groupChats } from "../utils/dates";
 
 export function ChatHistory() {
-  const { chats, chatsLoading, loadChats } = useChat();
+  const { chats, chatsLoading, loadChats, error } = useChat();
   const { setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useApp();
   useEffect(() => {
     void loadChats();
@@ -42,6 +42,7 @@ export function ChatHistory() {
         <main className="mx-auto w-full min-h-0 max-w-3xl flex-1 overflow-y-auto px-4 py-10">
           <h1 className="text-3xl font-extrabold text-slate-900">Conversation history</h1>
           <p className="mt-2 text-sm text-slate-600">Open a previous discussion. Answers are stored and are not regenerated.</p>
+          {error ? <p className="mt-4 text-sm font-semibold text-rose-700">{error}</p> : null}
           {chatsLoading ? <Spinner className="mt-8" label="Loading conversations..." /> : null}
           {!chatsLoading && !chats.length ? (
             <div className="mt-8">

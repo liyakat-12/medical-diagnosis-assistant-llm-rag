@@ -9,6 +9,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Set before chromadb / huggingface imports so they do not wait on the network.
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", "2")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 from dotenv import load_dotenv
 
 # backend/src/config.py → project root is two levels above backend/

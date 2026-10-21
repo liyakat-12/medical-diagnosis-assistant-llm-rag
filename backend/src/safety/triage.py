@@ -31,8 +31,16 @@ TRIAGE_LABELS = {
 TRIAGE_GUIDANCE = {
     "self_care": "This appears manageable with home/self-care. Monitor your symptoms and seek care if they worsen or don't improve.",
     "consult_doctor": "You should book an appointment with a doctor soon to get this properly evaluated. It is not an emergency, but professional assessment is recommended.",
-    "emergency": "This may be a medical emergency. Seek immediate in-person emergency care or call your local emergency number.",
+    "emergency": (
+        "This may be a medical emergency. In India, call 112 (national emergency) or go to the "
+        "nearest emergency department now. Do not wait for an online tool to confirm this."
+    ),
 }
+
+CHEST_PAIN_SAFETY_QUESTIONS = [
+    "Is the chest pain new, severe, persistent, or getting worse?",
+    "Do you also have breathlessness, sweating, fainting, nausea, or pain spreading to an arm, jaw, back, or shoulder?",
+]
 
 
 @dataclass

@@ -23,14 +23,27 @@ import re
 from dataclasses import dataclass, field
 
 from src import config
-from src.llm.generator import generate_grounded_answer, generate_ungrounded_answer, stream_grounded_answer
+from src.llm.generator import (
+    generate_conversational_answer,
+    generate_grounded_answer,
+    generate_ungrounded_answer,
+    stream_conversational_answer,
+    stream_grounded_answer,
+)
+from src.retrieval.query_normalize import normalize_retrieval_query
 from src.retrieval.retriever import Evidence, retrieve_candidates
 from src.safety.citation_faithfulness import FaithfulnessAudit, audit_citation_faithfulness
+from src.safety.followups import clarifying_questions, weak_match_answer
 from src.safety.guardrails import (
+    EMERGENCY_BANNER_MESSAGE,
     PRESCRIPTION_REFUSAL_MESSAGE,
+    check_emergency,
     check_prescription_request,
+    classify_intent,
+    conversational_reply,
+    has_chest_pain_signal,
 )
-from src.safety.triage import TriageResult, classify_triage
+from src.safety.triage import CHEST_PAIN_SAFETY_QUESTIONS, TriageResult, classify_triage
 
 OUTCOME_LIMIT = 4
 
@@ -158,18 +171,109 @@ def outcomes_for_query(
     embedding_mode: str | None = None,
     pool: list[dict] | None = None,
 ) -> list[dict]:
-    """Build match rows from the retrieval already done for this query.
-
-    A second vector search used to run when fewer than four unique conditions
-    appeared. That doubled embedding + Chroma + rerank cost without new
-    evidence, so the existing candidate pool is reused instead.
-    """
+    """Build match rows from the retrieval already done for this query."""
     del query, embedding_mode
     return build_possible_conditions(pool or citations)
 
 
-def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | None = None) -> DiagnosisResponse:
+def _history_payload(history: list[dict] | None) -> list[dict]:
+    rows: list[dict] = []
+    for item in history or []:
+        rows.append(
+            {
+                "role": item.get("role"),
+                "content": item.get("content") or "",
+                "possible_conditions": item.get("possible_conditions") or [],
+                "triage": item.get("triage"),
+            }
+        )
+    return rows[-10:]
+
+
+def _evidence_is_strong(evidence: list[Evidence]) -> bool:
+    """Relevant hits must not be discarded solely because rerank sigmoid is low."""
+    if not evidence:
+        return False
+    best_rerank = max(float(ev.relevance_score) for ev in evidence)
+    best_vector = max(float(ev.vector_score) for ev in evidence)
+    if best_rerank >= config.MIN_RELEVANCE_SCORE:
+        return True
+    if best_vector >= config.MIN_VECTOR_SCORE:
+        return True
+    return False
+
+
+def _emergency_answer(query: str, *, with_retrieval_note: bool = False) -> str:
+    lines = [EMERGENCY_BANNER_MESSAGE]
+    if has_chest_pain_signal(query):
+        lines.append(
+            "Chest pain can be serious. If it is severe, persistent, or comes with "
+            "breathlessness, sweating, fainting, nausea, or pain spreading to an arm, "
+            "jaw, back, or shoulder, seek emergency care now."
+        )
+        lines.extend(CHEST_PAIN_SAFETY_QUESTIONS)
+    if with_retrieval_note:
+        lines.append(
+            "I could not rely on matching knowledge-base notes for this urgency assessment; "
+            "emergency guidance does not wait on retrieval."
+        )
+    lines.append("Not a diagnosis — see a clinician if needed.")
+    return "\n".join(lines)
+
+
+def _weak_or_emergency_answer(query: str, triage: TriageResult | None) -> str:
+    if triage and triage.level == "emergency":
+        return _emergency_answer(query, with_retrieval_note=True)
+    return weak_match_answer(query)
+
+
+def _conversational_result(query: str, history: list[dict] | None = None) -> DiagnosisResponse:
+    try:
+        answer = generate_conversational_answer(query, history)
+    except Exception:
+        answer = conversational_reply(query)
+    return DiagnosisResponse(
+        query=query,
+        refused=False,
+        refusal_reason=None,
+        triage=None,
+        answer=answer,
+        citations=[],
+        faithfulness=None,
+        recommendations=[],
+        possible_conditions=[],
+    )
+
+
+def synthesize_retrieval_query(query: str, history: list[dict] | None = None) -> str:
+    """Keep follow-up retrieval anchored to earlier symptom text in this chat."""
+    if not history:
+        return normalize_retrieval_query(query)
+    prior: list[str] = []
+    for item in history:
+        if item.get("role") != "user":
+            continue
+        text = str(item.get("content") or "").strip()
+        if not text:
+            continue
+        if classify_intent(text, history) == "medical" or "extra detail:" in text.lower() or "body map context" in text.lower():
+            prior.append(normalize_retrieval_query(text))
+    if not prior:
+        return normalize_retrieval_query(query)
+    if classify_intent(query, history) != "medical":
+        return normalize_retrieval_query(query)
+    combined = "\n".join(prior[-3:] + [normalize_retrieval_query(query)])
+    return combined[:2000]
+
+
+def run_pipeline(
+    query: str,
+    top_k: int | None = None,
+    embedding_mode: str | None = None,
+    chat_history: list[dict] | None = None,
+) -> DiagnosisResponse:
     query = query.strip()
+    history = _history_payload(chat_history)
 
     # --- Safety pre-check: prescription/dosage requests are refused outright ---
     prescription_check = check_prescription_request(query)
@@ -185,18 +289,56 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
             recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
         )
 
-    # --- Retrieval (one search; pool is reused for the four match percentages) ---
-    evidence, pool = retrieve_candidates(query, top_k=top_k, mode=embedding_mode)
+    intent = classify_intent(query, history)
+    if intent != "medical":
+        return _conversational_result(query, history)
 
-    # --- Triage classification (emergency override happens here) ---
-    triage = classify_triage(query, evidence)
+    # Deterministic emergency triage BEFORE retrieval so chest-pain / red-flag
+    # guidance is never delayed by embeddings, reranking, or the LLM.
+    early_emergency = check_emergency(query)
+    early_triage = classify_triage(query, []) if early_emergency.triggered else None
 
-    # --- Generation, grounded in retrieved evidence ---
-    context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
-    answer = generate_grounded_answer(query, context_blocks)
+    search_query = synthesize_retrieval_query(query, history)
+    try:
+        evidence, pool = retrieve_candidates(search_query, top_k=top_k, mode=embedding_mode)
+    except Exception:
+        evidence, pool = [], []
+    strong = _evidence_is_strong(evidence)
+    # Emergency always; evidence-based triage only when retrieval is strong.
+    if early_triage and early_triage.level == "emergency":
+        triage = early_triage
+    elif strong:
+        triage = classify_triage(query, evidence)
+    else:
+        triage = None
 
-    citations = citations_from_evidence(evidence)
-    faithfulness = audit_citation_faithfulness(answer, citations)
+    if triage and triage.level == "emergency" and not strong:
+        answer = _emergency_answer(query, with_retrieval_note=True)
+        return DiagnosisResponse(
+            query=query,
+            refused=False,
+            refusal_reason=None,
+            triage=triage,
+            answer=answer,
+            citations=[],
+            faithfulness=None,
+            recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
+            possible_conditions=[],
+        )
+
+    context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)] if strong else []
+    if strong:
+        answer = generate_grounded_answer(query, context_blocks, history, weak_match=False)
+    else:
+        answer = _weak_or_emergency_answer(query, triage)
+    citations = citations_from_evidence(evidence) if strong else []
+    faithfulness = audit_citation_faithfulness(answer, citations) if strong else None
+    matches = (
+        outcomes_for_query(query, citations, embedding_mode, citations_from_evidence(pool))
+        if strong
+        else []
+    )
+    recs = _recommendations(triage, evidence) if strong else clarifying_questions(query, limit=2)
 
     return DiagnosisResponse(
         query=query,
@@ -206,10 +348,8 @@ def run_pipeline(query: str, top_k: int | None = None, embedding_mode: str | Non
         answer=answer,
         citations=citations,
         faithfulness=faithfulness,
-        recommendations=_recommendations(triage, evidence),
-        possible_conditions=outcomes_for_query(
-            query, citations, embedding_mode, citations_from_evidence(pool)
-        ),
+        recommendations=recs,
+        possible_conditions=matches,
     )
 
 
@@ -222,7 +362,7 @@ def result_to_dict(result: DiagnosisResponse) -> dict:
         "citations": result.citations,
         "recommendations": result.recommendations,
         "disclaimer": result.disclaimer,
-        "possible_conditions": result.possible_conditions or build_possible_conditions(result.citations),
+        "possible_conditions": result.possible_conditions or [],
         "triage": None,
         "faithfulness": None,
         "provider": config.resolve_llm_provider(),
@@ -239,10 +379,16 @@ def result_to_dict(result: DiagnosisResponse) -> dict:
     return payload
 
 
-def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: str | None = None):
+def iter_pipeline_stream(
+    query: str,
+    top_k: int | None = None,
+    embedding_mode: str | None = None,
+    chat_history: list[dict] | None = None,
+):
     """Yield SSE-friendly events while running the same RAG + safety flow."""
     query = query.strip()
-    yield {"type": "status", "content": "Analyzing your symptoms..."}
+    history = _history_payload(chat_history)
+    yield {"type": "status", "content": "Understanding your message..."}
 
     prescription_check = check_prescription_request(query)
     if prescription_check.triggered:
@@ -260,31 +406,112 @@ def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: s
         yield {"type": "done", "result": result_to_dict(result)}
         return
 
-    yield {"type": "status", "content": "Retrieving medical references..."}
-    evidence, pool = retrieve_candidates(query, top_k=top_k, mode=embedding_mode)
-    triage = classify_triage(query, evidence)
-    if triage:
+    intent = classify_intent(query, history)
+    if intent != "medical":
+        yield {"type": "status", "content": "Formulating response..."}
+        chunks: list[str] = []
+        try:
+            for chunk in stream_conversational_answer(query, history):
+                chunks.append(chunk)
+                yield {"type": "token", "content": chunk}
+        except Exception:
+            reply = conversational_reply(query)
+            yield {"type": "token", "content": reply}
+            chunks = [reply]
+        result = DiagnosisResponse(
+            query=query,
+            refused=False,
+            refusal_reason=None,
+            triage=None,
+            answer="".join(chunks).strip() or conversational_reply(query),
+            citations=[],
+            faithfulness=None,
+            recommendations=[],
+            possible_conditions=[],
+        )
+        yield {"type": "done", "result": result_to_dict(result)}
+        return
+
+    # Emit emergency triage immediately — do not wait on retrieval or the LLM.
+    early_emergency = check_emergency(query)
+    early_triage = classify_triage(query, []) if early_emergency.triggered else None
+    if early_triage:
         yield {
             "type": "triage",
-            "level": triage.level,
-            "label": triage.label,
-            "guidance": triage.guidance,
-            "reason": triage.reason,
+            "level": early_triage.level,
+            "label": early_triage.label,
+            "guidance": early_triage.guidance,
+            "reason": early_triage.reason,
         }
 
-    citations = citations_from_evidence(evidence)
-    possible_conditions = outcomes_for_query(
-        query, citations, embedding_mode, citations_from_evidence(pool)
-    )
-    yield {"type": "citation", "citations": citations, "possible_conditions": possible_conditions}
+    yield {"type": "status", "content": "Searching medical knowledge base..."}
+    search_query = synthesize_retrieval_query(query, history)
+    try:
+        evidence, pool = retrieve_candidates(search_query, top_k=top_k, mode=embedding_mode)
+    except Exception:
+        evidence, pool = [], []
+    strong = _evidence_is_strong(evidence)
+    if early_triage and early_triage.level == "emergency":
+        triage = early_triage
+    elif strong:
+        triage = classify_triage(query, evidence)
+        if not early_triage:
+            yield {
+                "type": "triage",
+                "level": triage.level,
+                "label": triage.label,
+                "guidance": triage.guidance,
+                "reason": triage.reason,
+            }
+    else:
+        triage = None
 
-    context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
+    if triage and triage.level == "emergency" and not strong:
+        answer = _emergency_answer(query, with_retrieval_note=True)
+        yield {"type": "token", "content": answer}
+        result = DiagnosisResponse(
+            query=query,
+            refused=False,
+            refusal_reason=None,
+            triage=triage,
+            answer=answer,
+            citations=[],
+            faithfulness=None,
+            recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
+            possible_conditions=[],
+        )
+        payload = result_to_dict(result)
+        yield {"type": "metadata", "recommendations": payload["recommendations"], "faithfulness": None}
+        yield {"type": "done", "result": payload}
+        return
+
+    citations = citations_from_evidence(evidence) if strong else []
+    possible_conditions = (
+        outcomes_for_query(query, citations, embedding_mode, citations_from_evidence(pool)) if strong else []
+    )
+    if citations or possible_conditions:
+        yield {"type": "citation", "citations": citations, "possible_conditions": possible_conditions}
+
+    yield {"type": "status", "content": "Formulating response..."}
     chunks: list[str] = []
-    for chunk in stream_grounded_answer(query, context_blocks):
-        chunks.append(chunk)
-        yield {"type": "token", "content": chunk}
-    answer = "".join(chunks).strip()
-    faithfulness = audit_citation_faithfulness(answer, citations)
+    if strong:
+        context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
+        try:
+            for chunk in stream_grounded_answer(query, context_blocks, history, weak_match=False):
+                chunks.append(chunk)
+                yield {"type": "token", "content": chunk}
+        except Exception:
+            fallback = _weak_or_emergency_answer(query, triage)
+            yield {"type": "token", "content": fallback}
+            chunks = [fallback]
+        answer = "".join(chunks).strip()
+        faithfulness = audit_citation_faithfulness(answer, citations)
+        recs = _recommendations(triage, evidence)
+    else:
+        answer = _weak_or_emergency_answer(query, triage)
+        yield {"type": "token", "content": answer}
+        faithfulness = None
+        recs = clarifying_questions(query, limit=2)
     result = DiagnosisResponse(
         query=query,
         refused=False,
@@ -293,7 +520,7 @@ def iter_pipeline_stream(query: str, top_k: int | None = None, embedding_mode: s
         answer=answer,
         citations=citations,
         faithfulness=faithfulness,
-        recommendations=_recommendations(triage, evidence),
+        recommendations=recs,
         possible_conditions=possible_conditions,
     )
     payload = result_to_dict(result)

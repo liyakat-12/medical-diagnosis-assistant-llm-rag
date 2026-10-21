@@ -18,7 +18,7 @@ RESULT_LIMIT = 8
 CACHE_TTL_S = 300.0
 ERROR_CACHE_TTL_S = 30.0
 HEADERS = {"User-Agent": "MediAssist/1.0 academic-project (hospital-lookup)"}
-FRIENDLY_ERROR = "Unable to load nearby hospitals right now. The map below still works, or call 108 if this is urgent."
+FRIENDLY_ERROR = "Unable to load nearby hospitals right now. The map below still works, or call 112 if this is urgent."
 
 _NEARBY_CACHE: dict[tuple[float, float], tuple[float, dict[str, Any]]] = {}
 _GEOCODE_CACHE: dict[str, tuple[float, dict[str, Any] | None]] = {}
@@ -316,12 +316,12 @@ def find_nearby_hospitals(lat: float, lng: float, radius: int = SEARCH_RADIUS_M)
 
     hospitals = [item for item in hospitals if _valid_coords(item.get("lat"), item.get("lng"))]
     if hospitals:
-        result = {"hospitals": hospitals, "emergency_number": "108", "error": None}
+        result = {"hospitals": hospitals, "emergency_number": "112", "error": None}
         _NEARBY_CACHE[key] = (time(), result)
         return deepcopy(result)
     result = {
         "hospitals": [],
-        "emergency_number": "108",
+        "emergency_number": "112",
         "error": FRIENDLY_ERROR,
     }
     _NEARBY_CACHE[key] = (time() - CACHE_TTL_S + ERROR_CACHE_TTL_S, result)

@@ -114,7 +114,7 @@ def test_nearby_hospitals_endpoint(client, monkeypatch):
                     "emergency": True,
                 }
             ],
-            "emergency_number": "108",
+            "emergency_number": "112",
             "error": None,
         },
     )
@@ -122,5 +122,5 @@ def test_nearby_hospitals_endpoint(client, monkeypatch):
     listed = client.get("/api/v1/hospitals/nearby?lat=28.61&lng=77.21")
     assert listed.status_code == 200, listed.text
     payload = listed.json()
-    assert payload["emergency_number"] == "108"
+    assert payload["emergency_number"] == "112"
     assert payload["hospitals"][0]["name"] == "Test Hospital"

@@ -53,6 +53,11 @@ def rerank_chunks(query: str, chunks: list[RetrievedChunk], top_k: int) -> list[
     reranked: list[RetrievedChunk] = []
     for chunk, score in ranked[:top_k]:
         relevance = 1.0 / (1.0 + math.exp(-float(score)))
+        vector_score = (
+            float(chunk.vector_score)
+            if chunk.vector_score is not None
+            else max(0.0, 1.0 - float(chunk.distance))
+        )
         reranked.append(
             RetrievedChunk(
                 chunk_id=chunk.chunk_id,
@@ -60,6 +65,7 @@ def rerank_chunks(query: str, chunks: list[RetrievedChunk], top_k: int) -> list[
                 distance=1.0 - relevance,
                 metadata=chunk.metadata,
                 rerank_score=relevance,
+                vector_score=vector_score,
             )
         )
     return reranked

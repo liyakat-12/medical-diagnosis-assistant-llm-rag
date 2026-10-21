@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -17,14 +18,21 @@ logger = logging.getLogger("mediassist")
 
 
 def _warmup_rag() -> None:
-    """Load MiniLM, the re-ranker, and Chroma once so the first chat is not a 2–4 minute wait."""
+    """Load MiniLM, Chroma, and the re-ranker in a worker thread so the first chat is not a cold start."""
     import time
 
     started = time.perf_counter()
     try:
+        from src import config
+        from src.embeddings.embedding_models import get_embedding_model
         from src.retrieval.retriever import retrieve
 
+        get_embedding_model(config.EMBEDDING_MODE).encode(["headache"])
         retrieve("headache", top_k=4)
+        if config.RERANK_ENABLED:
+            from src.retrieval.reranker import _load_model
+
+            _load_model()
         logger.info("RAG models warmed in %.1fs", time.perf_counter() - started)
     except Exception:
         logger.exception("RAG warmup skipped")
@@ -35,7 +43,7 @@ async def lifespan(_app: FastAPI):
     await connect()
     await ensure_indexes()
     await seed_demo_user()
-    _warmup_rag()
+    await asyncio.to_thread(_warmup_rag)
     logger.info("MediAssist API ready")
     yield
     await disconnect()

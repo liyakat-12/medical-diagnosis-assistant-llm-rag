@@ -49,9 +49,28 @@ async def add_assistant_message(user_id: str, chat_id: str, result: dict) -> dic
     return message
 
 
-def diagnose_sync(query: str, top_k: int | None = None) -> dict:
-    return result_to_dict(run_pipeline(query, top_k=top_k))
+def history_for_pipeline(messages: list[dict]) -> list[dict]:
+    rows: list[dict] = []
+    for item in messages[-10:]:
+        rows.append(
+            {
+                "role": item.get("role"),
+                "content": item.get("content") or "",
+                "possible_conditions": item.get("possible_conditions") or [],
+                "triage": item.get("triage"),
+            }
+        )
+    return rows
 
 
-def stream_events(query: str, top_k: int | None = None) -> Iterator[dict]:
-    yield from iter_pipeline_stream(query, top_k=top_k)
+async def recent_history(user_id: str, chat_id: str, limit: int = 10) -> list[dict]:
+    messages = await list_messages(user_id, chat_id)
+    return history_for_pipeline(messages[-limit:])
+
+
+def diagnose_sync(query: str, top_k: int | None = None, chat_history: list[dict] | None = None) -> dict:
+    return result_to_dict(run_pipeline(query, top_k=top_k, chat_history=chat_history))
+
+
+def stream_events(query: str, top_k: int | None = None, chat_history: list[dict] | None = None) -> Iterator[dict]:
+    yield from iter_pipeline_stream(query, top_k=top_k, chat_history=chat_history)

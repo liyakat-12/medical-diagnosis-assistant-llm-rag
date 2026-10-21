@@ -10,9 +10,9 @@ import {
   toggleItem,
 } from "../src/utils/bodyMap.ts";
 import { looksEmergency } from "../src/utils/emergency.ts";
-import { buildSuggestedFollowUps, formatFollowUpQuery } from "../src/components/chat/FollowUpCard.tsx";
+import { formatFollowUpQuery } from "../src/components/chat/FollowUpCard.tsx";
 
-const bodyMapSource = readFileSync(new URL("../src/components/chat/BodyMap.tsx", import.meta.url), "utf8");
+const bodyMapSource = readFileSync(new URL("../src/components/bodymap/BodyMap.tsx", import.meta.url), "utf8");
 const chatInputSource = readFileSync(new URL("../src/components/chat/ChatInput.tsx", import.meta.url), "utf8");
 const chatPageSource = readFileSync(new URL("../src/pages/Chat.tsx", import.meta.url), "utf8");
 
@@ -119,10 +119,13 @@ describe("accessibility and collapse markup", () => {
     assert.match(chatInputSource, /aria-expanded=\{mapOpen\}/);
   });
 
-  it("keeps the pre-send follow-up card for ordinary symptoms", () => {
+  it("opens a pre-send intake modal for ordinary symptoms, not every reply", () => {
     assert.match(chatPageSource, /setPendingSymptoms\(value\)/);
-    assert.match(chatPageSource, /<FollowUpCard/);
+    assert.match(chatPageSource, /SymptomIntakeModal/);
+    assert.match(chatPageSource, /needsSymptomIntake/);
     assert.match(chatPageSource, /looksEmergency/);
+    assert.match(chatPageSource, /HospitalFinderModal/);
+    assert.equal(chatPageSource.includes("<NearbyHospitals"), false);
   });
 });
 
@@ -137,13 +140,6 @@ describe("follow-up helpers", () => {
     assert.match(query, /lasting 1-2 days/);
     assert.match(query, /age group 18-40/);
     assert.match(query, /worse with Breathing/);
-  });
-
-  it("builds clickable follow-ups from the current answer without an extra model call", () => {
-    const questions = buildSuggestedFollowUps("I have a cough", [{ condition: "common cold" }]);
-    assert.equal(questions.length, 3);
-    assert.match(questions[0], /common cold/);
-    assert.ok(questions.every((item) => item.trim()));
   });
 });
 

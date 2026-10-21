@@ -7,10 +7,10 @@ export function Safety() {
     <PageShell className="mx-auto w-full max-w-4xl px-4 py-12">
       <h1 className="text-3xl font-extrabold text-slate-900">Safety</h1>
       <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-        MediAssist provides general medical information and urgency guidance. It does not diagnose, prescribe, or replace emergency services. If you think you are having an emergency, call 108 or local emergency services now.
+        MediAssist provides general medical information and urgency guidance. It does not diagnose, prescribe, or replace emergency services. If you think you are having an emergency, call 112 or local emergency services now.
       </p>
-      <a href="tel:108" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700">
-        Call 108
+      <a href="tel:112" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700">
+        Call 112
       </a>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">

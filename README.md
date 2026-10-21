@@ -1,189 +1,104 @@
 # MediAssist — Medical Diagnosis Assistant using LLM + RAG
 
-MediAssist is a research and academic medical information assistant. A user describes symptoms in everyday language—by typing, or by tapping a body map and choosing symptom chips—and the system looks up matching notes from a curated knowledge base, then returns grounded information with citations, a triage label (self-care, consult a doctor, or emergency), possible condition matches, and nearby hospitals. It is **not** a medical device and does **not** replace a doctor: it does not give a confirmed diagnosis, prescribe medicines, or suggest doses. Emergency wording and prescription/dosage questions are checked with safety rules before the model answers.
+MediAssist is a research and academic medical **information** assistant. A user describes symptoms in everyday language—by typing, or by tapping a body map and choosing symptom chips—and the system looks up matching notes from a curated knowledge base. It then returns grounded information with citations, a triage label (self-care, consult a doctor, or emergency), and possible condition matches. Nearby hospitals are available on demand from the chat header. It is **not** a medical device and does **not** replace a doctor: it does not give a confirmed diagnosis, prescribe medicines, or suggest doses.
 
-The website is built with **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS**. The chat UI streams answers as they are generated, stores conversations after login, and uses an interactive body map only to describe where the person feels discomfort. The backend is **FastAPI**. Login uses **JWT cookies**. **MongoDB** stores users, chats, and messages (or an in-memory stand-in for local demos). Medical notes stay as markdown files; search uses **ChromaDB**.
-
-The core method is **RAG (Retrieval-Augmented Generation)**. Symptom text is turned into vectors with **sentence-transformers** (`all-MiniLM-L6-v2`, with optional PubMedBERT). ChromaDB finds similar passages; a **cross-encoder** re-ranks them and keeps the best few. An LLM (mock, Groq, OpenAI, or Ollama) may write only from those retrieved notes. After that, the system adds citations, checks that claims match the sources, labels urgency, and can list nearby hospitals through OpenStreetMap. Quality is measured with project evaluation scripts for retrieval, triage, hallucination, and end-to-end answers—not with RAGAS.
+The website is **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS**. The backend is **FastAPI** with **JWT cookie** auth and **MongoDB** (or an in-memory stand-in for local demos). Medical notes stay as markdown files; search uses **ChromaDB**.
 
 ---
 
 ## Features
 
-- React + TypeScript chat UI: sidebar, scrolling conversation, pinned composer
-- Collapsible / resizable chat sidebar; overlay drawer on small screens
+- Intent classifier: greetings and off-topic chat skip retrieval, triage, and match cards
+- Multi-turn chat history (last 8–10 messages) for follow-up symptoms and “tell me more”
+- Conditional **Symptom Intake** modal (duration, age group, aggravating factors) only on the first symptom query
+- Standalone **Hospital Finder** modal from the chat header; emergency replies also get a compact hospital shortcut
 - Interactive body map on a new chat and from the **Body** button (not a diagnosis)
-- Demo login on the sign-in page (`demo@clinic.local` / `demo123`)
-- FastAPI backend with JWT authentication in HTTP-only cookies
-- MongoDB storage for users, chats, and messages
-- Retrieval-Augmented Generation over 400 curated medical notes
-- Sentence-transformer embeddings, ChromaDB vector search, and cross-encoder re-ranking
-- Nearby hospitals via OpenStreetMap (Overpass) with a Nominatim fallback
-- General and medical embedding modes
-- Safety guardrails, emergency detection, and prescription/dosage refusal
-- Triage labels: self-care, consult a doctor, emergency
-- Answers shown as urgency, recommendations, explanation, possible matches, then sources
-- Citation generation and citation-faithfulness auditing
-- Pluggable LLM providers: mock, Groq, OpenAI, Ollama
-- Token/chunk streaming over Server-Sent Events
+- SSE streaming with live status text, markdown rendering, and auto-scroll
+- RAG over 400 curated medical notes with MiniLM embeddings, ChromaDB, and a cross-encoder re-ranker
+- Safety guardrails for emergency language and prescription/dosage refusal
+- Pluggable LLM providers: `mock`, `groq`, `openai`, `ollama`
 - Evaluation scripts for embeddings, triage, hallucination, and end-to-end quality
-
----
-
-## Screenshots
-
-Add product screenshots here after a local run:
-
-- Landing page
-- Login / register
-- Chat with body map, urgency banner, recommendations, and citations
-- Nearby hospitals and conversation sidebar on desktop and mobile
 
 ---
 
 ## Architecture
 
-```
-Browser (http://localhost:5173)
-    │  cookie auth, SSE stream
-    ▼
-FastAPI (http://localhost:8000/api/v1)
-    ├── Auth / users          → MongoDB
-    ├── Chats / messages      → MongoDB
-    └── Diagnosis / stream
-            │
-            ▼
-        RAG pipeline (backend/src)
-            user query (typed text + optional body-map context)
-            → safety checks
-            → ChromaDB retrieval + cross-encoder re-rank
-            → triage
-            → LLM provider (mock | groq | openai | ollama)
-            → citations
-            → faithfulness audit
-            → streamed + stored assistant message
+```mermaid
+flowchart TD
+  U[User message] --> I[Intent classifier]
+  I -->|greeting / off-topic| C[Conversational LLM reply<br/>no retrieval, triage, or matches]
+  I -->|emergency| R[RAG path]
+  I -->|first symptom query| M[Symptom Intake modal]
+  M -->|Analyze Symptoms or Skip| R
+  I -->|medical follow-up| H[History contextualization]
+  H --> Q[Synthesize retrieval query]
+  Q --> V[Single ChromaDB fetch<br/>max TOP_K, RERANK_CANDIDATES]
+  V --> X[Cross-encoder rerank once]
+  X --> T{Relevance threshold}
+  T -->|weak| A[Ask clarifying questions<br/>empty matches]
+  T -->|strong| L[LLM grounded answer]
+  L --> S[Citations, triage, match percents]
+  S --> SSE[SSE: status, triage, tokens, metadata, done]
+  C --> SSE
+  HF[Hospital Finder modal] -.->|header button, anytime| OSM[OpenStreetMap Overpass / Nominatim]
+  S -.->|emergency only| HF
 ```
 
-The application never answers from the model alone in the live chat. Retrieval, triage, and guardrails stay in the path.
+The live chat never answers from the model alone for medical queries. Retrieval, triage, and guardrails stay in the path unless the intent classifier labels the turn as conversational.
 
 ---
 
-## Technology stack
-
-**Frontend:** React 19, TypeScript, Vite, Tailwind CSS, React Router, Context API, Lucide icons, React Markdown
-
-**Backend:** FastAPI, Pydantic, Motor (async MongoDB), bcrypt, PyJWT
-
-**AI / RAG:** ChromaDB, sentence-transformers (MiniLM / optional PubMedBERT), cross-encoder re-ranker (`ms-marco-MiniLM-L-6-v2`), safety modules, provider registry
-
-**Maps:** OpenStreetMap Overpass API, Nominatim fallback, embedded map for nearby hospitals
-
-**Database:** MongoDB for accounts and conversations; ChromaDB on disk for vectors
-
----
-
-## Folder structure
+## Repository layout
 
 ```
 project-root/
 ├── backend/
-│   ├── app/
-│   │   ├── api/              # HTTP routes
-│   │   ├── core/             # config, security, errors
-│   │   ├── connection/       # MongoDB client and indexes
-│   │   ├── models/           # user, chat, message documents
-│   │   ├── repositories/     # database queries
-│   │   ├── schemas/          # API request/response models
-│   │   └── services/         # auth, chat, RAG orchestration
-│   └── src/                  # RAG, embeddings, retrieval, safety, LLM providers
-├── frontend/                 # Vite + React + TypeScript
-├── knowledge_base/           # Curated markdown documents
-├── data/                     # Local Chroma indexes (gitignored)
-├── evaluation/               # Datasets and scoring scripts
-├── scripts/                  # Index build and smoke tests
-├── tests/                    # Pytest suite
-├── README.md
-└── TECHNICAL_README.md
+│   ├── app/                    # FastAPI HTTP layer
+│   │   ├── api/routes/         # auth, chats, messages, hospitals
+│   │   ├── connection/         # MongoDB client and indexes
+│   │   ├── core/               # config, security, errors
+│   │   ├── models/             # user, chat, message documents
+│   │   ├── repositories/
+│   │   ├── schemas/
+│   │   └── services/           # auth, chat, RAG orchestration + history
+│   └── src/                    # RAG pipeline (keep this tree)
+│       ├── ai/providers/       # mock, groq, openai, ollama
+│       ├── embeddings/
+│       ├── llm/
+│       ├── pipeline/           # rag_pipeline.py
+│       ├── retrieval/
+│       ├── safety/             # intent, triage, faithfulness
+│       └── api/main.py         # compatibility re-export of app.main:app
+├── frontend/src/
+│   ├── components/
+│   │   ├── chat/               # bubbles, composer, sidebar, intake card
+│   │   ├── modals/             # SymptomIntakeModal
+│   │   ├── hospitals/          # NearbyHospitals + HospitalFinderModal
+│   │   ├── bodymap/            # interactive body figure
+│   │   ├── common/             # buttons, inputs, shells
+│   │   ├── auth/
+│   │   └── medical/
+│   ├── context/
+│   ├── pages/
+│   ├── services/
+│   ├── types/
+│   └── utils/                  # intent, body map, emergency helpers
+├── knowledge_base/             # Curated markdown documents (do not delete)
+├── data/                       # Local Chroma indexes (gitignored)
+├── evaluation/                 # Datasets and scoring scripts
+├── scripts/build_index.py
+├── tests/                      # Pytest suite
+├── frontend/tests/             # Node test suite
+└── README.md
 ```
 
----
-
-## AI / RAG flow
-
-1. Safety pre-check on the raw query (prescription/dosage refusal; emergency flags).
-2. Retrieve 12 candidate passages from ChromaDB, then re-rank them with a cross-encoder and keep the top 4.
-3. Classify triage from the query and retrieved evidence (emergency override when red flags fire).
-4. Generate an answer that may only use retrieved context.
-5. Attach citations and run the citation-faithfulness audit.
-6. Stream tokens to the browser, then persist the final assistant message in MongoDB.
+`backend/src/api/main.py` re-exports `app.main:app` so `uvicorn src.api.main:app` still works with `PYTHONPATH=backend`. Prefer `uvicorn app.main:app`.
 
 ---
 
-## Authentication
+## Setup
 
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/me`
-- `POST /api/v1/auth/refresh`
-
-Passwords are hashed with bcrypt. Access and refresh JWTs are stored in HTTP-only cookies (`mediassist_access`, `mediassist_refresh`). The frontend sends `credentials: "include"` and does not keep tokens in `localStorage`. Protected chat routes are enforced on the server; a user cannot read another account's chats.
-
-A demo user is created on API startup if missing: `demo@clinic.local` / `demo123`.
-
----
-
-## MongoDB schema overview
-
-**users:** `_id`, `name`, `email`, `password_hash`, `created_at`, `updated_at`, `last_login`, `is_active`, `medical_disclaimer_accepted`
-
-**chats:** `_id`, `user_id`, `title`, `created_at`, `updated_at`, `last_message_at`, `message_count`, `archived`, `metadata`
-
-**messages:** `_id`, `chat_id`, `user_id`, `role`, `content`, timestamps, `model`, `citations`, `triage`, `possible_conditions`, `faithfulness`, `recommendations`, `refused`, `disclaimer`, `metadata`
-
-Indexes exist on email (unique), `user_id`, `chat_id`, and recency fields.
-
----
-
-## Chat architecture
-
-Creating a chat stores an empty conversation. The first user message generates a short title (deterministic, not an extra model call). The layout is a full-height chat shell: history sidebar, independently scrolling messages, and a composer that stays at the bottom. The sidebar can collapse to a narrow rail, be drag-resized on desktop (about 240–380 px), and becomes an overlay drawer on phones. Chats are grouped by Today / Yesterday / Previous 7 days / Older. Rename and delete are per-owner. Deleting a chat also deletes its messages.
-
-A new conversation shows a clickable body figure (“Tap where it hurts”) plus region buttons. The composer also has a **Body** control. The user can switch Front / Back, tap a region, and see only that region’s symptom chips. A **Will send** review line shows the typed text plus selected locations and symptoms before submit. Helpers live in `frontend/src/utils/bodyMap.ts` (`buildBodyMapQuery`, `formatReviewLine`). Changing a selection replaces that context instead of appending duplicates. The map only records discomfort; it does not name a disease, improve retrieval by itself, or change triage on its own.
-
-Assistant replies are arranged as: **urgency → recommendations → explanation → possible matches → sources**. Match percentages are normalized retrieval scores that sum to 100, not the chance of a diagnosis.
-
-Historical messages are loaded from MongoDB. Previous answers are not regenerated.
-
----
-
-## Streaming architecture
-
-`POST /api/v1/chats/{chat_id}/messages/stream` returns `text/event-stream` events:
-
-- `status` — retrieval / analysis progress
-- `token` — answer chunk
-- `citation` / `triage` / `metadata` — structured extras
-- `done` — final payload plus the saved assistant message
-
-Providers that cannot natively stream still emit reasonable chunks (the mock provider splits on words).
-
----
-
-## Safety design
-
-- Prescription and dosage requests are refused before generation.
-- Emergency language forces an emergency triage banner even if retrieval continues for context.
-- Answers must not claim certainty or replace a clinician.
-- The UI labels the product as an information assistant, not a doctor.
-- The body map never suppresses emergency checks; red-flag text in the sent message still forces emergency guidance.
-- Chat content is not written to application logs by default.
-
----
-
-## Installation
-
-Requirements: **Python 3.11**, **Node.js 18+**, **MongoDB 6+** running locally.
+Requirements: **Python 3.11**, **Node.js 18+**. MongoDB 6+ is recommended; for a disposable demo set `MONGODB_URI=memory`.
 
 ```bash
 python -m venv venv
@@ -194,79 +109,81 @@ cd frontend
 npm install
 ```
 
-Copy `.env.example` to `.env`. Keep `LLM_PROVIDER=mock` if you do not have an API key.
+Copy `.env.example` to `.env`.
 
----
+### LLM provider
 
-## Environment variables
+`LLM_PROVIDER` defaults to **`mock`**, which writes short grounded answers from retrieved notes only. That is enough to run the app and the tests.
 
-See `.env.example`. Important groups:
+For a real conversational model, set one of:
 
-- `MONGODB_URI`, `MONGODB_DB_NAME`
-- `JWT_SECRET`, cookie lifetimes
-- `CORS_ORIGINS` (include `http://localhost:5173`)
-- `LLM_PROVIDER`, provider keys / Ollama URL
-- `EMBEDDING_MODE`, `TOP_K`, `RERANK_ENABLED`, `RERANK_CANDIDATES`
+| Provider | Required settings |
+|---|---|
+| `groq` | `GROQ_API_KEY`, optional `GROQ_MODEL` (default `llama-3.1-8b-instant`) |
+| `openai` | `OPENAI_API_KEY`, optional `OPENAI_MODEL` (default `gpt-4o-mini`) |
+| `ollama` | local Ollama at `OLLAMA_BASE_URL` (default `http://localhost:11434`) and `OLLAMA_MODEL` |
 
-Do not put real secrets in `.env.example`.
+If a cloud key is missing or looks like a placeholder, the resolver falls back to `mock`.
 
----
+Other important variables: `MONGODB_URI`, `JWT_SECRET`, `CORS_ORIGINS`, `EMBEDDING_MODE`, `TOP_K`, `RERANK_ENABLED`, `RERANK_CANDIDATES`, `MIN_RELEVANCE_SCORE`.
 
-## Running the backend
-
-MongoDB must be reachable first (`mongodb://127.0.0.1:27017` by default). For a disposable in-memory store while developing without a MongoDB install, set `MONGODB_URI=memory`.
-
-```bash
-set PYTHONPATH=backend
-uvicorn app.main:app --reload --port 8000
-```
-
-Or double-click `run_api.bat`. Docs: http://localhost:8000/docs
-
----
-
-## Running the frontend
-
-```bash
-cd frontend
-npm run dev
-```
-
-Or `run_web.bat`. Website: http://localhost:5173  
-`run_full.bat` starts API then Vite.
-
-During development Vite proxies `/api` to port 8000.
-
----
-
-## Building vector indexes
-
-The live RAG path needs a Chroma index:
+### Build the vector index
 
 ```bash
 set PYTHONPATH=backend
 python scripts/build_index.py
 ```
 
-Use `general` or `medical` as an optional argument to build one store. The app reads `EMBEDDING_MODE`.
+Use `general` or `medical` as an optional argument. The app reads `EMBEDDING_MODE`.
 
 ---
 
-## Running tests
+## Run
 
 ```bash
 set PYTHONPATH=backend
-python -m pytest tests/ -v
+uvicorn app.main:app --reload --reload-dir backend --port 8000
 ```
 
-The repository has **32** pytest tests under `tests/` and **16** frontend body-map tests (`npm test`). Auth/chat tests use an in-memory Mongo mock. Pipeline tests cover ingestion, guardrails, triage, and faithfulness without calling a paid LLM. Do not claim the full suite passed unless you re-run it in this project’s venv.
-
-Body-map query helpers (frontend):
+In another terminal:
 
 ```bash
 cd frontend
-npm test
+npm run dev
 ```
+
+Or use `run_api.bat`, `run_web.bat`, or `run_full.bat`. Website: http://localhost:5173 — API docs: http://localhost:8000/docs
+
+Demo login: **Fill demo details** on the sign-in page, then sign in (`demo@clinic.local` / `demo123`).
+
+On startup the API warms the embedding model, Chroma collection, and cross-encoder (when `RERANK_ENABLED=true`) in a worker thread so the first chat is not a cold Hugging Face load.
+
+---
+
+## How a chat turn works
+
+1. **Frontend intent check.** Greetings (`hello`, `I am good`) and off-topic text skip the intake modal. Emergency wording bypasses intake and is sent immediately.
+2. **Symptom Intake modal** (first medical query only): Duration, Age Group, Aggravating Factors. **Analyze Symptoms** appends that context; **Skip & Send Now** or **Escape** sends the raw query. **Enter** submits when all three answers are chosen.
+3. **Backend intent classifier** (`backend/src/safety/guardrails.py`) runs before retrieval. Non-medical turns skip ChromaDB, reranking, triage, citations, and `possible_matches`. The LLM (or mock) replies conversationally with `triage: null` and empty match lists.
+4. **History.** The message service loads the last 8–10 MongoDB messages for the `chat_id` and passes `chat_history` into the pipeline. Follow-ups such as “I also have a mild fever with that” are combined with earlier symptom text before retrieval, and that history is included in the LLM prompt.
+5. **Single retrieval.** One Chroma query fetches `max(TOP_K, RERANK_CANDIDATES)` (default 12), one batched cross-encoder `predict()`, then `TOP_K` (default 4) for context. Up to four deduplicated `possible_matches` come from that same pool. If the best score is below `MIN_RELEVANCE_SCORE` (default 0.22), match percentages are not invented: `possible_matches` is empty and the generator asks clarifying questions.
+6. **SSE.** `status` and `triage` emit first, tokens stream as the provider yields them, then a citation audit runs on the finished text before `metadata` and `done`.
+7. **Hospitals.** The chat header **Nearby hospitals** button opens the finder modal at any time. Individual answers do not include a hospital widget. Emergency triage shows a compact **Emergency — View Nearby Hospitals** action on the alert banner.
+
+Match percentages are normalized retrieval shares that sum to 100. They are **not** diagnosis probabilities.
+
+---
+
+## Tests
+
+```bash
+$env:PYTHONPATH="backend"; pytest tests -v
+cd frontend
+npm test
+npm run build
+```
+
+Auth/chat tests use an in-memory Mongo mock. Pipeline tests cover ingestion, guardrails, intent, triage, and faithfulness without a paid LLM.
 
 ---
 
@@ -279,8 +196,6 @@ python evaluation/evaluate_hallucination.py
 python evaluation/evaluate_e2e.py
 ```
 
-Datasets live in `evaluation/datasets/`: **112** symptom–condition queries, **100** emergency cases (53 emergency / 47 non-emergency), and **112** hallucination questions. Scripts import `src.*` and the live RAG path.
-
 Documented results (expanded sets, MiniLM live path with re-ranking unless noted):
 
 | Test | Result |
@@ -291,35 +206,7 @@ Documented results (expanded sets, MiniLM live path with re-ranking unless noted
 | **Live MiniLM + re-ranker** | Recall@1 **85.71%**; Recall@3 94.64%; Recall@5 96.43%; MRR 0.903 |
 | End-to-end (same 112 queries) | Condition surfaced 110/112 (**98.21%**); exact triage 105/112 (93.75%) |
 
-PubMedBERT is slightly better at Recall@1 **without** the re-ranker; MiniLM is better at Recall@3, Recall@5, and MRR in that fair compare. The running app uses MiniLM **with** re-ranking.
-
-**98.21%** and **Recall@5 (96.43%)** are different tests: the first is end-to-end condition surfacing in the answer or citations (`evaluate_e2e.py`); the second is whether the expected document is in the top 5 retrieved chunks (`evaluate_embeddings.py`). Warm-cache timings still documented: about **24 ms** retrieval, **28 ms** mock pipeline, **82.1 s** / **114.4 s** to build the general / medical indexes.
-
----
-
-## Configuration
-
-| Setting | Role |
-|---|---|
-| `LLM_PROVIDER` | `mock`, `groq`, `openai`, or `ollama` |
-| `EMBEDDING_MODE` | `general` (MiniLM) or `medical` (PubMedBERT) |
-| `TOP_K` | Passages kept after re-ranking (default 4) |
-| `RERANK_ENABLED` | Cross-encoder second stage (default `true`) |
-| `RERANK_CANDIDATES` | Chroma hits scored before keeping `TOP_K` (default 12) |
-| Missing cloud keys | Provider resolver falls back to `mock` |
-
-Add a new model by implementing `generate` / `stream` in `backend/src/ai/providers/` and registering it in `backend/src/ai/registry.py`.
-
----
-
-## Limitations
-
-- Knowledge is limited to the bundled sample documents, not the whole medical literature.
-- Without re-ranking, first-place retrieval was 62.50% on 112 queries; with the cross-encoder it was 85.71%. A condition that is not in the 400-note set cannot be suggested.
-- The body map only adds location and symptom words to the query. It does not diagnose and is not claimed to raise Recall@1.
-- Mock mode answers from retrieved passages only; it is not a frontier clinical model.
-- MongoDB and Chroma are local-process defaults, not a production clinical deployment.
-- Cookie `Secure` is enabled only when `APP_ENV=production`.
+**98.21%** and **Recall@5 (96.43%)** are different tests: the first is end-to-end condition surfacing; the second is whether the expected document is in the top 5 retrieved chunks.
 
 ---
 
@@ -329,16 +216,7 @@ This tool provides general information retrieved from reference medical document
 
 ---
 
-## Future extension
-
-- Additional providers in the existing registry
-- Richer profile preferences
-- Cursor-based chat pagination for very large histories
-- Production reverse-proxy serving `frontend/dist` beside FastAPI
-
----
-
-## Academic objectives (unchanged)
+## Academic objectives
 
 | # | Objective | Status |
 |---|---|---|

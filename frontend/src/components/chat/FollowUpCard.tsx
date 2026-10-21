@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../common/Button";
 import { cn } from "../../lib/cn";
 
@@ -59,12 +59,23 @@ export function FollowUpCard({
   const [worse, setWorse] = useState("");
   const ready = Boolean(duration && age && worse);
 
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Enter" && ready) {
+        event.preventDefault();
+        onContinue({ duration, age, worse });
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [age, duration, onContinue, ready, worse]);
+
   return (
     <article className="flex max-w-[min(48rem,100%)] gap-3">
       <div className="min-w-0 flex-1 rounded-3xl border border-teal-100 bg-white px-4 py-4 shadow-sm">
-        <p className="text-sm font-extrabold text-slate-900">A few quick details first</p>
+        <p id="symptom-intake-title" className="text-sm font-extrabold text-slate-900">A few quick details first</p>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Answer these three questions, then I will show four possible matches, urgency, and nearby hospitals.
+          Answer these three questions, then I will look up possible matches and urgency. You can open nearby hospitals anytime from the header.
         </p>
         <p className="mt-3 max-h-32 overflow-y-auto rounded-2xl bg-teal-50 px-3 py-2 text-sm leading-6 break-anywhere text-slate-700">“{symptoms}”</p>
         <div className="mt-4 space-y-4">
@@ -74,10 +85,10 @@ export function FollowUpCard({
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           <Button disabled={!ready} onClick={() => onContinue({ duration, age, worse })}>
-            Continue to results
+            Analyze Symptoms
           </Button>
           <Button variant="secondary" onClick={onSkip}>
-            Skip questions
+            Skip & Send Now
           </Button>
         </div>
       </div>
@@ -87,53 +98,4 @@ export function FollowUpCard({
 
 export function formatFollowUpQuery(symptoms: string, answers: FollowUpAnswers): string {
   return `${symptoms.trim()}\n\nExtra detail: lasting ${answers.duration}; age group ${answers.age}; worse with ${answers.worse}.`;
-}
-
-export function buildSuggestedFollowUps(userText: string, conditions: { condition?: string }[]): string[] {
-  const cleaned = userText
-    .replace(/\n\nExtra detail:[\s\S]*$/, "")
-    .replace(/Body map context \(user-described discomfort, not a diagnosis\):[\s\S]*$/, "")
-    .trim();
-  const first = conditions.find((item) => item.condition)?.condition;
-  const topic = first || (cleaned.length > 72 ? "these symptoms" : cleaned || "these symptoms");
-  const seen = new Set<string>();
-  return [
-    `When should I see a doctor for ${topic}?`,
-    `What warning signs should I watch for with ${topic}?`,
-    `What self-care is usually suggested for ${topic}?`,
-  ].filter((item) => {
-    if (seen.has(item)) return false;
-    seen.add(item);
-    return Boolean(item.trim());
-  });
-}
-
-export function SuggestedFollowUps({
-  questions,
-  disabled,
-  onPick,
-}: {
-  questions: string[];
-  disabled?: boolean;
-  onPick: (question: string) => void;
-}) {
-  if (!questions.length) return null;
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-400">Follow-up questions</p>
-      <div className="flex flex-wrap gap-2">
-        {questions.map((question) => (
-          <button
-            key={question}
-            type="button"
-            disabled={disabled}
-            onClick={() => onPick(question)}
-            className="min-h-11 rounded-full border border-teal-100 bg-white px-3 text-xs font-bold text-teal-900 hover:bg-teal-50 disabled:opacity-50"
-          >
-            {question}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }

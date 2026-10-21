@@ -36,7 +36,11 @@ function assistantFromEvent(event: StreamEvent, fallback: ChatMessage): ChatMess
     ...fallback,
     content: String(result.answer || fallback.content),
     citations: (result.citations as ChatMessage["citations"]) || fallback.citations,
-    triage: (result.triage as ChatMessage["triage"]) || fallback.triage,
+    triage: (() => {
+      const triage = (result.triage as ChatMessage["triage"]) || fallback.triage;
+      if (!triage || triage.level === "none") return null;
+      return triage;
+    })(),
     possible_conditions: (result.possible_conditions as ChatMessage["possible_conditions"]) || fallback.possible_conditions,
     faithfulness: (result.faithfulness as ChatMessage["faithfulness"]) || fallback.faithfulness,
     recommendations: (result.recommendations as ChatMessage["recommendations"]) || fallback.recommendations,
@@ -128,7 +132,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       failedContentRef.current = null;
       setSending(true);
       setStreaming(true);
-      setStatus("Analyzing your symptoms...");
+      setStatus("Understanding your message...");
 
       let chatId = activeChatId;
       try {
@@ -202,14 +206,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 ),
               );
             }
-            if (event.type === "triage") {
+            if (event.type === "triage" && event.level && event.level !== "none") {
+              const level = event.level;
               setMessages((current) =>
                 current.map((item) =>
                   item.id === assistantId
                     ? {
                         ...item,
                         triage: {
-                          level: event.level || "consult_doctor",
+                          level,
                           label: event.label || "Urgency",
                           guidance: event.guidance || "",
                           reason: event.reason,

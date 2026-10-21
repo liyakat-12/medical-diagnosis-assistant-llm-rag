@@ -30,8 +30,14 @@ async def send_message(
     payload: SendMessageRequest,
     user: dict = Depends(get_current_user),
 ) -> list[MessageResponse]:
+    history = await message_service.recent_history(user["id"], chat_id)
     user_msg = await message_service.add_user_message(user["id"], chat_id, payload.content.strip())
-    result = await asyncio.to_thread(message_service.diagnose_sync, payload.content.strip(), payload.top_k)
+    result = await asyncio.to_thread(
+        message_service.diagnose_sync,
+        payload.content.strip(),
+        payload.top_k,
+        chat_history=history,
+    )
     assistant = await message_service.add_assistant_message(user["id"], chat_id, result)
     return [MessageResponse(**user_msg), MessageResponse(**assistant)]
 
@@ -42,10 +48,13 @@ async def stream_message(
     payload: SendMessageRequest,
     user: dict = Depends(get_current_user),
 ):
+    history = await message_service.recent_history(user["id"], chat_id)
     await message_service.add_user_message(user["id"], chat_id, payload.content.strip())
 
     async def event_source():
-        iterator = message_service.stream_events(payload.content.strip(), payload.top_k)
+        iterator = message_service.stream_events(
+            payload.content.strip(), payload.top_k, chat_history=history
+        )
         try:
             while True:
                 try:

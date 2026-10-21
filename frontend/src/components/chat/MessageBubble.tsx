@@ -1,4 +1,4 @@
-import { Copy, Stethoscope } from "lucide-react";
+import { Copy, MapPin, Stethoscope } from "lucide-react";
 import Markdown from "react-markdown";
 import type { ChatMessage } from "../../types";
 import { useApp } from "../../context/AppContext";
@@ -12,6 +12,9 @@ const URGENCY_COPY: Record<string, string> = {
   emergency: "This may be urgent. Seek emergency care now.",
 };
 
+const MARKDOWN_CLASS =
+  "break-anywhere space-y-3 text-sm leading-7 text-slate-700 [&_a]:font-bold [&_a]:text-teal-800 [&_h1]:text-lg [&_h1]:font-extrabold [&_h2]:text-base [&_h2]:font-extrabold [&_h3]:text-sm [&_h3]:font-extrabold [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_pre]:overflow-x-auto [&_strong]:font-extrabold [&_ul]:list-disc [&_ul]:pl-5";
+
 function SectionTitle({ children }: { children: string }) {
   return <h3 className="mb-2 text-xs font-extrabold uppercase tracking-[0.14em] text-slate-400">{children}</h3>;
 }
@@ -21,6 +24,32 @@ function visibleExplanation(content: string): string {
   const text = (cut >= 0 ? content.slice(0, cut) : content).trim();
   if (/^(?:#{1,3}\s*)?(?:possible matches|recommendations)\s*:/i.test(text)) return "";
   return text;
+}
+
+function hasMedicalCards(message: ChatMessage): boolean {
+  const level = message.triage?.level;
+  return Boolean(
+    message.possible_conditions.length ||
+      message.citations.length ||
+      (level && level !== "none"),
+  );
+}
+
+function ThinkingIndicator({ status }: { status?: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-teal-100" aria-live="polite">
+      <span className="flex gap-1" aria-hidden>
+        {[0, 1, 2].map((index) => (
+          <span
+            key={index}
+            className="h-2 w-2 animate-bounce rounded-full bg-teal-600"
+            style={{ animationDelay: `${index * 120}ms` }}
+          />
+        ))}
+      </span>
+      <p className="text-sm font-semibold text-teal-800">{status || "Understanding your message..."}</p>
+    </div>
+  );
 }
 
 function OutcomeList({ message }: { message: ChatMessage }) {
@@ -57,12 +86,18 @@ function OutcomeList({ message }: { message: ChatMessage }) {
   );
 }
 
-function UrgencyList({ message }: { message: ChatMessage }) {
+function UrgencyList({
+  message,
+  onOpenHospitals,
+}: {
+  message: ChatMessage;
+  onOpenHospitals?: () => void;
+}) {
   const triage = message.triage;
   if (message.streaming && !triage) {
     return <p className="text-sm font-semibold text-slate-500">Checking urgency...</p>;
   }
-  if (!triage) return null;
+  if (!triage || triage.level === "none") return null;
   return (
     <div
       className={cn(
@@ -76,9 +111,20 @@ function UrgencyList({ message }: { message: ChatMessage }) {
       <p className="text-sm font-extrabold">{triage.label}</p>
       <p className="mt-1 text-sm leading-6">{triage.guidance || URGENCY_COPY[triage.level]}</p>
       {triage.level === "emergency" ? (
-        <a href={EMERGENCY_TEL} className="mt-2 inline-block text-sm font-extrabold underline">
-          Call {EMERGENCY_NUMBER} now
-        </a>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href={EMERGENCY_TEL} className="inline-flex min-h-11 items-center rounded-full bg-white px-3 text-sm font-extrabold text-red-700">
+            Call {EMERGENCY_NUMBER} now
+          </a>
+          {onOpenHospitals ? (
+            <button
+              type="button"
+              onClick={onOpenHospitals}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/70 px-3 text-sm font-extrabold text-white hover:bg-red-500"
+            >
+              <MapPin size={14} /> Emergency — View Nearby Hospitals
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -116,7 +162,15 @@ function CitationBullets({ message }: { message: ChatMessage }) {
   );
 }
 
-export function MessageBubble({ message }: { message: ChatMessage }) {
+export function MessageBubble({
+  message,
+  status,
+  onOpenHospitals,
+}: {
+  message: ChatMessage;
+  status?: string;
+  onOpenHospitals?: () => void;
+}) {
   const { toast } = useApp();
   if (message.role === "user") {
     return (
@@ -126,11 +180,12 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
     );
   }
 
-  const structured = Boolean(message.possible_conditions.length || message.triage || message.citations.length);
+  const structured = hasMedicalCards(message);
   const explanation = visibleExplanation(message.content || "");
   const showFallback = message.refused || (!structured && Boolean(message.content));
   const showThinking = message.streaming && !structured && !message.content;
   const recommendations = message.recommendations.filter((item) => item.trim());
+  const showTriage = Boolean(message.triage && message.triage.level !== "none") || (message.streaming && structured);
 
   return (
     <article className="flex max-w-full gap-3">
@@ -138,18 +193,18 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
         <Stethoscope size={14} />
       </span>
       <div className="min-w-0 flex-1">
-        {showThinking ? <p className="text-sm font-semibold text-teal-800">Looking through the medical notes...</p> : null}
+        {showThinking ? <ThinkingIndicator status={status} /> : null}
         {showFallback ? (
-          <div className="space-y-2 break-anywhere text-sm leading-7 text-slate-700 [&_a]:font-bold [&_a]:text-teal-800 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_pre]:overflow-x-auto [&_strong]:font-extrabold [&_ul]:list-disc [&_ul]:pl-5">
+          <div className={MARKDOWN_CLASS}>
             <Markdown>{message.content || ""}</Markdown>
             {message.streaming ? <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-teal-700 align-middle" aria-hidden /> : null}
           </div>
         ) : (
           <div className="space-y-5">
-            {message.triage || (message.streaming && structured) ? (
+            {showTriage ? (
               <section>
                 <SectionTitle>Urgency</SectionTitle>
-                <UrgencyList message={message} />
+                <UrgencyList message={message} onOpenHospitals={onOpenHospitals} />
               </section>
             ) : null}
             {recommendations.length ? (
@@ -163,7 +218,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
               </section>
             ) : null}
             {explanation ? (
-              <section className="break-anywhere text-sm leading-7 text-slate-700 [&_a]:font-bold [&_a]:text-teal-800 [&_p]:mb-3 [&_pre]:overflow-x-auto">
+              <section className={MARKDOWN_CLASS}>
                 <SectionTitle>Explanation</SectionTitle>
                 <Markdown>{explanation}</Markdown>
                 {message.streaming ? <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-teal-700 align-middle" aria-hidden /> : null}

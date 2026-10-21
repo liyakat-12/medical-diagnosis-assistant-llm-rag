@@ -1,4 +1,4 @@
-export type TriageLevel = "self_care" | "consult_doctor" | "emergency";
+export type TriageLevel = "self_care" | "consult_doctor" | "emergency" | "none";
 
 export interface User {
   id: string;

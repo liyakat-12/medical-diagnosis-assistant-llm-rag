@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUp, PersonStanding, Square } from "lucide-react";
-import { BodyMap } from "./BodyMap";
+import { BodyMap } from "../bodymap/BodyMap";
 import {
   BODY_MAP_DISCLAIMER,
   REGION_LABELS,

@@ -17,7 +17,23 @@ class MockProvider:
         grounded: bool = True,
         model: str | None = None,
     ) -> str:
-        del system_prompt, model
+        del model
+        if "[CONVERSATIONAL]" in user_prompt or "friendly medical information helper" in (system_prompt or "").lower():
+            return (
+                "Hello — I'm MediAssist, a medical information helper. "
+                "Describe symptoms in your own words, or tap the body map, whenever you want to look something up. "
+                "I'm not a doctor and this is not a diagnosis."
+            )
+        if "Do not name specific diseases" in (system_prompt or ""):
+            from src.safety.followups import weak_match_answer
+
+            # Pull the user line from the prompt when present so follow-ups stay relevant.
+            query = ""
+            for line in (user_prompt or "").splitlines():
+                if line.lower().startswith("user symptom description:"):
+                    query = line.split(":", 1)[-1].strip()
+                    break
+            return weak_match_answer(query or user_prompt or "")
         if not grounded:
             return (
                 "No documents were retrieved, so this answer cannot be cited.\n"

@@ -22,8 +22,9 @@ class Evidence:
     url: str
     condition: str
     triage_level: str
-    relevance_score: float  # higher is better (1 - cosine distance)
+    relevance_score: float  # higher is better (rerank sigmoid or 1 - cosine distance)
     doc_id: str = ""
+    vector_score: float = 0.0  # dense cosine similarity (1 - distance), before rerank
 
     def citation(self) -> str:
         return f"{self.title} ({self.source})"
@@ -37,10 +38,14 @@ def _get_store(mode: str) -> VectorStore:
 def _to_evidence(results) -> list[Evidence]:
     evidence = []
     for r in results:
+        if r.vector_score is not None:
+            vector_score = max(0.0, float(r.vector_score))
+        else:
+            vector_score = max(0.0, 1.0 - float(r.distance))
         if r.rerank_score is not None:
             score = float(r.rerank_score)
         else:
-            score = 1.0 - float(r.distance)
+            score = vector_score
         evidence.append(
             Evidence(
                 text=r.text,
@@ -51,6 +56,7 @@ def _to_evidence(results) -> list[Evidence]:
                 triage_level=r.metadata.get("triage_level", "consult_doctor"),
                 relevance_score=score,
                 doc_id=str(r.metadata.get("doc_id") or ""),
+                vector_score=vector_score,
             )
         )
     return evidence
@@ -71,10 +77,11 @@ def retrieve_candidates(
     store = _get_store(mode)
     fetch_k = max(top_k, config.RERANK_CANDIDATES) if use_rerank else max(top_k, 12)
     results = store.search(query, top_k=fetch_k)
+    for chunk in results:
+        chunk.vector_score = max(0.0, 1.0 - float(chunk.distance))
     if use_rerank:
         results = rerank_chunks(query, results, top_k=len(results))
     return _to_evidence(results[:top_k]), _to_evidence(results)
-
 
 def retrieve(query: str, top_k: int | None = None, mode: str | None = None, rerank: bool | None = None) -> list[Evidence]:
     top, _pool = retrieve_candidates(query, top_k=top_k, mode=mode, rerank=rerank)

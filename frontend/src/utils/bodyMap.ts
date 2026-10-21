@@ -53,10 +53,21 @@ export function formatReviewLine(freeText: string, regions: BodyRegion[], sympto
 
 export function buildBodyMapQuery(freeText: string, regions: BodyRegion[], symptoms: string[]): string {
   const typed = freeText.trim();
-  const locationText = unique(regions.map((region) => REGION_LABELS[region])).join(", ");
-  const symptomText = unique(symptoms).join(", ");
+  const locationLabels = unique(regions.map((region) => REGION_LABELS[region]));
+  const symptomList = unique(symptoms);
+  const locationText = locationLabels.join(", ");
+  const symptomText = symptomList.join(", ");
   const parts: string[] = [];
-  if (typed) parts.push(typed);
+  // Natural-language line first so embeddings match clinical notes; metadata kept for audit.
+  // Keep free text first when present so the user's own words stay primary.
+  const naturalBits = unique([
+    typed,
+    ...symptomList,
+    ...locationLabels.map((label) => `${label} discomfort`),
+  ]);
+  if (naturalBits.length) {
+    parts.push(naturalBits.join("; "));
+  }
   if (locationText || symptomText) {
     const details = [
       locationText ? `locations = ${locationText}` : "",

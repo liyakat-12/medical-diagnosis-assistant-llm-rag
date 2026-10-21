@@ -89,6 +89,13 @@ TOP_K = int(os.getenv("TOP_K", "4"))
 RERANK_ENABLED = os.getenv("RERANK_ENABLED", "true").strip().lower() in {"1", "true", "yes"}
 RERANK_CANDIDATES = int(os.getenv("RERANK_CANDIDATES", "12"))
 RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+# Drop noisy matches when the best retrieved chunk is weaker than this (0–1).
+# Applied to rerank sigmoid scores when a cross-encoder is enabled.
+MIN_RELEVANCE_SCORE = float(os.getenv("MIN_RELEVANCE_SCORE", "0.22"))
+# Dense cosine similarity (1 - distance) floor used alongside rerank scores so
+# clinically relevant hits are not discarded when the cross-encoder is poorly
+# calibrated on short symptom / body-map queries.
+MIN_VECTOR_SCORE = float(os.getenv("MIN_VECTOR_SCORE", "0.38"))
 
 # ---------------------------------------------------------------------------
 # LLM

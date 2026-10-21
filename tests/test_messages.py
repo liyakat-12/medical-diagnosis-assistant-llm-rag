@@ -14,7 +14,7 @@ def test_message_persistence_and_ownership(client, monkeypatch):
         "faithfulness": {"supported": ["tension headache"], "uncited": [], "not_retrieved": []},
         "provider": "mock",
     }
-    monkeypatch.setattr("app.services.message_service.diagnose_sync", lambda query, top_k=None: fake)
+    monkeypatch.setattr("app.services.message_service.diagnose_sync", lambda query, top_k=None, **_kwargs: fake)
 
     client.post("/api/v1/auth/register", json={"name": "Asha", "email": "asha@test.local", "password": "securepass"})
     chat = client.post("/api/v1/chats", json={}).json()
@@ -36,7 +36,7 @@ def test_message_persistence_and_ownership(client, monkeypatch):
 
 
 def test_stream_saves_assistant_message(client, monkeypatch):
-    def fake_stream(query, top_k=None):
+    def fake_stream(query, top_k=None, **_kwargs):
         yield {"type": "token", "content": "Possible sinus issue. "}
         yield {
             "type": "done",

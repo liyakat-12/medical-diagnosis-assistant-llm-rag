@@ -1,20 +1,20 @@
 import type { TriageLevel } from "../../types";
 import { cn } from "../../lib/cn";
 
-const LABELS: Record<TriageLevel, string> = {
+const LABELS: Record<Exclude<TriageLevel, "none">, string> = {
   self_care: "Self care",
   consult_doctor: "Consult a doctor",
   emergency: "Emergency",
 };
 
-const COPY: Record<TriageLevel, string> = {
+const COPY: Record<Exclude<TriageLevel, "none">, string> = {
   self_care: "Monitor your symptoms and consider general self-care.",
   consult_doctor: "Consider speaking with a healthcare professional.",
   emergency: "Seek immediate medical attention.",
 };
 
 export function TriageBadge({ level }: { level?: TriageLevel | null }) {
-  if (!level) return null;
+  if (!level || level === "none") return null;
   return (
     <span
       className={cn(
@@ -30,7 +30,7 @@ export function TriageBadge({ level }: { level?: TriageLevel | null }) {
 }
 
 export function TriageBanner({ level, guidance }: { level?: TriageLevel | null; guidance?: string }) {
-  if (!level) return null;
+  if (!level || level === "none") return null;
   return (
     <div
       role="status"

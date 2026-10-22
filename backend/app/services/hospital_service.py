@@ -326,3 +326,38 @@ def find_nearby_hospitals(lat: float, lng: float, radius: int = SEARCH_RADIUS_M)
     }
     _NEARBY_CACHE[key] = (time() - CACHE_TTL_S + ERROR_CACHE_TTL_S, result)
     return deepcopy(result)
+
+
+# OSM.org blocks browser hotlinking. Carto now returns an "API KEY REQUIRED"
+# PNG. Esri street tiles and OSM.de work without a key.
+TILE_URLS = (
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
+)
+_TILE_CACHE: dict[tuple[int, int, int], bytes] = {}
+
+
+def fetch_map_tile(z: int, x: int, y: int) -> bytes:
+    if z < 1 or z > 19:
+        raise ValueError("invalid zoom")
+    span = 2**z
+    if x < 0 or y < 0 or x >= span or y >= span:
+        raise ValueError("invalid tile")
+    cached = _TILE_CACHE.get((z, x, y))
+    if cached:
+        return cached
+    last_error: Exception | None = None
+    for template in TILE_URLS:
+        try:
+            with httpx.Client(timeout=3.0, headers=HEADERS, follow_redirects=True) as client:
+                response = client.get(template.format(z=z, x=x, y=y))
+            data = response.content
+            if response.status_code == 200 and data[:8] == b"\x89PNG\r\n\x1a\n":
+                if len(_TILE_CACHE) > 256:
+                    _TILE_CACHE.clear()
+                _TILE_CACHE[(z, x, y)] = data
+                return data
+            last_error = RuntimeError(f"tile HTTP {response.status_code}")
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(str(last_error or "map tile unavailable"))

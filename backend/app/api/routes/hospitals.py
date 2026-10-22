@@ -3,11 +3,28 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 
 from app.core.dependencies import get_current_user
-from app.services.hospital_service import find_nearby_hospitals, geocode_place, locate_by_ip
+from app.services.hospital_service import fetch_map_tile, find_nearby_hospitals, geocode_place, locate_by_ip
 
 router = APIRouter(prefix="/hospitals", tags=["hospitals"])
+
+
+@router.get("/map-tiles/{z}/{x}/{y}.png")
+async def map_tile(z: int, x: int, y: int) -> Response:
+    """Serve map tiles so the browser is not blocked by OpenStreetMap's tile policy."""
+    try:
+        data = await asyncio.to_thread(fetch_map_tile, z, x, y)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid map tile.")
+    except Exception:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Map tiles are temporarily unavailable.")
+    return Response(
+        content=data,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/nearby")

@@ -51,6 +51,27 @@ function googleOpenUrl(origin: { lat: number; lng: number } | null, selected: Ne
   return "https://www.google.com/maps/search/hospitals";
 }
 
+function streetTileUrl(zoom: number, x: number, y: number): string {
+  // Esri street tiles work in the browser with no API key.
+  // OSM.org blocks hotlinking; Carto now watermarks "API KEY REQUIRED".
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${zoom}/${y}/${x}`;
+}
+
+function MapTile({ zoom, x, y }: { zoom: number; x: number; y: number }) {
+  const [fallback, setFallback] = useState(false);
+  const src = fallback
+    ? `/api/v1/hospitals/map-tiles/${zoom}/${x}/${y}.png`
+    : streetTileUrl(zoom, x, y);
+  return (
+    <img
+      alt=""
+      src={src}
+      onError={() => setFallback(true)}
+      className="h-full w-full object-cover"
+    />
+  );
+}
+
 function HospitalMap({
   lat,
   lng,
@@ -81,13 +102,7 @@ function HospitalMap({
       <div className="relative h-64 w-full md:h-80" role="img" aria-label={label}>
         <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">
           {tiles.map((item) => (
-            <img
-              key={`${item.x}-${item.y}`}
-              alt=""
-              src={`https://tile.openstreetmap.org/${zoom}/${item.x}/${item.y}.png`}
-              referrerPolicy="no-referrer"
-              className="h-full w-full object-cover"
-            />
+            <MapTile key={`${item.x}-${item.y}`} zoom={zoom} x={item.x} y={item.y} />
           ))}
         </div>
         {hospitals.map((hospital) => {
@@ -117,7 +132,7 @@ function HospitalMap({
       <div className="flex items-center justify-between gap-2 border-t border-teal-100 bg-teal-50 px-3 py-2">
         <p className="truncate text-xs font-semibold text-slate-600">
           {label}
-          <span className="ml-1 font-medium text-slate-400">© OpenStreetMap</span>
+          <span className="ml-1 font-medium text-slate-400">© Esri, © OpenStreetMap</span>
         </p>
         <a
           href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`}

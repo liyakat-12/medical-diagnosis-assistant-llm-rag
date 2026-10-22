@@ -124,3 +124,43 @@ def test_nearby_hospitals_endpoint(client, monkeypatch):
     payload = listed.json()
     assert payload["emergency_number"] == "112"
     assert payload["hospitals"][0]["name"] == "Test Hospital"
+
+
+def test_map_tile_rejects_invalid_zoom():
+    from app.services.hospital_service import fetch_map_tile
+
+    try:
+        fetch_map_tile(0, 0, 0)
+    except ValueError:
+        return
+    raise AssertionError("invalid zoom should be rejected")
+
+
+def test_map_tile_uses_png_fallback(monkeypatch):
+    from app.services import hospital_service as hs
+
+    hs._TILE_CACHE.clear()
+
+    class FakeResponse:
+        def __init__(self, status_code: int, content: bytes):
+            self.status_code = status_code
+            self.content = content
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def get(self, url: str):
+            if "arcgisonline" in url:
+                return FakeResponse(403, b"<html>Access blocked</html>")
+            return FakeResponse(200, b"\x89PNG\r\n\x1a\n" + b"tile")
+
+    monkeypatch.setattr(hs.httpx, "Client", FakeClient)
+    data = hs.fetch_map_tile(12, 2900, 1700)
+    assert data.startswith(b"\x89PNG")

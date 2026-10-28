@@ -130,6 +130,17 @@ describe("ui04 switch chats during or after a stream", () => {
     assert.equal(after.messages.some((item) => item.content.includes("cough leftover")), false);
     assert.equal(after.messages[0].content, "hello");
   });
+
+  it("does not accept chat A tokens into a new send in chat B", () => {
+    let state = emptySession("chat-a");
+    state = beginSend(state, "chat-a", "I have a cough", false, "a");
+    const aRequest = state.requestId;
+    state = switchChat(state, "chat-b", []);
+    state = beginSend(state, "chat-b", "hello", false, "b");
+    assert.notEqual(state.requestId, aRequest);
+    const after = applyStreamEvent(state, { type: "token", content: "cough leftover" }, aRequest);
+    assert.equal(after.messages.some((item) => item.content.includes("cough leftover")), false);
+  });
 });
 
 describe("ui05 emergency header state", () => {

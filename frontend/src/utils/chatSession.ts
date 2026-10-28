@@ -260,6 +260,7 @@ export function reloadMessages(state: ChatSessionState, chatId: string, serverMe
   return {
     ...emptySession(chatId),
     messages: serverMessages.map(publicMessage),
+    requestId: state.requestId + 1,
   };
 }
 

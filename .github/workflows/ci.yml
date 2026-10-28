@@ -20,6 +20,8 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Build retrieval index
+        run: python scripts/build_index.py general
       - name: Run backend tests
         run: pytest tests -q
 

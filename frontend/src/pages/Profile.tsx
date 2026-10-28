@@ -31,7 +31,7 @@ export function Profile() {
 
   return (
     <PageShell className="mx-auto w-full max-w-xl px-4 py-12">
-        <div className="rounded-[2rem] border border-teal-100 bg-white p-8 shadow-sm">
+        <div className="min-w-0 rounded-[2rem] border border-teal-100 bg-white p-5 shadow-sm sm:p-8">
           <div className="flex items-center gap-3">
             <Avatar name={user.name} />
             <div>

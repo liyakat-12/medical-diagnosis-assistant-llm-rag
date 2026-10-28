@@ -60,6 +60,77 @@ REFRESH_COOKIE = "mediassist_refresh"
 DEMO_EMAIL = os.getenv("DEMO_EMAIL", "demo@clinic.local")
 DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "demo123")
 DEMO_NAME = os.getenv("DEMO_NAME", "Demo Patient")
+CHAT_HISTORY_WINDOW = int(os.getenv("CHAT_HISTORY_WINDOW", "8"))
+EMERGENCY_REGION = os.getenv("EMERGENCY_REGION", "IN").strip().upper() or "IN"
+EMERGENCY_NUMBER = os.getenv("EMERGENCY_NUMBER", "112").strip() or "112"
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "20"))
+LLM_MEDICAL_MAX_TOKENS = int(os.getenv("LLM_MEDICAL_MAX_TOKENS", "280"))
+LLM_GENERAL_MAX_TOKENS = int(os.getenv("LLM_GENERAL_MAX_TOKENS", "1200"))
+
+_UNSAFE_JWT_SECRETS = {
+    "",
+    "dev-only-change-me",
+    "change-this-to-a-long-random-string",
+    "replace-with-a-long-unique-local-secret",
+    "changeme",
+    "secret",
+    "jwt-secret",
+}
+
+
+def is_production() -> bool:
+    return APP_ENV in {"production", "prod"}
+
+
+def jwt_secret_is_unsafe(secret: str | None = None) -> bool:
+    value = (JWT_SECRET if secret is None else secret) or ""
+    stripped = value.strip()
+    if stripped.lower() in {item.lower() for item in _UNSAFE_JWT_SECRETS}:
+        return True
+    return len(stripped) < 24
+
+
+def mongo_uri_mode(uri: str | None = None) -> str:
+    """Return 'memory' or 'persistent'. Raises ValueError for unsupported URIs."""
+    value = (MONGODB_URI if uri is None else uri).strip()
+    lowered = value.lower()
+    if lowered in {"memory", "mongomock"}:
+        return "memory"
+    if lowered.startswith("mongodb://") or lowered.startswith("mongodb+srv://"):
+        return "persistent"
+    raise ValueError(
+        "MONGODB_URI must be mongodb://..., mongodb+srv://..., or memory. "
+        "MediAssist will not switch databases automatically."
+    )
+
+
+def validate_runtime_config() -> None:
+    """Fail closed in production; warn in development. Never logs secret values."""
+    import logging
+
+    log = logging.getLogger("mediassist.config")
+    production = is_production()
+    if jwt_secret_is_unsafe():
+        message = (
+            "JWT_SECRET is missing, shorter than 24 characters, or a known placeholder. "
+            "Set a unique secret. Rotating JWT_SECRET invalidates existing access and refresh cookies."
+        )
+        if production:
+            raise RuntimeError(message)
+        log.warning(message)
+    try:
+        mode = mongo_uri_mode()
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
+    log.info("Database mode=%s db=%s", mode, MONGODB_DB_NAME)
+    if "*" in CORS_ORIGINS:
+        message = (
+            "CORS_ORIGINS cannot include * while the API sends credentialed cookies. "
+            "List explicit frontend origins instead."
+        )
+        if production:
+            raise RuntimeError(message)
+        log.warning(message)
 
 for _dir in (PROCESSED_DIR, VECTOR_STORE_GENERAL_DIR, VECTOR_STORE_MEDICAL_DIR, EVAL_RESULTS_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
@@ -103,6 +174,9 @@ MIN_VECTOR_SCORE = float(os.getenv("MIN_VECTOR_SCORE", "0.38"))
 # "mock" = offline template answers from retrieved passages (no API key needed)
 # "groq" = free cloud API | "openai" = paid | "ollama" = local model
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock").strip().lower()
+# When local notes are a weak match, a real LLM (Groq/OpenAI/Ollama) may fill
+# the same urgency / match / source cards from general knowledge.
+LLM_KB_FALLBACK = os.getenv("LLM_KB_FALLBACK", "true").strip().lower() in {"1", "true", "yes"}
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -110,7 +184,7 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 # Groq: free tier, no credit card required, OpenAI-compatible API.
 # Get a key at https://console.groq.com/keys
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")

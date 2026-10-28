@@ -18,7 +18,7 @@ class OpenAIProvider:
         if config._looks_like_placeholder(config.OPENAI_API_KEY):
             raise RuntimeError("OPENAI_API_KEY is not set.")
         if self._cached_client is None:
-            self._cached_client = OpenAI(api_key=config.OPENAI_API_KEY, timeout=20.0)
+            self._cached_client = OpenAI(api_key=config.OPENAI_API_KEY, timeout=config.LLM_TIMEOUT_SECONDS)
         return self._cached_client
 
     def generate(
@@ -28,6 +28,7 @@ class OpenAIProvider:
         *,
         grounded: bool = True,
         model: str | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         del grounded
         response = self._client().chat.completions.create(
@@ -37,7 +38,7 @@ class OpenAIProvider:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=280,
+            max_tokens=max_tokens or config.LLM_MEDICAL_MAX_TOKENS,
         )
         return (response.choices[0].message.content or "").strip()
 
@@ -48,6 +49,7 @@ class OpenAIProvider:
         *,
         grounded: bool = True,
         model: str | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[str]:
         del grounded
         stream = self._client().chat.completions.create(
@@ -57,7 +59,7 @@ class OpenAIProvider:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=280,
+            max_tokens=max_tokens or config.LLM_MEDICAL_MAX_TOKENS,
             stream=True,
         )
         for chunk in stream:

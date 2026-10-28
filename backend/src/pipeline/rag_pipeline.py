@@ -19,32 +19,58 @@ Flow for a single user query:
 """
 from __future__ import annotations
 
+import logging
 import re
+import time
 from dataclasses import dataclass, field
 
 from src import config
+from src.pipeline.conversation_state import ConversationState, build_conversation_state
+from src.pipeline.question_type import (
+    GENERAL_KNOWLEDGE,
+    MEDICATION_SAFETY,
+    generation_mode,
+    uses_condition_cards,
+    uses_personalized_triage,
+)
 from src.llm.generator import (
     generate_conversational_answer,
     generate_grounded_answer,
+    generate_notes_fallback_answer,
     generate_ungrounded_answer,
     stream_conversational_answer,
     stream_grounded_answer,
 )
-from src.retrieval.query_normalize import normalize_retrieval_query
+from src.llm.kb_miss import (
+    KbMissBundle,
+    can_use_llm_kb_fallback,
+    general_ai_citation,
+    generate_kb_miss_bundle,
+    is_broad_unnamed_medical_query,
+)
+from src.retrieval.query_normalize import (
+    evidence_supports_named_disease,
+    is_underspecified_medical_query,
+    retrieval_topics,
+)
 from src.retrieval.retriever import Evidence, retrieve_candidates
 from src.safety.citation_faithfulness import FaithfulnessAudit, audit_citation_faithfulness
+from src.safety.public_text import KB_MISS_STATUS, public_chat_payload, sanitize_status
 from src.safety.followups import clarifying_questions, weak_match_answer
 from src.safety.guardrails import (
-    EMERGENCY_BANNER_MESSAGE,
     PRESCRIPTION_REFUSAL_MESSAGE,
     check_emergency,
     check_prescription_request,
-    classify_intent,
     conversational_reply,
+    emergency_banner_message,
     has_chest_pain_signal,
+    is_general_intent,
 )
+
+GENERAL_CHAT_FAILURE = "I could not finish this reply. Please try again in a moment."
 from src.safety.triage import CHEST_PAIN_SAFETY_QUESTIONS, TriageResult, classify_triage
 
+logger = logging.getLogger("mediassist.pipeline")
 OUTCOME_LIMIT = 4
 
 
@@ -67,6 +93,42 @@ class DiagnosisResponse:
     disclaimer: str = config.DISCLAIMER
     recommendations: list[str] = field(default_factory=list)
     possible_conditions: list[dict] = field(default_factory=list)
+    evidence_origin: str = "none"
+    timings: dict[str, float] = field(default_factory=dict)
+    question_type: str = ""
+    personal_context: bool = False
+
+
+_REFERENCE_NOTE = "This is general information from reference notes, not personal medical advice."
+
+
+def _attach_state(result: DiagnosisResponse, state: ConversationState | None) -> DiagnosisResponse:
+    if state is None:
+        return result
+    result.question_type = state.question_type
+    result.personal_context = bool(state.personal_context)
+    return result
+
+
+def _apply_question_policy(
+    state: ConversationState,
+    *,
+    triage: TriageResult | None,
+    matches: list[dict],
+    recs: list[str],
+    strong: bool,
+) -> tuple[TriageResult | None, list[dict], list[str]]:
+    if triage and triage.level == "emergency":
+        return triage, matches if uses_condition_cards(state.question_type, True) else matches, recs
+    if not uses_personalized_triage(state.question_type, state.personal_context):
+        triage = None
+        if strong:
+            recs = [_REFERENCE_NOTE]
+        elif recs:
+            recs = [item for item in recs if "see a doctor" not in item.lower() and "book" not in item.lower()]
+    if not uses_condition_cards(state.question_type, state.personal_context):
+        matches = []
+    return triage, matches, recs
 
 
 def _recommendations(triage: TriageResult | None, evidence: list[Evidence]) -> list[str]:
@@ -187,7 +249,8 @@ def _history_payload(history: list[dict] | None) -> list[dict]:
                 "triage": item.get("triage"),
             }
         )
-    return rows[-10:]
+    window = max(2, int(getattr(config, "CHAT_HISTORY_WINDOW", 8)))
+    return rows[-window:]
 
 
 def _evidence_is_strong(evidence: list[Evidence]) -> bool:
@@ -204,7 +267,7 @@ def _evidence_is_strong(evidence: list[Evidence]) -> bool:
 
 
 def _emergency_answer(query: str, *, with_retrieval_note: bool = False) -> str:
-    lines = [EMERGENCY_BANNER_MESSAGE]
+    lines = [emergency_banner_message()]
     if has_chest_pain_signal(query):
         lines.append(
             "Chest pain can be serious. If it is severe, persistent, or comes with "
@@ -227,43 +290,153 @@ def _weak_or_emergency_answer(query: str, triage: TriageResult | None) -> str:
     return weak_match_answer(query)
 
 
-def _conversational_result(query: str, history: list[dict] | None = None) -> DiagnosisResponse:
-    try:
-        answer = generate_conversational_answer(query, history)
-    except Exception:
-        answer = conversational_reply(query)
+def _scope_result(query: str, intent: str, history: list[dict] | None = None) -> DiagnosisResponse:
+    """Greetings stay canned. General questions use the configured LLM without medical RAG."""
+    if is_general_intent(intent):
+        try:
+            answer = (generate_conversational_answer(query, history) or "").strip()
+        except Exception:
+            logger.exception("General chat provider failed")
+            answer = ""
+        if not answer:
+            answer = GENERAL_CHAT_FAILURE
+        return DiagnosisResponse(
+            query=query,
+            refused=False,
+            refusal_reason=None,
+            triage=None,
+            answer=answer,
+            citations=[],
+            faithfulness=None,
+            recommendations=[],
+            possible_conditions=[],
+            evidence_origin="general",
+            question_type=GENERAL_KNOWLEDGE,
+        )
     return DiagnosisResponse(
         query=query,
         refused=False,
         refusal_reason=None,
         triage=None,
-        answer=answer,
+        answer=conversational_reply(query, intent),
         citations=[],
         faithfulness=None,
         recommendations=[],
         possible_conditions=[],
+        evidence_origin="none",
+        question_type=GENERAL_KNOWLEDGE,
     )
 
 
+def _result_from_kb_miss(query: str, bundle: KbMissBundle) -> DiagnosisResponse:
+    return DiagnosisResponse(
+        query=query,
+        refused=False,
+        refusal_reason=None,
+        triage=bundle.triage,
+        answer=bundle.answer,
+        citations=bundle.citations,
+        faithfulness=None,
+        disclaimer=bundle.disclaimer,
+        recommendations=bundle.recommendations,
+        possible_conditions=bundle.possible_conditions,
+        evidence_origin="none" if bundle.failed else "llm",
+    )
+
+
+_EMERGENCY_NOTE = re.compile(
+    r"\b(chest|heart|cardiac|stroke|bleed|breath|anaphyla|seizure|suicid|poison|overdose)\b",
+    re.I,
+)
+
+
+def _evidence_matches_query_topics(query: str, evidence: list[Evidence]) -> list[Evidence]:
+    """Keep notes for the current complaint only. Empty is safer than leftover cards."""
+    topics = retrieval_topics(query)
+    if not topics or not evidence:
+        filtered = list(evidence)
+    else:
+        filtered = [
+            ev
+            for ev in evidence
+            if retrieval_topics(f"{ev.title} {ev.condition} {ev.text[:500]}") & topics
+        ]
+    if not check_emergency(query).triggered:
+        return filtered
+    return [
+        ev
+        for ev in filtered
+        if _EMERGENCY_NOTE.search(f"{ev.title} {ev.condition} {ev.doc_id}")
+    ]
+
+
+def _retain_relevant_evidence(query: str, evidence: list[Evidence]) -> list[Evidence]:
+    """Topic filter, then drop individually weak hits so junk 0–2% cards disappear."""
+    if is_underspecified_medical_query(query) or is_broad_unnamed_medical_query(query):
+        return []
+    filtered = _evidence_matches_query_topics(query, evidence)
+    texts = [f"{ev.title} {ev.condition} {ev.doc_id} {ev.text[:500]}" for ev in filtered]
+    if filtered and not evidence_supports_named_disease(query, texts):
+        return []
+    return [
+        ev
+        for ev in filtered
+        if float(ev.relevance_score) >= config.MIN_RELEVANCE_SCORE
+        or float(ev.vector_score) >= config.MIN_VECTOR_SCORE
+    ]
+
+
+_REC_CONTINUATION = re.compile(
+    r"^(if|or|and|when|recurring)\b|seek emergency|see a doctor|consult a doctor",
+    re.I,
+)
+
+
+def _needs_general_knowledge_disclosure(audit: FaithfulnessAudit | None) -> bool:
+    """Mark mixed origin only for invented sources or extra uncited condition claims."""
+    if audit is None:
+        return False
+    if audit.fabricated_count:
+        return True
+    if not audit.claims:
+        return bool(audit.unsupported_count)
+    return any(
+        claim.status == "unsupported" and not _REC_CONTINUATION.search(claim.text or "")
+        for claim in audit.claims
+    )
+
+
+def _with_emergency_banner(query: str, answer: str, triage: TriageResult | None) -> str:
+    """Keep emergency guidance in the answer body even when notes also matched."""
+    if not triage or triage.level != "emergency":
+        return answer
+    banner = emergency_banner_message()
+    number = str(getattr(config, "EMERGENCY_NUMBER", "112"))
+    if number in (answer or "") and re.search(r"\bemergency\b", answer or "", re.I):
+        return answer
+    extra = ""
+    if has_chest_pain_signal(query) and "Chest pain can be serious" not in (answer or ""):
+        extra = (
+            "\nChest pain can be serious. If it is severe, persistent, or comes with "
+            "breathlessness, sweating, fainting, nausea, or pain spreading to an arm, "
+            "jaw, back, or shoulder, seek emergency care now.\n"
+            + "\n".join(CHEST_PAIN_SAFETY_QUESTIONS)
+        )
+    return f"{banner}{extra}\n\n{answer}".strip()
+
+
 def synthesize_retrieval_query(query: str, history: list[dict] | None = None) -> str:
-    """Keep follow-up retrieval anchored to earlier symptom text in this chat."""
-    if not history:
-        return normalize_retrieval_query(query)
-    prior: list[str] = []
-    for item in history:
-        if item.get("role") != "user":
-            continue
-        text = str(item.get("content") or "").strip()
-        if not text:
-            continue
-        if classify_intent(text, history) == "medical" or "extra detail:" in text.lower() or "body map context" in text.lower():
-            prior.append(normalize_retrieval_query(text))
-    if not prior:
-        return normalize_retrieval_query(query)
-    if classify_intent(query, history) != "medical":
-        return normalize_retrieval_query(query)
-    combined = "\n".join(prior[-3:] + [normalize_retrieval_query(query)])
-    return combined[:2000]
+    """Keep follow-up retrieval anchored to the active complaint only."""
+    return build_conversation_state(query, history).search_query
+
+
+def _empty_timings() -> dict[str, float]:
+    return {"classify_ms": 0.0, "retrieve_ms": 0.0, "generate_ms": 0.0, "total_ms": 0.0}
+
+
+def _with_timings(result: DiagnosisResponse, timings: dict[str, float]) -> DiagnosisResponse:
+    result.timings = timings
+    return result
 
 
 def run_pipeline(
@@ -272,84 +445,150 @@ def run_pipeline(
     embedding_mode: str | None = None,
     chat_history: list[dict] | None = None,
 ) -> DiagnosisResponse:
+    started = time.perf_counter()
+    timings = _empty_timings()
     query = query.strip()
     history = _history_payload(chat_history)
 
     # --- Safety pre-check: prescription/dosage requests are refused outright ---
     prescription_check = check_prescription_request(query)
     if prescription_check.triggered:
-        return DiagnosisResponse(
-            query=query,
-            refused=True,
-            refusal_reason="prescription_or_dosage_request",
-            triage=None,
-            answer=PRESCRIPTION_REFUSAL_MESSAGE,
-            citations=[],
-            faithfulness=None,
-            recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        return _with_timings(
+            DiagnosisResponse(
+                query=query,
+                refused=True,
+                refusal_reason="prescription_or_dosage_request",
+                triage=None,
+                answer=PRESCRIPTION_REFUSAL_MESSAGE,
+                citations=[],
+                faithfulness=None,
+                recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
+                question_type=MEDICATION_SAFETY,
+                personal_context=False,
+            ),
+            timings,
         )
 
-    intent = classify_intent(query, history)
-    if intent != "medical":
-        return _conversational_result(query, history)
+    classify_started = time.perf_counter()
+    state = build_conversation_state(query, history)
+    timings["classify_ms"] = round((time.perf_counter() - classify_started) * 1000, 2)
+    if state.intent != "medical":
+        generate_started = time.perf_counter()
+        result = _scope_result(query, state.intent, state.generation_history)
+        timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        logger.info("pipeline timings %s", timings)
+        return _with_timings(_attach_state(result, state), timings)
 
     # Deterministic emergency triage BEFORE retrieval so chest-pain / red-flag
     # guidance is never delayed by embeddings, reranking, or the LLM.
-    early_emergency = check_emergency(query)
-    early_triage = classify_triage(query, []) if early_emergency.triggered else None
+    early_emergency = check_emergency(query, history)
+    early_triage = classify_triage(query, [], history) if early_emergency.triggered else None
 
-    search_query = synthesize_retrieval_query(query, history)
+    retrieve_started = time.perf_counter()
     try:
-        evidence, pool = retrieve_candidates(search_query, top_k=top_k, mode=embedding_mode)
+        evidence, pool = retrieve_candidates(state.search_query, top_k=top_k, mode=embedding_mode)
     except Exception:
         evidence, pool = [], []
+    retain_query = state.search_query or query
+    evidence = _retain_relevant_evidence(retain_query, evidence)
+    pool = _retain_relevant_evidence(retain_query, pool)
+    timings["retrieve_ms"] = round((time.perf_counter() - retrieve_started) * 1000, 2)
     strong = _evidence_is_strong(evidence)
     # Emergency always; evidence-based triage only when retrieval is strong.
     if early_triage and early_triage.level == "emergency":
         triage = early_triage
-    elif strong:
-        triage = classify_triage(query, evidence)
+    elif strong and uses_personalized_triage(state.question_type, state.personal_context):
+        triage = classify_triage(query, evidence, history)
     else:
         triage = None
 
     if triage and triage.level == "emergency" and not strong:
         answer = _emergency_answer(query, with_retrieval_note=True)
-        return DiagnosisResponse(
-            query=query,
-            refused=False,
-            refusal_reason=None,
-            triage=triage,
-            answer=answer,
-            citations=[],
-            faithfulness=None,
-            recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
-            possible_conditions=[],
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        logger.info("pipeline timings %s", timings)
+        return _with_timings(
+            _attach_state(
+                DiagnosisResponse(
+                    query=query,
+                    refused=False,
+                    refusal_reason=None,
+                    triage=triage,
+                    answer=answer,
+                    citations=[],
+                    faithfulness=None,
+                    recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
+                    possible_conditions=[],
+                    evidence_origin="none",
+                ),
+                state,
+            ),
+            timings,
         )
 
+    generate_started = time.perf_counter()
+    if not strong and can_use_llm_kb_fallback():
+        bundle = generate_kb_miss_bundle(query, state.generation_history)
+        timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
+        if bundle:
+            timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+            logger.info("pipeline timings %s", timings)
+            miss = _result_from_kb_miss(query, bundle)
+            miss.triage, miss.possible_conditions, miss.recommendations = _apply_question_policy(
+                state,
+                triage=miss.triage,
+                matches=miss.possible_conditions,
+                recs=miss.recommendations,
+                strong=False,
+            )
+            return _with_timings(_attach_state(miss, state), timings)
+
+    mode = generation_mode(state.question_type, state.personal_context)
     context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)] if strong else []
     if strong:
-        answer = generate_grounded_answer(query, context_blocks, history, weak_match=False)
+        answer = generate_grounded_answer(
+            query, context_blocks, state.generation_history, weak_match=False, mode=mode
+        )
+        answer = _with_emergency_banner(query, answer, triage)
     else:
         answer = _weak_or_emergency_answer(query, triage)
+    timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
     citations = citations_from_evidence(evidence) if strong else []
     faithfulness = audit_citation_faithfulness(answer, citations) if strong else None
+    origin = "knowledge_base" if strong else "none"
+    if strong and _needs_general_knowledge_disclosure(faithfulness):
+        citations = [*citations, general_ai_citation()]
+        origin = "mixed"
     matches = (
         outcomes_for_query(query, citations, embedding_mode, citations_from_evidence(pool))
         if strong
         else []
     )
     recs = _recommendations(triage, evidence) if strong else clarifying_questions(query, limit=2)
+    triage, matches, recs = _apply_question_policy(
+        state, triage=triage, matches=matches, recs=recs, strong=strong
+    )
+    timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+    logger.info("pipeline timings %s", timings)
 
-    return DiagnosisResponse(
-        query=query,
-        refused=False,
-        refusal_reason=None,
-        triage=triage,
-        answer=answer,
-        citations=citations,
-        faithfulness=faithfulness,
-        recommendations=recs,
-        possible_conditions=matches,
+    return _with_timings(
+        _attach_state(
+            DiagnosisResponse(
+                query=query,
+                refused=False,
+                refusal_reason=None,
+                triage=triage,
+                answer=answer,
+                citations=citations,
+                faithfulness=faithfulness,
+                recommendations=recs,
+                possible_conditions=matches,
+                evidence_origin=origin,
+            ),
+            state,
+        ),
+        timings,
     )
 
 
@@ -365,7 +604,10 @@ def result_to_dict(result: DiagnosisResponse) -> dict:
         "possible_conditions": result.possible_conditions or [],
         "triage": None,
         "faithfulness": None,
-        "provider": config.resolve_llm_provider(),
+        "evidence_origin": result.evidence_origin,
+        "timings": result.timings or {},
+        "question_type": result.question_type or "",
+        "personal_context": bool(result.personal_context),
     }
     if result.triage:
         payload["triage"] = {
@@ -376,7 +618,7 @@ def result_to_dict(result: DiagnosisResponse) -> dict:
         }
     if result.faithfulness is not None:
         payload["faithfulness"] = result.faithfulness.to_dict()
-    return payload
+    return public_chat_payload(payload)
 
 
 def iter_pipeline_stream(
@@ -386,55 +628,78 @@ def iter_pipeline_stream(
     chat_history: list[dict] | None = None,
 ):
     """Yield SSE-friendly events while running the same RAG + safety flow."""
+    started = time.perf_counter()
+    timings = _empty_timings()
     query = query.strip()
     history = _history_payload(chat_history)
     yield {"type": "status", "content": "Understanding your message..."}
 
     prescription_check = check_prescription_request(query)
     if prescription_check.triggered:
-        result = DiagnosisResponse(
-            query=query,
-            refused=True,
-            refusal_reason="prescription_or_dosage_request",
-            triage=None,
-            answer=PRESCRIPTION_REFUSAL_MESSAGE,
-            citations=[],
-            faithfulness=None,
-            recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        result = _with_timings(
+            DiagnosisResponse(
+                query=query,
+                refused=True,
+                refusal_reason="prescription_or_dosage_request",
+                triage=None,
+                answer=PRESCRIPTION_REFUSAL_MESSAGE,
+                citations=[],
+                faithfulness=None,
+                recommendations=["Ask a doctor or pharmacist instead of requesting a specific dose here."],
+                question_type=MEDICATION_SAFETY,
+                personal_context=False,
+            ),
+            timings,
         )
         yield {"type": "token", "content": PRESCRIPTION_REFUSAL_MESSAGE}
         yield {"type": "done", "result": result_to_dict(result)}
         return
 
-    intent = classify_intent(query, history)
-    if intent != "medical":
+    classify_started = time.perf_counter()
+    state = build_conversation_state(query, history)
+    timings["classify_ms"] = round((time.perf_counter() - classify_started) * 1000, 2)
+    if state.intent != "medical":
         yield {"type": "status", "content": "Formulating response..."}
-        chunks: list[str] = []
-        try:
-            for chunk in stream_conversational_answer(query, history):
-                chunks.append(chunk)
-                yield {"type": "token", "content": chunk}
-        except Exception:
-            reply = conversational_reply(query)
-            yield {"type": "token", "content": reply}
-            chunks = [reply]
-        result = DiagnosisResponse(
-            query=query,
-            refused=False,
-            refusal_reason=None,
-            triage=None,
-            answer="".join(chunks).strip() or conversational_reply(query),
-            citations=[],
-            faithfulness=None,
-            recommendations=[],
-            possible_conditions=[],
-        )
-        yield {"type": "done", "result": result_to_dict(result)}
+        generate_started = time.perf_counter()
+        if is_general_intent(state.intent):
+            chunks: list[str] = []
+            try:
+                for chunk in stream_conversational_answer(query, state.generation_history):
+                    chunks.append(chunk)
+                    yield {"type": "token", "content": chunk}
+                answer = "".join(chunks).strip()
+                if not answer:
+                    raise RuntimeError("empty general stream")
+            except Exception:
+                logger.exception("General chat stream failed")
+                answer = GENERAL_CHAT_FAILURE
+                yield {"type": "token", "content": answer}
+            result = DiagnosisResponse(
+                query=query,
+                refused=False,
+                refusal_reason=None,
+                triage=None,
+                answer=answer,
+                citations=[],
+                faithfulness=None,
+                recommendations=[],
+                possible_conditions=[],
+                evidence_origin="general",
+                question_type=GENERAL_KNOWLEDGE,
+            )
+        else:
+            result = _scope_result(query, state.intent, state.generation_history)
+            yield {"type": "token", "content": result.answer}
+        timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        logger.info("pipeline timings %s", timings)
+        yield {"type": "done", "result": result_to_dict(_with_timings(_attach_state(result, state), timings))}
         return
 
     # Emit emergency triage immediately — do not wait on retrieval or the LLM.
-    early_emergency = check_emergency(query)
-    early_triage = classify_triage(query, []) if early_emergency.triggered else None
+    early_emergency = check_emergency(query, history)
+    early_triage = classify_triage(query, [], history) if early_emergency.triggered else None
     if early_triage:
         yield {
             "type": "triage",
@@ -445,16 +710,20 @@ def iter_pipeline_stream(
         }
 
     yield {"type": "status", "content": "Searching medical knowledge base..."}
-    search_query = synthesize_retrieval_query(query, history)
+    retrieve_started = time.perf_counter()
     try:
-        evidence, pool = retrieve_candidates(search_query, top_k=top_k, mode=embedding_mode)
+        evidence, pool = retrieve_candidates(state.search_query, top_k=top_k, mode=embedding_mode)
     except Exception:
         evidence, pool = [], []
+    retain_query = state.search_query or query
+    evidence = _retain_relevant_evidence(retain_query, evidence)
+    pool = _retain_relevant_evidence(retain_query, pool)
+    timings["retrieve_ms"] = round((time.perf_counter() - retrieve_started) * 1000, 2)
     strong = _evidence_is_strong(evidence)
     if early_triage and early_triage.level == "emergency":
         triage = early_triage
-    elif strong:
-        triage = classify_triage(query, evidence)
+    elif strong and uses_personalized_triage(state.question_type, state.personal_context):
+        triage = classify_triage(query, evidence, history)
         if not early_triage:
             yield {
                 "type": "triage",
@@ -469,59 +738,141 @@ def iter_pipeline_stream(
     if triage and triage.level == "emergency" and not strong:
         answer = _emergency_answer(query, with_retrieval_note=True)
         yield {"type": "token", "content": answer}
-        result = DiagnosisResponse(
-            query=query,
-            refused=False,
-            refusal_reason=None,
-            triage=triage,
-            answer=answer,
-            citations=[],
-            faithfulness=None,
-            recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
-            possible_conditions=[],
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        logger.info("pipeline timings %s", timings)
+        result = _with_timings(
+            _attach_state(
+                DiagnosisResponse(
+                    query=query,
+                    refused=False,
+                    refusal_reason=None,
+                    triage=triage,
+                    answer=answer,
+                    citations=[],
+                    faithfulness=None,
+                    recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
+                    possible_conditions=[],
+                    evidence_origin="none",
+                ),
+                state,
+            ),
+            timings,
         )
         payload = result_to_dict(result)
         yield {"type": "metadata", "recommendations": payload["recommendations"], "faithfulness": None}
         yield {"type": "done", "result": payload}
         return
 
+    generate_started = time.perf_counter()
+    if not strong and can_use_llm_kb_fallback():
+        yield {"type": "status", "content": sanitize_status(KB_MISS_STATUS)}
+        bundle = generate_kb_miss_bundle(query, state.generation_history)
+        timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
+        if bundle:
+            timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+            logger.info("pipeline timings %s", timings)
+            miss = _result_from_kb_miss(query, bundle)
+            miss.triage, miss.possible_conditions, miss.recommendations = _apply_question_policy(
+                state,
+                triage=miss.triage,
+                matches=miss.possible_conditions,
+                recs=miss.recommendations,
+                strong=False,
+            )
+            result = _with_timings(_attach_state(miss, state), timings)
+            payload = result_to_dict(result)
+            yield {"type": "status", "content": "Formulating response..."}
+            if bundle.answer:
+                yield {"type": "token", "content": bundle.answer}
+            if result.triage:
+                yield {
+                    "type": "triage",
+                    "level": result.triage.level,
+                    "label": result.triage.label,
+                    "guidance": result.triage.guidance,
+                    "reason": result.triage.reason,
+                }
+            yield {
+                "type": "citation",
+                "citations": result.citations,
+                "possible_conditions": result.possible_conditions,
+            }
+            yield {"type": "metadata", "recommendations": payload["recommendations"], "faithfulness": None}
+            yield {"type": "done", "result": payload}
+            return
+
+    mode = generation_mode(state.question_type, state.personal_context)
     citations = citations_from_evidence(evidence) if strong else []
     possible_conditions = (
         outcomes_for_query(query, citations, embedding_mode, citations_from_evidence(pool)) if strong else []
     )
+    if not uses_condition_cards(state.question_type, state.personal_context):
+        possible_conditions = []
     if citations or possible_conditions:
         yield {"type": "citation", "citations": citations, "possible_conditions": possible_conditions}
 
     yield {"type": "status", "content": "Formulating response..."}
     chunks: list[str] = []
+    generate_started = time.perf_counter()
     if strong:
         context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
+        banner = _with_emergency_banner(query, "", triage)
+        if banner:
+            yield {"type": "token", "content": banner + "\n\n"}
+            chunks.append(banner + "\n\n")
         try:
-            for chunk in stream_grounded_answer(query, context_blocks, history, weak_match=False):
+            for chunk in stream_grounded_answer(
+                query, context_blocks, state.generation_history, weak_match=False, mode=mode
+            ):
                 chunks.append(chunk)
                 yield {"type": "token", "content": chunk}
+            answer = "".join(chunks).strip()
+            if not answer or answer == banner:
+                raise RuntimeError("empty grounded stream")
         except Exception:
-            fallback = _weak_or_emergency_answer(query, triage)
+            logger.exception("Assistant generation failed after notes were found; answering from retrieved notes")
+            fallback = generate_notes_fallback_answer(
+                query, context_blocks, state.generation_history, mode=mode
+            )
+            fallback = _with_emergency_banner(query, fallback, triage) if not banner else fallback
             yield {"type": "token", "content": fallback}
-            chunks = [fallback]
-        answer = "".join(chunks).strip()
+            chunks = [banner + "\n\n" + fallback if banner else fallback]
+            answer = "".join(chunks).strip()
         faithfulness = audit_citation_faithfulness(answer, citations)
+        if _needs_general_knowledge_disclosure(faithfulness):
+            citations = [*citations, general_ai_citation()]
         recs = _recommendations(triage, evidence)
     else:
         answer = _weak_or_emergency_answer(query, triage)
         yield {"type": "token", "content": answer}
         faithfulness = None
         recs = clarifying_questions(query, limit=2)
-    result = DiagnosisResponse(
-        query=query,
-        refused=False,
-        refusal_reason=None,
-        triage=triage,
-        answer=answer,
-        citations=citations,
-        faithfulness=faithfulness,
-        recommendations=recs,
-        possible_conditions=possible_conditions,
+    timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
+    origin = "knowledge_base" if strong else "none"
+    if strong and any((item.get("title") or "").startswith("General AI") for item in citations):
+        origin = "mixed"
+    triage, possible_conditions, recs = _apply_question_policy(
+        state, triage=triage, matches=possible_conditions, recs=recs, strong=strong
+    )
+    timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+    logger.info("pipeline timings %s", timings)
+    result = _with_timings(
+        _attach_state(
+            DiagnosisResponse(
+                query=query,
+                refused=False,
+                refusal_reason=None,
+                triage=triage,
+                answer=answer,
+                citations=citations,
+                faithfulness=faithfulness,
+                recommendations=recs,
+                possible_conditions=possible_conditions,
+                evidence_origin=origin,
+            ),
+            state,
+        ),
+        timings,
     )
     payload = result_to_dict(result)
     yield {"type": "metadata", "recommendations": payload["recommendations"], "faithfulness": payload["faithfulness"]}

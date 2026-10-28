@@ -4,8 +4,9 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core import config
@@ -40,6 +41,9 @@ def _warmup_rag() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    from src.config import validate_runtime_config
+
+    validate_runtime_config()
     await connect()
     await ensure_indexes()
     await seed_demo_user()
@@ -52,7 +56,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="MediAssist API",
-    description="Medical RAG assistant with triage, citations, and persistent chats.",
+    description="Medical-information and general conversational assistant. Not a substitute for professional diagnosis.",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -66,6 +70,14 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api/v1")
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(_request: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, HTTPException):
+        raise exc
+    logger.error("Unhandled server error: %s", type(exc).__name__, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Something went wrong. Please try again."})
 
 
 @app.get("/")

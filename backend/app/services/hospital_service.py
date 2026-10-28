@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import threading
 from copy import deepcopy
 from time import time
 from typing import Any
@@ -24,6 +25,17 @@ _NEARBY_CACHE: dict[tuple[float, float], tuple[float, dict[str, Any]]] = {}
 _GEOCODE_CACHE: dict[str, tuple[float, dict[str, Any] | None]] = {}
 _IP_CACHE: tuple[float, dict[str, Any] | None] | None = None
 _MISS = object()
+_HTTP: httpx.Client | None = None
+_HTTP_LOCK = threading.Lock()
+
+
+def _http() -> httpx.Client:
+    global _HTTP
+    if _HTTP is None:
+        with _HTTP_LOCK:
+            if _HTTP is None:
+                _HTTP = httpx.Client(headers=HEADERS, follow_redirects=True, timeout=8.0)
+    return _HTTP
 
 
 def _valid_coords(lat: float, lng: float) -> bool:
@@ -188,17 +200,16 @@ def _fetch_overpass(lat: float, lng: float, radius: int) -> list[dict[str, Any]]
     last_error: Exception | None = None
     for url in OVERPASS_URLS:
         try:
-            with httpx.Client(timeout=5.0, headers=HEADERS, follow_redirects=True) as client:
-                response = client.post(url, data={"data": query})
-                if response.status_code >= 400:
-                    last_error = httpx.HTTPStatusError(
-                        f"{response.status_code}",
-                        request=response.request,
-                        response=response,
-                    )
-                    continue
-                payload = response.json()
-                return parse_elements(payload.get("elements") or [], lat, lng)
+            response = _http().post(url, data={"data": query}, timeout=5.0)
+            if response.status_code >= 400:
+                last_error = httpx.HTTPStatusError(
+                    f"{response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+                continue
+            payload = response.json()
+            return parse_elements(payload.get("elements") or [], lat, lng)
         except Exception as exc:
             last_error = exc
             continue
@@ -218,10 +229,9 @@ def _fetch_nominatim(lat: float, lng: float) -> list[dict[str, Any]]:
         "bounded": 1,
         "viewbox": f"{lng - delta},{lat + delta},{lng + delta},{lat - delta}",
     }
-    with httpx.Client(timeout=8.0, headers=HEADERS, follow_redirects=True) as client:
-        response = client.get(NOMINATIM_URL, params=params)
-        response.raise_for_status()
-        payload = response.json()
+    response = _http().get(NOMINATIM_URL, params=params, timeout=8.0)
+    response.raise_for_status()
+    payload = response.json()
     if not isinstance(payload, list):
         return []
     return parse_nominatim(payload, lat, lng)
@@ -236,10 +246,9 @@ def geocode_place(query: str) -> dict[str, Any] | None:
     if cached is not _MISS:
         return cached
     params = {"format": "jsonv2", "q": text, "limit": 1}
-    with httpx.Client(timeout=8.0, headers=HEADERS, follow_redirects=True) as client:
-        response = client.get(NOMINATIM_URL, params=params)
-        response.raise_for_status()
-        payload = response.json()
+    response = _http().get(NOMINATIM_URL, params=params, timeout=8.0)
+    response.raise_for_status()
+    payload = response.json()
     if not isinstance(payload, list) or not payload:
         _GEOCODE_CACHE[cache_key] = (time(), None)
         return None
@@ -274,10 +283,9 @@ def locate_by_ip() -> dict[str, Any] | None:
     )
     for url, keys in sources:
         try:
-            with httpx.Client(timeout=6.0, headers=HEADERS, follow_redirects=True) as client:
-                response = client.get(url)
-                response.raise_for_status()
-                payload = response.json()
+            response = _http().get(url, timeout=6.0)
+            response.raise_for_status()
+            payload = response.json()
             if not isinstance(payload, dict):
                 continue
             if payload.get("status") == "fail":
@@ -349,8 +357,7 @@ def fetch_map_tile(z: int, x: int, y: int) -> bytes:
     last_error: Exception | None = None
     for template in TILE_URLS:
         try:
-            with httpx.Client(timeout=3.0, headers=HEADERS, follow_redirects=True) as client:
-                response = client.get(template.format(z=z, x=x, y=y))
+            response = _http().get(template.format(z=z, x=x, y=y), timeout=3.0)
             data = response.content
             if response.status_code == 200 and data[:8] == b"\x89PNG\r\n\x1a\n":
                 if len(_TILE_CACHE) > 256:

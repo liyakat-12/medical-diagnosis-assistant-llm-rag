@@ -67,7 +67,8 @@ function MapTile({ zoom, x, y }: { zoom: number; x: number; y: number }) {
       alt=""
       src={src}
       onError={() => setFallback(true)}
-      className="h-full w-full object-cover"
+      draggable={false}
+      className="block size-full max-w-none object-fill"
     />
   );
 }
@@ -99,35 +100,37 @@ function HospitalMap({
 
   return (
     <div className="mb-3 overflow-hidden rounded-2xl border border-teal-100 bg-slate-100">
-      <div className="relative h-64 w-full md:h-80" role="img" aria-label={label}>
-        <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">
-          {tiles.map((item) => (
-            <MapTile key={`${item.x}-${item.y}`} zoom={zoom} x={item.x} y={item.y} />
-          ))}
+      <div className="relative h-64 w-full overflow-hidden md:h-80" role="img" aria-label={label}>
+        <div className="absolute left-1/2 top-1/2 aspect-square min-h-full min-w-full -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 [grid-template-columns:repeat(3,minmax(0,1fr))] [grid-template-rows:repeat(3,minmax(0,1fr))]">
+            {tiles.map((item) => (
+              <MapTile key={`${item.x}-${item.y}`} zoom={zoom} x={item.x} y={item.y} />
+            ))}
+          </div>
+          {hospitals.map((hospital) => {
+            const world = latLngToWorld(hospital.lat, hospital.lng, zoom);
+            const left = ((world.x - (tile.x - 1)) / 3) * 100;
+            const top = ((world.y - (tile.y - 1)) / 3) * 100;
+            if (left < 2 || left > 98 || top < 2 || top > 98) return null;
+            const active = selected?.name === hospital.name && selected?.lat === hospital.lat;
+            return (
+              <button
+                key={`${hospital.name}-${hospital.lat}`}
+                type="button"
+                title={hospital.name}
+                aria-label={hospital.name}
+                onClick={() => onSelect(hospital)}
+                className={cn(
+                  "absolute z-10 -translate-x-1/2 -translate-y-full drop-shadow",
+                  active ? "text-red-600" : "text-teal-800",
+                )}
+                style={{ left: `${left}%`, top: `${top}%` }}
+              >
+                <MapPin size={active ? 30 : 22} fill="currentColor" />
+              </button>
+            );
+          })}
         </div>
-        {hospitals.map((hospital) => {
-          const world = latLngToWorld(hospital.lat, hospital.lng, zoom);
-          const left = ((world.x - (tile.x - 1)) / 3) * 100;
-          const top = ((world.y - (tile.y - 1)) / 3) * 100;
-          if (left < 2 || left > 98 || top < 2 || top > 98) return null;
-          const active = selected?.name === hospital.name && selected?.lat === hospital.lat;
-          return (
-            <button
-              key={`${hospital.name}-${hospital.lat}`}
-              type="button"
-              title={hospital.name}
-              aria-label={hospital.name}
-              onClick={() => onSelect(hospital)}
-              className={cn(
-                "absolute z-10 -translate-x-1/2 -translate-y-full drop-shadow",
-                active ? "text-red-600" : "text-teal-800",
-              )}
-              style={{ left: `${left}%`, top: `${top}%` }}
-            >
-              <MapPin size={active ? 30 : 22} fill="currentColor" />
-            </button>
-          );
-        })}
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-teal-100 bg-teal-50 px-3 py-2">
         <p className="truncate text-xs font-semibold text-slate-600">

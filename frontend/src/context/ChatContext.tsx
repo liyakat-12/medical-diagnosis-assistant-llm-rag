@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import * as chatApi from "../services/chat";
-import type { Chat, ChatMessage, StreamEvent } from "../types";
+import type { Chat, ChatMessage } from "../types";
+import { assistantFromEvent, markAssistantIncomplete, publicMessage, shouldAcceptStreamEvent } from "../utils/chatSession";
+import { PUBLIC_SEND_ERROR, publicError, publicStatus } from "../utils/publicText";
 import { useApp } from "./AppContext";
 
 interface ChatContextValue {
@@ -28,27 +30,12 @@ interface ChatContextValue {
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
-function assistantFromEvent(event: StreamEvent, fallback: ChatMessage): ChatMessage {
-  const saved = event.message;
-  if (saved) return { ...saved, streaming: false };
-  const result = event.result || {};
-  return {
-    ...fallback,
-    content: String(result.answer || fallback.content),
-    citations: (result.citations as ChatMessage["citations"]) || fallback.citations,
-    triage: (() => {
-      const triage = (result.triage as ChatMessage["triage"]) || fallback.triage;
-      if (!triage || triage.level === "none") return null;
-      return triage;
-    })(),
-    possible_conditions: (result.possible_conditions as ChatMessage["possible_conditions"]) || fallback.possible_conditions,
-    faithfulness: (result.faithfulness as ChatMessage["faithfulness"]) || fallback.faithfulness,
-    recommendations: (result.recommendations as ChatMessage["recommendations"]) || fallback.recommendations,
-    refused: Boolean(result.refused),
-    disclaimer: (result.disclaimer as string) || fallback.disclaimer,
-    streaming: false,
-  };
+function localChatTitle(text: string): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "New chat";
+  return cleaned.length > 52 ? `${cleaned.slice(0, 52).replace(/\s+\S*$/, "")}…` : cleaned;
 }
+
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -64,14 +51,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const failedContentRef = useRef<string | null>(null);
+  const sendingRef = useRef(false);
+  const tokenBufferRef = useRef("");
+  const tokenFlushRef = useRef<number | null>(null);
+  const requestIdRef = useRef(0);
+  const streamMetaRef = useRef<{ requestId: number; assistantId: string; userText: string; chatId: string } | null>(null);
 
-  const stopActiveStream = () => {
-    if (!abortRef.current) return;
-    abortRef.current.abort();
-    abortRef.current = null;
+  const stopActiveStream = (markIncomplete = true) => {
+    const meta = streamMetaRef.current;
+    const leftover = tokenBufferRef.current;
+    if (tokenFlushRef.current != null) {
+      window.cancelAnimationFrame(tokenFlushRef.current);
+      tokenFlushRef.current = null;
+    }
+    tokenBufferRef.current = "";
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    sendingRef.current = false;
     setStreaming(false);
     setSending(false);
     setStatus("");
+    if (markIncomplete && meta) {
+      requestIdRef.current += 1;
+      failedContentRef.current = meta.userText;
+      setMessages((current) =>
+        current.map((item) => (item.id === meta.assistantId && item.streaming ? markAssistantIncomplete(item, leftover) : item)),
+      );
+    }
+    streamMetaRef.current = null;
   };
 
   const loadChats = useCallback(async (query?: string) => {
@@ -79,7 +88,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       setChats(await chatApi.listChats(query));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load conversations.");
+      setError(publicError(err instanceof Error ? err.message : "Unable to load conversations."));
     } finally {
       setChatsLoading(false);
     }
@@ -94,10 +103,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessagesLoading(true);
     setError("");
     try {
-      setMessages(await chatApi.listMessages(chatId));
+      setMessages((await chatApi.listMessages(chatId)).map(publicMessage));
     } catch (err) {
       setMessages([]);
-      setError(err instanceof Error ? err.message : "Unable to load this conversation.");
+      setError(publicError(err instanceof Error ? err.message : "Unable to load this conversation."));
     } finally {
       setMessagesLoading(false);
     }
@@ -127,14 +136,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const sendMessage = useCallback(
     async (content: string, options?: { reuseFailed?: boolean }) => {
       const text = content.trim();
-      if (!text || sending) return;
+      if (!text || sendingRef.current) return;
       setError("");
       failedContentRef.current = null;
+      sendingRef.current = true;
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
       setSending(true);
       setStreaming(true);
       setStatus("Understanding your message...");
 
       let chatId = activeChatId;
+      let assistantId = "";
       try {
         if (!chatId) {
           const created = await chatApi.createChat();
@@ -157,7 +170,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           recommendations: [],
           refused: false,
         };
-        const assistantId = `temp-asst-${now}`;
+        assistantId = `temp-asst-${now}`;
         const assistantMsg: ChatMessage = {
           id: assistantId,
           chat_id: chatId,
@@ -181,19 +194,37 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         const controller = new AbortController();
         abortRef.current = controller;
+        streamMetaRef.current = { requestId, assistantId, userText: text, chatId };
+        const flushTokens = () => {
+          if (tokenFlushRef.current != null) {
+            window.cancelAnimationFrame(tokenFlushRef.current);
+            tokenFlushRef.current = null;
+          }
+          const extra = tokenBufferRef.current;
+          tokenBufferRef.current = "";
+          if (!extra) return;
+          setMessages((current) =>
+            current.map((item) => (item.id === assistantId ? { ...item, content: item.content + extra } : item)),
+          );
+        };
         await chatApi.streamMessage(
           chatId,
           text,
           (event) => {
-            if (event.type === "status" && event.content) setStatus(event.content);
+            if (!shouldAcceptStreamEvent(requestId, requestIdRef.current)) return;
+            if (event.type === "status" && event.content) setStatus(publicStatus(event.content));
             if (event.type === "token" && event.content) {
-              setMessages((current) =>
-                current.map((item) =>
-                  item.id === assistantId ? { ...item, content: item.content + event.content } : item,
-                ),
-              );
+              tokenBufferRef.current += event.content;
+              if (tokenFlushRef.current == null) {
+                tokenFlushRef.current = window.requestAnimationFrame(() => {
+                  tokenFlushRef.current = null;
+                  if (!shouldAcceptStreamEvent(requestId, requestIdRef.current)) return;
+                  flushTokens();
+                });
+              }
             }
             if (event.type === "citation") {
+              flushTokens();
               setMessages((current) =>
                 current.map((item) =>
                   item.id === assistantId
@@ -201,12 +232,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                         ...item,
                         citations: event.citations || item.citations,
                         possible_conditions: event.possible_conditions || item.possible_conditions,
+                        metadata: {
+                          ...(item.metadata || {}),
+                          evidence_origin: (event.citations || []).some((row) =>
+                            /not verified|General AI medical knowledge|not in local notes/i.test(
+                              `${row.source || ""} ${row.title || ""}`,
+                            ),
+                          )
+                            ? "llm"
+                            : item.metadata?.evidence_origin,
+                        },
                       }
                     : item,
                 ),
               );
             }
             if (event.type === "triage" && event.level && event.level !== "none") {
+              flushTokens();
               const level = event.level;
               setMessages((current) =>
                 current.map((item) =>
@@ -225,6 +267,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               );
             }
             if (event.type === "metadata") {
+              flushTokens();
               setMessages((current) =>
                 current.map((item) =>
                   item.id === assistantId
@@ -238,29 +281,67 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               );
             }
             if (event.type === "done") {
+              if (!shouldAcceptStreamEvent(requestId, requestIdRef.current)) return;
+              flushTokens();
               setMessages((current) =>
-                current.map((item) => (item.id === assistantId ? assistantFromEvent(event, item) : item)),
+                current.map((item) => (item.id === assistantId && item.streaming ? assistantFromEvent(event, item) : item)),
               );
             }
           },
           controller.signal,
         );
-        await loadChats();
+        setChats((current) => {
+          const updated = current.map((item) =>
+            item.id === chatId
+              ? {
+                  ...item,
+                  title: item.title === "New chat" ? localChatTitle(text) : item.title,
+                  updated_at: now,
+                  last_message_at: now,
+                  message_count: Math.max(item.message_count || 0, 0) + (options?.reuseFailed ? 1 : 2),
+                }
+              : item,
+          );
+          const active = updated.find((item) => item.id === chatId);
+          return active ? [active, ...updated.filter((item) => item.id !== chatId)] : updated;
+        });
       } catch (err) {
         if ((err as Error).name === "AbortError") {
           setStatus("");
           return;
         }
         failedContentRef.current = text;
-        setError(err instanceof Error ? err.message : "Unable to send your message. Please try again.");
+        setError(publicError(err instanceof Error ? err.message : PUBLIC_SEND_ERROR, PUBLIC_SEND_ERROR));
+        if (assistantId) {
+          setMessages((current) =>
+            current.map((item) => (item.id === assistantId && item.streaming ? markAssistantIncomplete(item) : item)),
+          );
+        }
       } finally {
         abortRef.current = null;
+        if (tokenFlushRef.current != null) {
+          window.cancelAnimationFrame(tokenFlushRef.current);
+          tokenFlushRef.current = null;
+        }
+        const leftover = tokenBufferRef.current;
+        tokenBufferRef.current = "";
+        if (leftover) {
+          setMessages((current) =>
+            current.map((item) =>
+              item.streaming && item.role === "assistant" && !item.content.includes(leftover)
+                ? { ...item, content: item.content + leftover }
+                : item,
+            ),
+          );
+        }
+        sendingRef.current = false;
         setSending(false);
         setStreaming(false);
         setStatus("");
+        if (streamMetaRef.current?.requestId === requestId) streamMetaRef.current = null;
       }
     },
-    [activeChatId, loadChats, navigate, sending],
+    [activeChatId, navigate],
   );
 
   const retryLast = useCallback(async () => {
@@ -276,7 +357,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setChats((current) => current.map((item) => (item.id === chatId ? updated : item)));
         toast("Conversation renamed.");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to rename this conversation.");
+        setError(publicError(err instanceof Error ? err.message : "Unable to rename this conversation."));
       }
     },
     [toast],
@@ -294,7 +375,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
         toast("Conversation deleted.");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to delete this conversation.");
+        setError(publicError(err instanceof Error ? err.message : "Unable to delete this conversation."));
       }
     },
     [activeChatId, navigate, toast],

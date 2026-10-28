@@ -135,6 +135,7 @@ def test_insufficient_evidence_honest_fallback_without_invented_conditions(monke
         )
     ]
     monkeypatch.setattr(rp, "retrieve_candidates", lambda *_a, **_k: (weak, weak))
+    monkeypatch.setattr(rp, "can_use_llm_kb_fallback", lambda: False)
     result = run_pipeline("I have a mild cough that is hard to pin down further")
     assert result.citations == []
     assert result.possible_conditions == []
@@ -220,6 +221,7 @@ def test_retrieval_service_failure_handled_gracefully(monkeypatch):
         raise RuntimeError("embedding timeout")
 
     monkeypatch.setattr(rp, "retrieve_candidates", boom)
+    monkeypatch.setattr(rp, "can_use_llm_kb_fallback", lambda: False)
     result = run_pipeline("I have a mild sore throat")
     assert result.refused is False
     assert result.citations == []

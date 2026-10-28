@@ -12,8 +12,8 @@ flagged. Disclaimer / preamble lines are ignored so they do not inflate
 or deflate the score.
 
 This is the inspectable anti-hallucination layer: RAG retrieves documents,
-the model writes an answer, and this audit verifies the answer did not
-invent unsupported claims.
+the model writes an answer, and this audit flags unsupported or fabricated
+citations. It detects issues; it does not rewrite the answer.
 """
 from __future__ import annotations
 
@@ -32,7 +32,9 @@ NON_CLAIM_RE = re.compile(
     r"not a diagnosis|consult a (qualified )?(healthcare|doctor|clinician)|"
     r"possible explanations include|based on the retrieved|"
     r"i could not find enough|please rephrase|"
-    r"without retrieval|no documents retrieved",
+    r"without retrieval|no documents retrieved|"
+    r"medical emergency|call \d+|automated detection is not infallible|"
+    r"chest pain can be serious|seek emergency care now",
     re.IGNORECASE,
 )
 
@@ -138,18 +140,21 @@ def _verdict(supported: int, unsupported: int, fabricated: int, claims: int) -> 
     if unsupported == 0 and fabricated == 0:
         return (
             "pass",
-            f"All {supported} claim(s) are cited and match retrieved documents.",
+            f"All {supported} claim(s) are cited and match retrieved documents. "
+            "This audit flags issues; it does not rewrite the answer.",
         )
     problems = unsupported + fabricated
     if supported == 0:
         return (
             "fail",
-            f"None of {claims} claim(s) could be tied to a retrieved source.",
+            f"None of {claims} claim(s) could be tied to a retrieved source. "
+            "This audit flags issues; it does not rewrite the answer.",
         )
     return (
         "partial",
         f"{supported} supported, {problems} not faithful "
-        f"({unsupported} uncited, {fabricated} citation not in retrieval).",
+        f"({unsupported} uncited, {fabricated} citation not in retrieval). "
+        "This audit flags issues; it does not rewrite the answer.",
     )
 
 

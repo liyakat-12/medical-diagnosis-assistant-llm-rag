@@ -20,10 +20,12 @@ from src.safety.guardrails import check_emergency, check_prescription_request
 
 def test_load_documents_finds_all_sample_docs():
     docs = load_documents()
-    assert len(docs) == 400
+    assert len(docs) == 1017
     ids = {d.id for d in docs}
     assert "heart_attack" in ids
     assert "common_cold" in ids
+    assert "norovirus" in ids
+    assert "fabry_disease" in ids
 
 
 def test_every_document_has_required_metadata():
@@ -77,6 +79,11 @@ def test_prescription_guardrail_ignores_normal_symptom_question():
     assert not result.triggered
 
 
+def test_prescription_guardrail_ignores_benign_medication_info():
+    assert not check_prescription_request("What is paracetamol used for?").triggered
+    assert not check_prescription_request("Can you explain what ibuprofen is?").triggered
+
+
 def test_faithfulness_marks_cited_retrieved_claim_supported():
     answer = (
         "1. One possible condition may be related to Common Cold (Source: Common Cold).\n\n"
@@ -126,7 +133,7 @@ def test_rerank_puts_best_chunk_first(monkeypatch):
     ]
 
     class FakeModel:
-        def predict(self, pairs, show_progress_bar=False):
+        def predict(self, pairs, show_progress_bar=False, **_kwargs):
             return [0.1, 4.0, 0.2]
 
     monkeypatch.setattr("src.retrieval.reranker._load_model", lambda: FakeModel())

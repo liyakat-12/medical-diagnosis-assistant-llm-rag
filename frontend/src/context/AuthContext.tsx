@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { HttpError } from "../services/api";
 import * as authApi from "../services/auth";
 import type { User } from "../types";
 
@@ -21,19 +20,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const restore = useCallback(async () => {
     try {
-      const me = await authApi.fetchMe();
-      setUser(me);
-    } catch (error) {
-      if (error instanceof HttpError && error.status === 401) {
-        try {
-          const refreshed = await authApi.refreshSession();
-          setUser(refreshed);
-        } catch {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
+      setUser(await authApi.fetchMe());
+    } catch {
+      setUser(null);
     } finally {
       setLoading(false);
     }

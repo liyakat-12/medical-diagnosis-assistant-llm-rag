@@ -53,7 +53,7 @@ def serialize_message(doc: dict) -> dict:
         "content": doc.get("content") or "",
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
-        "model": doc.get("model"),
+        "model": None,
         "citations": doc.get("citations") or [],
         "triage": doc.get("triage"),
         "possible_conditions": doc.get("possible_conditions") or [],

@@ -1,4 +1,5 @@
 import type { ApiError } from "../types";
+import { PUBLIC_LOOKUP_ERROR, publicError } from "../utils/publicText";
 
 const API_BASE = "/api/v1";
 const AUTH_SKIP_REFRESH = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
@@ -72,7 +73,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, retried 
       response.status === 401
         ? "Your session has expired. Please sign in again."
         : "Unable to complete this request.";
-    throw new HttpError(parseDetail(data, fallback), response.status);
+    throw new HttpError(publicError(parseDetail(data, fallback), fallback), response.status);
   }
   return data as T;
 }
@@ -97,7 +98,10 @@ export async function readSse(
       const refreshed = await refreshOnce();
       if (refreshed) return readSse(path, body, onEvent, signal, true);
     }
-    throw new HttpError(parseDetail(parseJson(text), "Something went wrong while generating the response."), response.status);
+    throw new HttpError(
+      publicError(parseDetail(parseJson(text), PUBLIC_LOOKUP_ERROR), PUBLIC_LOOKUP_ERROR),
+      response.status,
+    );
   }
 
   const reader = response.body.getReader();
@@ -111,12 +115,11 @@ export async function readSse(
     const chunks = buffer.split("\n\n");
     buffer = chunks.pop() ?? "";
     for (const chunk of chunks) {
-      const line = chunk
+      const payload = chunk
         .split("\n")
-        .map((item) => item.trim())
-        .find((item) => item.startsWith("data:"));
-      if (!line) continue;
-      const payload = line.replace(/^data:\s?/, "");
+        .filter((item) => item.startsWith("data:"))
+        .map((item) => item.replace(/^data:\s?/, ""))
+        .join("\n");
       if (!payload) continue;
       const parsed = parseJson(payload);
       if (parsed && typeof parsed === "object") onEvent(parsed as Record<string, unknown>);

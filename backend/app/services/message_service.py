@@ -35,7 +35,7 @@ async def add_assistant_message(user_id: str, chat_id: str, result: dict) -> dic
         user_id=user_id,
         role="assistant",
         content=result.get("answer") or "",
-        model=result.get("provider") or config.resolve_llm_provider(),
+        model=None,
         citations=result.get("citations") or [],
         triage=result.get("triage"),
         possible_conditions=result.get("possible_conditions") or [],
@@ -43,7 +43,12 @@ async def add_assistant_message(user_id: str, chat_id: str, result: dict) -> dic
         recommendations=result.get("recommendations") or [],
         refused=bool(result.get("refused")),
         disclaimer=result.get("disclaimer") or config.DISCLAIMER,
-        metadata={"query": result.get("query")},
+        metadata={
+            "query": result.get("query"),
+            "evidence_origin": result.get("evidence_origin") or "none",
+            "question_type": result.get("question_type") or "",
+            "personal_context": bool(result.get("personal_context")),
+        },
     )
     await chat_repository.bump_after_message(chat_id)
     return message
@@ -51,7 +56,8 @@ async def add_assistant_message(user_id: str, chat_id: str, result: dict) -> dic
 
 def history_for_pipeline(messages: list[dict]) -> list[dict]:
     rows: list[dict] = []
-    for item in messages[-10:]:
+    window = max(2, int(config.CHAT_HISTORY_WINDOW))
+    for item in messages[-window:]:
         rows.append(
             {
                 "role": item.get("role"),
@@ -63,9 +69,12 @@ def history_for_pipeline(messages: list[dict]) -> list[dict]:
     return rows
 
 
-async def recent_history(user_id: str, chat_id: str, limit: int = 10) -> list[dict]:
-    messages = await list_messages(user_id, chat_id)
-    return history_for_pipeline(messages[-limit:])
+async def recent_history(user_id: str, chat_id: str, limit: int | None = None) -> list[dict]:
+    if limit is None:
+        limit = max(2, int(config.CHAT_HISTORY_WINDOW))
+    await get_chat(user_id, chat_id)
+    messages = await message_repository.list_recent_for_chat(chat_id, user_id, limit)
+    return history_for_pipeline(messages)
 
 
 def diagnose_sync(query: str, top_k: int | None = None, chat_history: list[dict] | None = None) -> dict:

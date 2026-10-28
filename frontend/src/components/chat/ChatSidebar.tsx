@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogOut, MessageSquarePlus, PanelLeft, Pencil, Search, Stethoscope, Trash2, UserRound, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -18,8 +18,12 @@ export function ChatSidebar() {
   const [renameId, setRenameId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const filtered = chats.filter((chat) => chat.title.toLowerCase().includes(query.toLowerCase()));
-  const groups = groupChats(filtered);
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return chats;
+    return chats.filter((chat) => chat.title.toLowerCase().includes(needle));
+  }, [chats, query]);
+  const groups = useMemo(() => groupChats(filtered), [filtered]);
   const deleteTarget = chats.find((chat) => chat.id === deleteId);
 
   useEffect(() => {

@@ -28,13 +28,26 @@ TRIAGE_LABELS = {
     "emergency": "Seek emergency care",
 }
 
+def emergency_guidance() -> str:
+    from src import config
+
+    number = config.EMERGENCY_NUMBER
+    if config.EMERGENCY_REGION in {"IN", "INDIA"}:
+        return (
+            f"This may be a medical emergency. In India, call {number} (national emergency) or go to the "
+            "nearest emergency department now. Do not wait for an online tool to confirm this. "
+            "Automated detection is not infallible."
+        )
+    return (
+        f"This may be a medical emergency. Call {number} or go to the nearest emergency department now. "
+        "Do not wait for an online tool to confirm this. Automated detection is not infallible."
+    )
+
+
 TRIAGE_GUIDANCE = {
     "self_care": "This appears manageable with home/self-care. Monitor your symptoms and seek care if they worsen or don't improve.",
     "consult_doctor": "You should book an appointment with a doctor soon to get this properly evaluated. It is not an emergency, but professional assessment is recommended.",
-    "emergency": (
-        "This may be a medical emergency. In India, call 112 (national emergency) or go to the "
-        "nearest emergency department now. Do not wait for an online tool to confirm this."
-    ),
+    "emergency": emergency_guidance(),
 }
 
 CHEST_PAIN_SAFETY_QUESTIONS = [
@@ -66,13 +79,13 @@ def _primary_evidence_level(evidence: list[Evidence]) -> str:
     return level if level in SEVERITY_ORDER else "consult_doctor"
 
 
-def classify_triage(query: str, evidence: list[Evidence]) -> TriageResult:
-    guard = check_emergency(query)
+def classify_triage(query: str, evidence: list[Evidence], history: list[dict] | None = None) -> TriageResult:
+    guard = check_emergency(query, history)
     if guard.triggered:
         return TriageResult(
             level="emergency",
             label=TRIAGE_LABELS["emergency"],
-            guidance=TRIAGE_GUIDANCE["emergency"],
+            guidance=emergency_guidance(),
             reason="Rule-based safety layer detected emergency red-flag symptoms in your description.",
             matched_emergency_terms=guard.matched_terms,
         )

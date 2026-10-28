@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+!.env.example
+venv
+.venv
+__pycache__
+.pytest_cache
+frontend/node_modules
+frontend/dist
+data/vector_store_general
+data/vector_store_medical
+data/users.json
+data/chats.json
+*.pyc
+.cursor
+agent-transcripts

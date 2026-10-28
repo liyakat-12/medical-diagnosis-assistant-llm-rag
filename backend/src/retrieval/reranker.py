@@ -48,7 +48,7 @@ def rerank_chunks(query: str, chunks: list[RetrievedChunk], top_k: int) -> list[
 
     model = _load_model()
     pairs = [(query, chunk.text) for chunk in chunks]
-    scores = model.predict(pairs, show_progress_bar=False)
+    scores = model.predict(pairs, batch_size=4, show_progress_bar=False)
     ranked = sorted(zip(chunks, scores), key=lambda item: float(item[1]), reverse=True)
     reranked: list[RetrievedChunk] = []
     for chunk, score in ranked[:top_k]:

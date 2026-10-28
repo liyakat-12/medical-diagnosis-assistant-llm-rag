@@ -8,13 +8,13 @@ The website is **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS**. The
 
 ## Features
 
-- Intent classifier: greetings and off-topic chat skip retrieval, triage, and match cards
+- Intent routing: greetings stay canned; general, coding, travel, and comparison questions use the configured LLM without medical cards; medical questions use RAG
 - Multi-turn chat history (last 8–10 messages) for follow-up symptoms and “tell me more”
 - Conditional **Symptom Intake** modal (duration, age group, aggravating factors) only on the first symptom query
 - Standalone **Hospital Finder** modal from the chat header; emergency replies also get a compact hospital shortcut
 - Interactive body map on a new chat and from the **Body** button (not a diagnosis)
 - SSE streaming with live status text, markdown rendering, and auto-scroll
-- RAG over 400 curated medical notes with MiniLM embeddings, ChromaDB, and a cross-encoder re-ranker
+- RAG over about 1000 curated medical notes with MiniLM embeddings, ChromaDB, and a cross-encoder re-ranker
 - Safety guardrails for emergency language and prescription/dosage refusal
 - Pluggable LLM providers: `mock`, `groq`, `openai`, `ollama`
 - Evaluation scripts for embeddings, triage, hallucination, and end-to-end quality
@@ -109,7 +109,13 @@ cd frontend
 npm install
 ```
 
-Copy `.env.example` to `.env`.
+Copy `.env.example` to `.env`. Generate a unique `JWT_SECRET` (at least 24 characters). Rotating `JWT_SECRET` invalidates existing login cookies. Production (`APP_ENV=production`) refuses a missing, short, or placeholder secret and refuses `CORS_ORIGINS=*`.
+
+### Database persistence
+
+- `MONGODB_URI=mongodb://127.0.0.1:27017` (or `mongodb+srv://...`) keeps accounts, sessions, and chat history across restarts. Start MongoDB yourself; the app will not silently switch to another database.
+- `MONGODB_URI=memory` is for isolated tests and local demos. Data is discarded when the process stops.
+- Invalid URIs fail at startup with a clear error.
 
 ### LLM provider
 
@@ -119,13 +125,13 @@ For a real conversational model, set one of:
 
 | Provider | Required settings |
 |---|---|
-| `groq` | `GROQ_API_KEY`, optional `GROQ_MODEL` (default `llama-3.1-8b-instant`) |
+| `groq` | `GROQ_API_KEY`, optional `GROQ_MODEL` (default `openai/gpt-oss-20b`) |
 | `openai` | `OPENAI_API_KEY`, optional `OPENAI_MODEL` (default `gpt-4o-mini`) |
 | `ollama` | local Ollama at `OLLAMA_BASE_URL` (default `http://localhost:11434`) and `OLLAMA_MODEL` |
 
 If a cloud key is missing or looks like a placeholder, the resolver falls back to `mock`.
 
-Other important variables: `MONGODB_URI`, `JWT_SECRET`, `CORS_ORIGINS`, `EMBEDDING_MODE`, `TOP_K`, `RERANK_ENABLED`, `RERANK_CANDIDATES`, `MIN_RELEVANCE_SCORE`.
+Other important variables: `MONGODB_URI`, `JWT_SECRET`, `CORS_ORIGINS`, `EMBEDDING_MODE`, `TOP_K`, `RERANK_ENABLED`, `RERANK_CANDIDATES`, `MIN_RELEVANCE_SCORE`, `EMERGENCY_NUMBER`, `CHAT_HISTORY_WINDOW`, `LLM_TIMEOUT_SECONDS`.
 
 ### Build the vector index
 
@@ -154,7 +160,7 @@ npm run dev
 
 Or use `run_api.bat`, `run_web.bat`, or `run_full.bat`. Website: http://localhost:5173 — API docs: http://localhost:8000/docs
 
-Demo login: **Fill demo details** on the sign-in page, then sign in (`demo@clinic.local` / `demo123`).
+Demo login (development only): **Fill demo details** on the sign-in page, then sign in (`demo@clinic.local` / `demo123`). Production does not seed this account.
 
 On startup the API warms the embedding model, Chroma collection, and cross-encoder (when `RERANK_ENABLED=true`) in a worker thread so the first chat is not a cold Hugging Face load.
 
@@ -207,6 +213,20 @@ Documented results (expanded sets, MiniLM live path with re-ranking unless noted
 | End-to-end (same 112 queries) | Condition surfaced 110/112 (**98.21%**); exact triage 105/112 (93.75%) |
 
 **98.21%** and **Recall@5 (96.43%)** are different tests: the first is end-to-end condition surfacing; the second is whether the expected document is in the top 5 retrieved chunks.
+
+---
+
+## Docker and CI
+
+Docker Compose can run MongoDB, the API, and a built frontend. Secrets stay in `.env` (never in the image). This is a starting point, not a hardened production deployment: put TLS, a real reverse proxy, and unique secrets in front of it before exposing it on the internet.
+
+```bash
+docker compose up --build
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the backend and frontend test suites with `LLM_PROVIDER=mock` and `MONGODB_URI=memory`. Do not put real API keys in CI.
+
+The development Vite server (`npm run dev`) is not a production host.
 
 ---
 

@@ -87,6 +87,9 @@ async def refresh_user(refresh_token: str | None) -> str:
 
 
 async def seed_demo_user() -> None:
+    if config.is_production() or not (config.DEMO_EMAIL or "").strip():
+        logger.info("Skipping demo user seed")
+        return
     existing = await user_repository.find_by_email(config.DEMO_EMAIL)
     if existing:
         return

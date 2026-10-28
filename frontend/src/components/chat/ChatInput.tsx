@@ -37,9 +37,10 @@ export const ChatInput = forwardRef<
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftRef = useRef({ value: "", regions: [] as BodyRegion[], symptoms: [] as string[] });
   const suggestions = useMemo(() => (activeRegion ? REGION_SYMPTOMS[activeRegion] : []), [activeRegion]);
-  const preview = buildBodyMapQuery(value, regions, symptoms);
+  const preview = useMemo(() => buildBodyMapQuery(value, regions, symptoms), [value, regions, symptoms]);
   const canSend = Boolean(preview) && !disabled;
-  const summary = summarizeSelection(regions, symptoms);
+  const summary = useMemo(() => summarizeSelection(regions, symptoms), [regions, symptoms]);
+  const reviewLine = useMemo(() => formatReviewLine(value, regions, symptoms), [value, regions, symptoms]);
   const hasMapSelection = Boolean(regions.length || symptoms.length);
 
   useImperativeHandle(
@@ -102,7 +103,7 @@ export const ChatInput = forwardRef<
   }
 
   return (
-    <form onSubmit={submit} className="shrink-0 border-t border-sky-100 bg-sky-50 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <form onSubmit={submit} aria-busy={disabled || streaming} className="shrink-0 border-t border-sky-100 bg-sky-50 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto max-w-3xl">
         <BodyMap
           selectedRegions={regions}
@@ -190,7 +191,7 @@ export const ChatInput = forwardRef<
         {preview ? (
           <p className="mt-2 text-xs leading-5 text-slate-500">
             <span className="font-bold text-slate-700">Will send: </span>
-            {formatReviewLine(value, regions, symptoms)}
+            {reviewLine}
           </p>
         ) : (
           <p className="mt-2 text-xs leading-5 text-slate-500">{BODY_MAP_DISCLAIMER}</p>

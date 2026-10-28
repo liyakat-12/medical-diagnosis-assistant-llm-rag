@@ -7,7 +7,7 @@ import { scrollToSection } from "../utils/scroll";
 import { PageShell } from "../components/common/PageShell";
 
 const features = [
-  { icon: BookOpen, title: "Evidence-grounded answers", body: "Symptoms are matched to curated medical notes before a response is generated." },
+  { icon: BookOpen, title: "General and medical chat", body: "Ask everyday, coding, or travel questions in the same chat. Symptom questions still match curated medical notes before a response is generated." },
   { icon: MapPin, title: "Body map for location", body: "Tap a body region when it is hard to describe symptoms in words. The map helps locate discomfort; it does not diagnose." },
   { icon: ShieldCheck, title: "Safety-first triage", body: "Emergency wording is flagged and prescription or dosage requests are refused." },
   { icon: Activity, title: "Transparent sources", body: "Each answer can show supporting documents so you can see where the information came from." },
@@ -59,7 +59,7 @@ export function Home() {
               </Button>
             </div>
           </div>
-          <img src="/images/hero-rag.png" alt="Symptom description matched to medical documents" className="w-full rounded-[2rem] object-cover shadow-xl shadow-teal-900/10" />
+          <img src="/images/hero-rag.png" alt="Symptom description matched to medical documents" width={960} height={640} decoding="async" fetchPriority="high" className="h-auto w-full rounded-[2rem] object-cover shadow-xl shadow-teal-900/10" />
         </section>
 
         <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-16 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

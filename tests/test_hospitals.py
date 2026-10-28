@@ -140,6 +140,7 @@ def test_map_tile_uses_png_fallback(monkeypatch):
     from app.services import hospital_service as hs
 
     hs._TILE_CACHE.clear()
+    hs._HTTP = None
 
     class FakeResponse:
         def __init__(self, status_code: int, content: bytes):
@@ -156,11 +157,11 @@ def test_map_tile_uses_png_fallback(monkeypatch):
         def __exit__(self, *_args):
             return False
 
-        def get(self, url: str):
+        def get(self, url: str, **_kwargs):
             if "arcgisonline" in url:
                 return FakeResponse(403, b"<html>Access blocked</html>")
             return FakeResponse(200, b"\x89PNG\r\n\x1a\n" + b"tile")
 
-    monkeypatch.setattr(hs.httpx, "Client", FakeClient)
+    monkeypatch.setattr(hs, "_http", lambda: FakeClient())
     data = hs.fetch_map_tile(12, 2900, 1700)
     assert data.startswith(b"\x89PNG")

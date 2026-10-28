@@ -8,13 +8,14 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from src import config
+from src.safety.public_text import PUBLIC_LOOKUP_FAILURE, public_chat_payload, sanitize_status
 
 from app.core.dependencies import get_current_user
 from app.schemas.message import MessageResponse, SendMessageRequest
 from app.services import message_service
 
 logger = logging.getLogger("mediassist.messages")
-STREAM_FAILURE_ANSWER = "I could not finish this lookup. Please try again. This is not a diagnosis."
+STREAM_FAILURE_ANSWER = PUBLIC_LOOKUP_FAILURE
 
 router = APIRouter(prefix="/chats", tags=["messages"])
 
@@ -52,40 +53,62 @@ async def stream_message(
     await message_service.add_user_message(user["id"], chat_id, payload.content.strip())
 
     async def event_source():
-        iterator = message_service.stream_events(
-            payload.content.strip(), payload.top_k, chat_history=history
-        )
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+        done_marker = object()
+
+        def produce() -> None:
+            try:
+                for event in message_service.stream_events(
+                    payload.content.strip(), payload.top_k, chat_history=history
+                ):
+                    asyncio.run_coroutine_threadsafe(queue.put(event), loop).result()
+                asyncio.run_coroutine_threadsafe(queue.put(done_marker), loop).result()
+            except Exception as exc:
+                asyncio.run_coroutine_threadsafe(queue.put(exc), loop).result()
+
+        producer = asyncio.create_task(asyncio.to_thread(produce))
         try:
             while True:
-                try:
-                    event = await asyncio.to_thread(next, iterator, None)
-                except Exception:
-                    logger.exception("RAG stream failed for chat %s", chat_id)
-                    error_result = {
-                        "query": payload.content.strip(),
-                        "refused": False,
-                        "answer": STREAM_FAILURE_ANSWER,
-                        "citations": [],
-                        "recommendations": ["Try sending the same question again."],
-                        "disclaimer": config.DISCLAIMER,
-                        "possible_conditions": [],
-                        "triage": None,
-                        "faithfulness": None,
-                        "provider": config.resolve_llm_provider(),
-                    }
+                item = await queue.get()
+                if item is done_marker:
+                    break
+                if isinstance(item, Exception):
+                    logger.error("Chat stream failed for chat %s: %s", chat_id, type(item).__name__, exc_info=item)
+                    error_result = public_chat_payload(
+                        {
+                            "query": payload.content.strip(),
+                            "refused": False,
+                            "answer": STREAM_FAILURE_ANSWER,
+                            "citations": [],
+                            "recommendations": ["Try sending the same question again."],
+                            "disclaimer": config.DISCLAIMER,
+                            "possible_conditions": [],
+                            "triage": None,
+                            "faithfulness": None,
+                        }
+                    )
                     assistant = await message_service.add_assistant_message(user["id"], chat_id, error_result)
                     yield f"data: {json.dumps({'type': 'token', 'content': STREAM_FAILURE_ANSWER}, default=str)}\n\n"
                     yield f"data: {json.dumps({'type': 'done', 'result': error_result, 'message': assistant}, default=str)}\n\n"
                     return
-                if event is None:
-                    break
+                event = item
+                if event.get("type") == "status":
+                    event = {**event, "content": sanitize_status(event.get("content"))}
                 if event.get("type") == "done":
-                    final = event.get("result") or {}
+                    final = public_chat_payload(event.get("result") or {})
                     assistant = await message_service.add_assistant_message(user["id"], chat_id, final)
-                    event = {**event, "message": assistant}
+                    event = {**event, "result": final, "message": assistant}
                 yield f"data: {json.dumps(event, default=str)}\n\n"
         except Exception:
             logger.exception("SSE writer failed for chat %s", chat_id)
+        finally:
+            if not producer.done():
+                producer.cancel()
+            try:
+                await producer
+            except (asyncio.CancelledError, Exception):
+                pass
 
     return StreamingResponse(
         event_source(),

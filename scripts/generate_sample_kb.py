@@ -1,5 +1,5 @@
 """
-One-time generator for the STARTER sample knowledge base (400 notes).
+One-time generator for the sample knowledge base (~1000 notes).
 
 IMPORTANT: The text below is written in plain language for demonstration
 purposes only. It is general medical knowledge (the kind found in any
@@ -8,7 +8,7 @@ copy of any single source. The "source" field names the organization whose
 public guidance informed the summary, so every chunk retrieved at query
 time can show a real, checkable citation.
 
-The 400 notes are split across this file and scripts/extra_sample_kb*.py
+The notes are split across this file and scripts/extra_sample_kb*.py
 purely to keep each file readable. To extend the corpus, add tuples to a
 new extra_sample_kb_N.py module, import it here, and append it to
 `all_docs` in main(); duplicate ids are rejected at generation time.
@@ -26,6 +26,14 @@ from extra_sample_kb import EXTRA_DOCUMENTS
 from extra_sample_kb_2 import MORE_DOCUMENTS
 from extra_sample_kb_3 import MORE_DOCUMENTS_3
 from extra_sample_kb_4 import MORE_DOCUMENTS_4
+from extra_sample_kb_5 import MORE_DOCUMENTS_5
+from extra_sample_kb_6 import MORE_DOCUMENTS_6
+from extra_sample_kb_7 import MORE_DOCUMENTS_7
+from extra_sample_kb_8 import MORE_DOCUMENTS_8
+from extra_sample_kb_9 import MORE_DOCUMENTS_9
+from extra_sample_kb_10 import PHASE1_DOCUMENTS
+from extra_sample_kb_11 import PHASE2_DOCUMENTS
+from extra_sample_kb_12 import PHASE2B_DOCUMENTS
 
 OUT_DIR = SCRIPT_DIR.parent / "knowledge_base" / "sample_documents"
 
@@ -807,6 +815,14 @@ def main() -> None:
         + MORE_DOCUMENTS
         + MORE_DOCUMENTS_3
         + MORE_DOCUMENTS_4
+        + MORE_DOCUMENTS_5
+        + MORE_DOCUMENTS_6
+        + MORE_DOCUMENTS_7
+        + MORE_DOCUMENTS_8
+        + MORE_DOCUMENTS_9
+        + PHASE1_DOCUMENTS
+        + PHASE2_DOCUMENTS
+        + PHASE2B_DOCUMENTS
     )
     seen: set[str] = set()
     for doc in all_docs:

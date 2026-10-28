@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, MapPin, Menu, PanelLeft } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
@@ -12,6 +12,8 @@ import { Spinner } from "../components/common/Spinner";
 import { Button } from "../components/common/Button";
 import { useChat } from "../context/ChatContext";
 import { useApp } from "../context/AppContext";
+import { isIncompleteMessage } from "../utils/chatSession";
+import { conversationChrome } from "../utils/conversationChrome";
 import { looksEmergency } from "../utils/emergency";
 import { needsSymptomIntake } from "../utils/intent";
 
@@ -53,16 +55,22 @@ export function Chat() {
   }, [chatId, activeChatId, sending, streaming, openChat, showBlankChat]);
 
   useEffect(() => {
-    const lastUser = [...messages].reverse().find((item) => item.role === "user");
+    let lastUser: (typeof messages)[number] | undefined;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].role === "user") {
+        lastUser = messages[index];
+        break;
+      }
+    }
     if (lastUser && lastUser.id !== lastFocusedUser.current) {
       lastFocusedUser.current = lastUser.id;
       stickToBottom.current = true;
-      document.getElementById(`msg-${lastUser.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(`msg-${lastUser.id}`)?.scrollIntoView({ behavior: streaming ? "auto" : "smooth", block: "start" });
       return;
     }
     if (!stickToBottom.current) return;
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
-  }, [messages, status, pendingSymptoms]);
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: streaming ? "auto" : "smooth" });
+  }, [messages, status, pendingSymptoms, streaming]);
 
   function onScroll() {
     const node = scroller.current;
@@ -72,31 +80,41 @@ export function Chat() {
     setShowJump(!nearBottom && node.scrollHeight > node.clientHeight + 120);
   }
 
-  function handleSend(value: string) {
-    if (looksEmergency(value) || !needsSymptomIntake(value, messages)) {
+  const handleSend = useCallback(
+    (value: string) => {
+        if (looksEmergency(value, messages) || !needsSymptomIntake(value, messages)) {
+        setPendingSymptoms(null);
+        void sendMessage(value);
+        return;
+      }
+      setPendingSymptoms(value);
+    },
+    [messages, sendMessage],
+  );
+
+  const handleFollowUp = useCallback(
+    (answers: FollowUpAnswers) => {
+      if (!pendingSymptoms) return;
+      const query = formatFollowUpQuery(pendingSymptoms, answers);
       setPendingSymptoms(null);
-      void sendMessage(value);
-      return;
-    }
-    setPendingSymptoms(value);
-  }
+      void sendMessage(query);
+    },
+    [pendingSymptoms, sendMessage],
+  );
 
-  function handleFollowUp(answers: FollowUpAnswers) {
-    if (!pendingSymptoms) return;
-    const query = formatFollowUpQuery(pendingSymptoms, answers);
-    setPendingSymptoms(null);
-    void sendMessage(query);
-  }
+  const openHospitals = useCallback(() => setHospitalsOpen(true), []);
 
-  const latest = [...messages].reverse().find((item) => item.role === "assistant" && !item.streaming);
-  const urgent = latest?.triage?.level === "emergency";
+  const chrome = useMemo(() => conversationChrome(messages), [messages]);
+  const urgent = chrome.emphasizeEmergency;
+  const lastIncomplete = Boolean(messages.at(-1) && isIncompleteMessage(messages.at(-1)!));
+  const showRetry = Boolean(error) || lastIncomplete;
 
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden bg-[#eaf4fb]">
       <ChatSidebar />
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-sky-100 bg-white px-3 sm:px-4">
-          <div className="flex min-w-0 items-center gap-2">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-sky-100 bg-white px-2 sm:gap-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
             <button
               type="button"
               className="hidden min-h-11 min-w-11 place-items-center rounded-xl text-slate-600 hover:bg-teal-50 lg:grid"
@@ -115,23 +133,25 @@ export function Chat() {
               <Menu size={18} />
             </button>
             <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold text-slate-900">Symptom conversation</p>
-              <p className="hidden truncate text-xs text-slate-500 sm:block">Matches, urgency, sources, and nearby hospitals. Not a diagnosis.</p>
+              <p className="truncate text-sm font-extrabold text-slate-900">{chrome.title}</p>
+              <p className="hidden truncate text-xs text-slate-500 sm:block">{chrome.subtitle}</p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
-              onClick={() => setHospitalsOpen(true)}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 text-xs font-extrabold text-teal-900 hover:bg-teal-50"
+              onClick={openHospitals}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-teal-200 bg-white px-2.5 text-xs font-extrabold text-teal-900 hover:bg-teal-50 sm:px-3"
             >
-              <MapPin size={14} /> Nearby hospitals
+              <MapPin size={14} />
+              <span className="sm:hidden">Hospitals</span>
+              <span className="hidden sm:inline">Nearby hospitals</span>
             </button>
             <EmergencyCallButton urgent={urgent} />
           </div>
         </header>
         <div className="relative min-h-0 flex-1">
-          <div ref={scroller} onScroll={onScroll} className="absolute inset-0 overflow-x-hidden overflow-y-auto px-3 py-5 pb-16 sm:px-4">
+          <div ref={scroller} onScroll={onScroll} className="absolute inset-0 overflow-x-hidden overflow-y-auto px-3 py-5 pb-28 sm:px-4">
             <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-5">
               {messagesLoading ? <Spinner label="Loading conversation..." /> : null}
               {!messagesLoading && !messages.length && !pendingSymptoms ? (
@@ -167,29 +187,32 @@ export function Chat() {
                   <MessageBubble
                     message={message}
                     status={message.streaming ? status : undefined}
-                    onOpenHospitals={() => setHospitalsOpen(true)}
+                    onOpenHospitals={openHospitals}
                   />
                 </div>
               ))}
-              {error ? (
-                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3" role="alert">
-                  <p className="text-sm font-semibold text-rose-800">{error}</p>
+              {showRetry ? (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3" role="alert" aria-live="assertive">
+                  <p className="text-sm font-semibold text-rose-800">{error || "This reply was stopped before it finished."}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button variant="secondary" size="sm" onClick={() => void retryLast()}>
                       Try again
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => clearError()}>
-                      Dismiss
-                    </Button>
+                    {error ? (
+                      <Button variant="secondary" size="sm" onClick={() => clearError()}>
+                        Dismiss
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
+              {messages.length ? <div className="h-16 shrink-0" aria-hidden /> : null}
             </div>
           </div>
           {showJump ? (
             <button
               type="button"
-              className="absolute bottom-3 left-1/2 z-10 flex min-h-11 -translate-x-1/2 items-center gap-1 rounded-full border border-teal-100 bg-white px-3 text-xs font-bold text-teal-900 shadow-sm"
+              className="absolute bottom-5 right-4 z-10 flex min-h-11 items-center gap-1 rounded-full border border-teal-100 bg-white px-3 text-xs font-bold text-teal-900 shadow-sm sm:right-6"
               onClick={() => {
                 stickToBottom.current = true;
                 scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
@@ -215,9 +238,11 @@ export function Chat() {
           />
         </Suspense>
       ) : null}
-      <Suspense fallback={null}>
-        <HospitalFinderModal open={hospitalsOpen} onClose={() => setHospitalsOpen(false)} />
-      </Suspense>
+      {hospitalsOpen ? (
+        <Suspense fallback={null}>
+          <HospitalFinderModal open onClose={() => setHospitalsOpen(false)} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

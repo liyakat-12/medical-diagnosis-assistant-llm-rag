@@ -34,7 +34,7 @@ export function Navbar() {
 
   return (
     <header className={cn("sticky top-0 z-40 border-b border-teal-100 bg-white/90 backdrop-blur", hideOnChat && "lg:hidden")}>
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 overflow-hidden px-4">
         <NavLink to="/" className="flex items-center gap-2 font-extrabold text-teal-900">
           <span className="grid h-9 w-9 place-items-center rounded-2xl bg-teal-700 text-white">
             <Stethoscope size={18} />

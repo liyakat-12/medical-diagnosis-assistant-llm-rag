@@ -18,8 +18,9 @@ class OllamaProvider:
         *,
         grounded: bool = True,
         model: str | None = None,
+        max_tokens: int | None = None,
     ) -> str:
-        del grounded
+        del grounded, max_tokens
         payload = {
             "model": model or config.OLLAMA_MODEL,
             "messages": [
@@ -28,7 +29,11 @@ class OllamaProvider:
             ],
             "stream": False,
         }
-        resp = requests.post(f"{config.OLLAMA_BASE_URL}/api/chat", json=payload, timeout=45)
+        resp = requests.post(
+            f"{config.OLLAMA_BASE_URL}/api/chat",
+            json=payload,
+            timeout=max(45.0, float(config.LLM_TIMEOUT_SECONDS)),
+        )
         resp.raise_for_status()
         return (resp.json().get("message") or {}).get("content", "").strip()
 
@@ -39,8 +44,9 @@ class OllamaProvider:
         *,
         grounded: bool = True,
         model: str | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[str]:
-        del grounded
+        del grounded, max_tokens
         payload = {
             "model": model or config.OLLAMA_MODEL,
             "messages": [

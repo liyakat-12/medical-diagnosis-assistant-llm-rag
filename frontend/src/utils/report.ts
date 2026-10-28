@@ -1,4 +1,7 @@
-import type { ChatMessage, PossibleCondition } from "../types";
+import type { ChatMessage, Citation, PossibleCondition } from "../types";
+
+const EVIDENCE_STATUS =
+  /not verified|General AI medical knowledge|No matching sources|not retrieved from the (MediAssist )?knowledge base/i;
 
 export function formatConditionName(value?: string): string {
   const text = (value || "").trim();
@@ -49,41 +52,77 @@ export function uniqueCitations(message: ChatMessage) {
   });
 }
 
+export function isEvidenceStatusCitation(item: Citation): boolean {
+  return EVIDENCE_STATUS.test(`${item.title || ""} ${item.source || ""} ${item.condition || ""}`);
+}
+
+export function retrievedCitations(message: ChatMessage): Citation[] {
+  return uniqueCitations(message).filter((item) => !isEvidenceStatusCitation(item));
+}
+
+export function evidenceStatusItems(message: ChatMessage): Citation[] {
+  return uniqueCitations(message).filter((item) => isEvidenceStatusCitation(item));
+}
+
+export function isSymptomCardMessage(message: ChatMessage): boolean {
+  const level = message.triage?.level;
+  return Boolean(message.possible_conditions.length || (level && level !== "none"));
+}
+
 export function formatAssistantCopy(message: ChatMessage): string {
   if (message.refused) return message.content;
   const outcomes = withPercents(message.possible_conditions);
-  const citations = uniqueCitations(message);
+  const citations = retrievedCitations(message);
+  const statusItems = evidenceStatusItems(message);
   const lines: string[] = [];
+  const explanation = (message.content || "").trim();
+  const symptomLayout = isSymptomCardMessage(message);
 
-  lines.push("1. Possible outcomes");
-  if (outcomes.length) {
-    for (const item of outcomes) {
-      lines.push(`• ${formatConditionName(item.condition)} — ${item.match_percent}%`);
+  if (explanation) {
+    lines.push(explanation);
+  }
+
+  if (symptomLayout) {
+    if (lines.length) lines.push("");
+    lines.push("Possible matches");
+    if (outcomes.length) {
+      for (const item of outcomes) {
+        lines.push(`• ${formatConditionName(item.condition)} — ${item.match_percent}%`);
+      }
     }
-  } else {
-    lines.push("• No close matches yet. Try adding more symptom detail.");
+    if (message.triage && message.triage.level !== "none") {
+      lines.push("", "Urgency");
+      lines.push(`• ${message.triage.label}`);
+      if (message.triage.guidance) lines.push(`• ${message.triage.guidance}`);
+    }
   }
 
-  lines.push("", "2. Urgency");
-  if (message.triage) {
-    lines.push(`• ${message.triage.label}`);
-    if (message.triage.guidance) lines.push(`• ${message.triage.guidance}`);
-  } else {
-    lines.push("• Urgency will appear after the notes are checked.");
-  }
-
-  lines.push("", "3. Citations");
   if (citations.length) {
+    if (lines.length) lines.push("");
+    lines.push("Sources");
     for (const item of citations) {
       const title = item.title || formatConditionName(item.condition);
       lines.push(`• ${title}${item.source ? ` — ${item.source}` : ""}`);
     }
-  } else {
-    lines.push("• No sources retrieved for this reply.");
   }
 
-  if (message.disclaimer) {
-    lines.push("", message.disclaimer);
+  if (statusItems.length) {
+    if (lines.length) lines.push("");
+    lines.push("Evidence status");
+    for (const item of statusItems) {
+      const title = item.title || formatConditionName(item.condition);
+      lines.push(`• ${title}${item.source ? ` — ${item.source}` : ""}`);
+    }
+  }
+
+  const disclaimer = (message.disclaimer || "").trim();
+  const combined = lines.join("\n").toLowerCase();
+  if (
+    disclaimer &&
+    !combined.includes(disclaimer.toLowerCase()) &&
+    !(statusItems.length && /not verified against the .*knowledge base/i.test(disclaimer))
+  ) {
+    lines.push("", disclaimer);
   }
   return lines.join("\n");
 }

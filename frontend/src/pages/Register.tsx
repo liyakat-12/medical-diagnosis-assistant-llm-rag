@@ -41,7 +41,7 @@ export function Register() {
 
   return (
     <PageShell className="mx-auto grid w-full max-w-md px-4 py-16">
-        <div className="rounded-[2rem] border border-teal-100 bg-white p-8 shadow-sm">
+        <div className="min-w-0 rounded-[2rem] border border-teal-100 bg-white p-5 shadow-sm sm:p-8">
           <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-teal-700">MediAssist</p>
           <h1 className="mt-2 text-3xl font-extrabold text-slate-900">Create your account</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">Your conversations stay private to this account.</p>

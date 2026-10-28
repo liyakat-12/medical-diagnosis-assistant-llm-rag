@@ -14,6 +14,7 @@ class BaseAIProvider(Protocol):
         *,
         grounded: bool = True,
         model: str | None = None,
+        max_tokens: int | None = None,
     ) -> str: ...
 
     def stream(
@@ -23,4 +24,5 @@ class BaseAIProvider(Protocol):
         *,
         grounded: bool = True,
         model: str | None = None,
+        max_tokens: int | None = None,
     ) -> AsyncIterator[str] | None: ...

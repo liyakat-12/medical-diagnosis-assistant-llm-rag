@@ -13,5 +13,6 @@ async def ensure_indexes() -> None:
     await db[CHATS].create_index([("user_id", 1), ("last_message_at", -1)])
     await db[CHATS].create_index("user_id")
     await db[MESSAGES].create_index([("chat_id", 1), ("created_at", 1)])
+    await db[MESSAGES].create_index([("chat_id", 1), ("user_id", 1), ("created_at", -1)])
     await db[MESSAGES].create_index("user_id")
     await db[MESSAGES].create_index("chat_id")

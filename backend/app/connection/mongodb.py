@@ -46,19 +46,26 @@ def set_client(client: AsyncIOMotorClient | None) -> None:
 
 
 async def connect() -> None:
-    if config.MONGODB_URI.strip().lower() in {"memory", "mongomock"}:
+    try:
+        mode = config.mongo_uri_mode()
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
+    if mode == "memory":
         from mongomock_motor import AsyncMongoMockClient
 
         set_client(AsyncMongoMockClient())
-        logger.warning("Using in-memory MongoDB. Data will not persist across restarts.")
+        logger.warning("Using in-memory MongoDB. Accounts and chat history will not persist across restarts.")
         return
     try:
         client = get_client()
         await client.admin.command("ping")
-    except Exception:
-        logger.exception("MongoDB connection failed")
-        raise
-    logger.info("Connected to MongoDB database=%s", config.MONGODB_DB_NAME)
+    except Exception as exc:
+        raise RuntimeError(
+            "Could not connect to MongoDB. Set MONGODB_URI to a reachable mongodb:// or "
+            "mongodb+srv:// URI, or use MONGODB_URI=memory for a disposable in-memory store. "
+            "The application will not switch databases automatically."
+        ) from exc
+    logger.info("Connected to MongoDB mode=persistent db=%s", config.MONGODB_DB_NAME)
 
 
 async def disconnect() -> None:

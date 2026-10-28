@@ -9,6 +9,18 @@ async def list_for_chat(chat_id: str, user_id: str) -> list[dict]:
     return [serialize_message(doc) async for doc in cursor]
 
 
+async def list_recent_for_chat(chat_id: str, user_id: str, limit: int = 10) -> list[dict]:
+    cursor = (
+        get_db()[MESSAGES]
+        .find({"chat_id": oid(chat_id), "user_id": oid(user_id)})
+        .sort("created_at", -1)
+        .limit(max(1, int(limit)))
+    )
+    rows = [serialize_message(doc) async for doc in cursor]
+    rows.reverse()
+    return rows
+
+
 async def create_message(
     *,
     chat_id: str,

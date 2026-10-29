@@ -15,20 +15,39 @@ export interface SafetyCheck {
   failed: unknown[];
 }
 
+export interface RetrievalRunConfig {
+  embedding_mode: string | null;
+  embedding_backend: string | null;
+  rerank_enabled: boolean | null;
+  top_k: number | null;
+}
+
 export interface RetrievalRun {
   id: string;
   label: string;
   description: string;
   file: string;
   generated_at: string;
+  dataset?: string | null;
   corpus_docs: number | null;
   query_count: number | null;
   depth: number;
+  config?: RetrievalRunConfig;
   metrics: RankMetrics;
   stored_metrics: { recall_at_1: number | null; recall_at_4: number | null; mrr: number | null };
   rank_distribution: Record<string, number>;
   categories: Record<string, RankMetrics>;
   safety: Record<string, SafetyCheck>;
+}
+
+export interface RetrievalReportStatus {
+  directory: string;
+  directory_exists: boolean;
+  expected_glob: string;
+  dataset: string;
+  report_files: string[];
+  valid_runs: number;
+  missing_message: string | null;
 }
 
 export interface EmbeddingRun {
@@ -89,6 +108,7 @@ export interface KnowledgeBaseStatus {
 export interface EvaluationOverview {
   knowledge_base: KnowledgeBaseStatus;
   retrieval_runs: RetrievalRun[];
+  retrieval_report_status?: RetrievalReportStatus;
   embedding_comparison: EmbeddingRun[];
   quality_reports: QualityReport[];
   grounding: GroundingSummary | null;

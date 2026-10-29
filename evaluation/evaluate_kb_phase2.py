@@ -116,10 +116,20 @@ def evaluate(k: int = 4) -> dict:
         if detail["rank"] is not None:
             by_category[row["category"]]["hit4"] += 1
 
+    from src import config as app_config
+
     return {
         "corpus_docs": len(docs),
         "query_count": len(QUERIES),
         "retrieval_n": len(retrieval_rows),
+        "dataset": "kb_expansion_phase2.jsonl",
+        "config": {
+            "embedding_mode": app_config.EMBEDDING_MODE,
+            "embedding_backend": getattr(app_config, "EMBEDDING_BACKEND", "sentence_transformers"),
+            "rerank_enabled": app_config.RERANK_ENABLED,
+            "top_k": k,
+            "dataset": "kb_expansion_phase2.jsonl",
+        },
         "missing_labels": missing_labels,
         "recall@1": hits_at_1 / n,
         "recall@4": hits_at_k / n,

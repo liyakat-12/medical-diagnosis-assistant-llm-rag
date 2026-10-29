@@ -28,10 +28,12 @@ data/vector_store_general/
 data/vector_store_medical/
 data/processed/*.json
 
-# Evaluation outputs
+# Evaluation outputs (ephemeral local runs stay untracked)
 evaluation/results/*.csv
 evaluation/results/*.json
 !evaluation/results/.gitkeep
+# Packaged production retrieval report for the Evaluation Dashboard / Docker image
+!evaluation/results/kb_phase2_production.json
 
 # IDE
 .vscode/

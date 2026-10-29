@@ -1,0 +1,1344 @@
+{
+  "corpus_docs": 1017,
+  "query_count": 122,
+  "retrieval_n": 103,
+  "dataset": "kb_expansion_phase2.jsonl",
+  "config": {
+    "embedding_mode": "general",
+    "embedding_backend": "fastembed",
+    "rerank_enabled": false,
+    "top_k": 4,
+    "dataset": "kb_expansion_phase2.jsonl"
+  },
+  "missing_labels": [],
+  "recall@1": 0.8349514563106796,
+  "recall@4": 0.970873786407767,
+  "mrr": 0.8972491909385114,
+  "citation_rate": 1.0,
+  "retrieval_misses": [
+    {
+      "id": "c06",
+      "query": "I have a wheezy cough and a tight chest",
+      "retrieved": [
+        "cough_with_mucus",
+        "back_pain_after_coughing",
+        "wheeze_after_cold",
+        "cough_after_exercise"
+      ],
+      "expected": [
+        "asthma_mild",
+        "what_is_asthma_simple",
+        "exercise_induced_asthma"
+      ]
+    },
+    {
+      "id": "d19",
+      "query": "My big toe is red hot and extremely painful overnight",
+      "retrieved": [
+        "big_toe_joint_ache",
+        "ingrown_toenail_pain_note",
+        "flip_flop_toe_pain",
+        "new_shoes_sore_feet"
+      ],
+      "expected": [
+        "gout"
+      ]
+    },
+    {
+      "id": "r03",
+      "query": "What is Kawasaki disease?",
+      "retrieved": [
+        "fifth_disease",
+        "diphtheria",
+        "leprosy",
+        "shigellosis"
+      ],
+      "expected": [
+        "kawasaki_disease"
+      ]
+    }
+  ],
+  "category_recall@4": {
+    "combo": 0.9166666666666666,
+    "condition": 0.95,
+    "life_stage": 1.0,
+    "medication": 1.0,
+    "prevention": 1.0,
+    "rare": 0.8333333333333334,
+    "symptom": 1.0,
+    "synonym": 1.0
+  },
+  "safety": {
+    "emergency": {
+      "n": 9,
+      "passed": 9,
+      "failed": []
+    },
+    "prescription": {
+      "n": 3,
+      "passed": 3,
+      "failed": []
+    },
+    "out_of_scope": {
+      "n": 4,
+      "passed": 4,
+      "failed": []
+    },
+    "isolation": {
+      "n": 3,
+      "passed": 3,
+      "failed": []
+    },
+    "absent": {
+      "n": 0,
+      "passed": 0,
+      "failed": []
+    }
+  },
+  "gaps": [],
+  "counts": {
+    "retrieval": 103,
+    "prescription": 3,
+    "isolation": 3,
+    "emergency": 9,
+    "out_of_scope": 4
+  },
+  "per_query": [
+    {
+      "id": "s01",
+      "category": "symptom",
+      "query": "I have a headache after a long day at the screen",
+      "rank": 1,
+      "retrieved": [
+        "headache_after_screens",
+        "exam_eye_ache",
+        "neck_pain_after_desk_work",
+        "school_exam_headache"
+      ]
+    },
+    {
+      "id": "s02",
+      "category": "symptom",
+      "query": "What is a fever?",
+      "rank": 1,
+      "retrieved": [
+        "what_is_a_fever",
+        "low_grade_fever",
+        "headache_with_fever",
+        "when_fever_needs_a_doctor"
+      ]
+    },
+    {
+      "id": "s03",
+      "category": "symptom",
+      "query": "I have a dry cough at night",
+      "rank": 1,
+      "retrieved": [
+        "dry_cough_at_night",
+        "differential_cough",
+        "cough_worse_lying_down",
+        "tuberculosis"
+      ]
+    },
+    {
+      "id": "s04",
+      "category": "symptom",
+      "query": "My throat is sore and scratchy",
+      "rank": 2,
+      "retrieved": [
+        "sore_throat_dry_air",
+        "viral_sore_throat",
+        "self_care_sore_throat",
+        "sore_throat_morning"
+      ]
+    },
+    {
+      "id": "s05",
+      "category": "symptom",
+      "query": "I feel exhausted all the time",
+      "rank": 1,
+      "retrieved": [
+        "differential_fatigue",
+        "cricket_match_dehydration",
+        "chronic_fatigue_syndrome",
+        "weakness_after_viral"
+      ]
+    },
+    {
+      "id": "s06",
+      "category": "symptom",
+      "query": "I get dizzy when I stand up quickly",
+      "rank": 1,
+      "retrieved": [
+        "postural_hypotension",
+        "vertigo",
+        "differential_dizzy",
+        "spinning_vertigo_bed"
+      ]
+    },
+    {
+      "id": "s07",
+      "category": "symptom",
+      "query": "I feel nauseous but I am not vomiting",
+      "rank": 1,
+      "retrieved": [
+        "nausea_without_vomiting",
+        "nausea_anxiety",
+        "morning_nausea",
+        "vomiting_stomach_bug"
+      ]
+    },
+    {
+      "id": "s08",
+      "category": "symptom",
+      "query": "I have diarrhoea after a meal out",
+      "rank": 1,
+      "retrieved": [
+        "diarrhea_after_meal",
+        "food_related_upset",
+        "food_poisoning_cramps",
+        "diarrhoea_when_travelling"
+      ]
+    },
+    {
+      "id": "s09",
+      "category": "symptom",
+      "query": "I have not had a bowel movement for days and the stools are hard",
+      "rank": 2,
+      "retrieved": [
+        "stool_hard_then_loose",
+        "constipation_hard_stools",
+        "constipation_when_travelling",
+        "straining_on_toilet"
+      ]
+    },
+    {
+      "id": "s10",
+      "category": "symptom",
+      "query": "My tummy hurts in the lower part",
+      "rank": 2,
+      "retrieved": [
+        "belly_button_ache",
+        "abdominal_pain_lower",
+        "stress_upset_stomach",
+        "tummy_ache_left"
+      ]
+    },
+    {
+      "id": "s11",
+      "category": "symptom",
+      "query": "I have lower back pain after sitting",
+      "rank": 1,
+      "retrieved": [
+        "lower_back_pain_after_sitting",
+        "muscle_pain_after_sitting",
+        "lower_back_pain_standing",
+        "sit_bone_pain"
+      ]
+    },
+    {
+      "id": "s12",
+      "category": "symptom",
+      "query": "My joints ache in cold weather",
+      "rank": 1,
+      "retrieved": [
+        "joint_pain_cold_weather",
+        "what_is_joint_wear",
+        "osteoarthritis",
+        "joint_stiffness_morning"
+      ]
+    },
+    {
+      "id": "s13",
+      "category": "symptom",
+      "query": "I have a mild itchy rash",
+      "rank": 1,
+      "retrieved": [
+        "dry_itchy_skin",
+        "differential_rash",
+        "contact_dermatitis",
+        "eczema"
+      ]
+    },
+    {
+      "id": "s14",
+      "category": "symptom",
+      "query": "My skin is very itchy and dry",
+      "rank": 2,
+      "retrieved": [
+        "dry_skin",
+        "dry_itchy_skin",
+        "dry_skin_winter",
+        "eczema"
+      ]
+    },
+    {
+      "id": "s15",
+      "category": "symptom",
+      "query": "It burns when I urinate",
+      "rank": 1,
+      "retrieved": [
+        "burning_when_urinating",
+        "urethritis",
+        "what_is_a_uti_simple",
+        "urinary_tract_infection"
+      ]
+    },
+    {
+      "id": "c01",
+      "category": "combo",
+      "query": "I have a fever and a sore throat",
+      "rank": 1,
+      "retrieved": [
+        "sore_throat_and_fever",
+        "viral_sore_throat",
+        "common_cold_vs_flu",
+        "differential_sore_throat"
+      ]
+    },
+    {
+      "id": "c02",
+      "category": "combo",
+      "query": "What can cause a headache with nausea?",
+      "rank": 1,
+      "retrieved": [
+        "headache_with_nausea",
+        "nausea_anxiety",
+        "differential_headache",
+        "nausea_without_vomiting"
+      ]
+    },
+    {
+      "id": "c03",
+      "category": "combo",
+      "query": "Fever, cough, and a sore throat for two days",
+      "rank": 1,
+      "retrieved": [
+        "sore_throat_and_fever",
+        "viral_sore_throat",
+        "mild_viral_illness",
+        "recovering_from_cold"
+      ]
+    },
+    {
+      "id": "c04",
+      "category": "combo",
+      "query": "It burns when I pee and I have fever and pain in my side",
+      "rank": 2,
+      "retrieved": [
+        "what_is_a_uti_simple",
+        "burning_when_urinating",
+        "urinary_tract_infection",
+        "urethritis"
+      ]
+    },
+    {
+      "id": "c05",
+      "category": "combo",
+      "query": "I get burning in my chest after meals",
+      "rank": 2,
+      "retrieved": [
+        "pain_after_spicy_food",
+        "heartburn_after_meals",
+        "tea_empty_stomach",
+        "gerd"
+      ]
+    },
+    {
+      "id": "c06",
+      "category": "combo",
+      "query": "I have a wheezy cough and a tight chest",
+      "rank": null,
+      "retrieved": [
+        "cough_with_mucus",
+        "back_pain_after_coughing",
+        "wheeze_after_cold",
+        "cough_after_exercise"
+      ]
+    },
+    {
+      "id": "c07",
+      "category": "combo",
+      "query": "I've been throwing up and have watery diarrhea since last night",
+      "rank": 1,
+      "retrieved": [
+        "mild_gastroenteritis",
+        "diarrhea_after_meal",
+        "vomiting_stomach_bug",
+        "travel_diarrhea"
+      ]
+    },
+    {
+      "id": "c08",
+      "category": "combo",
+      "query": "Pain shoots down my leg when I sit",
+      "rank": 1,
+      "retrieved": [
+        "sciatica_when_sitting",
+        "auto_rickshaw_jolt",
+        "sciatica",
+        "muscle_pain_after_sitting"
+      ]
+    },
+    {
+      "id": "c09",
+      "category": "combo",
+      "query": "I am very thirsty and peeing a lot",
+      "rank": 2,
+      "retrieved": [
+        "dehydration",
+        "what_is_high_sugar_simple",
+        "high_sugar_thirst",
+        "frequent_urination"
+      ]
+    },
+    {
+      "id": "c10",
+      "category": "combo",
+      "query": "Cough with mucus, fever, chills, and chest pain when I breathe in",
+      "rank": 1,
+      "retrieved": [
+        "pneumonia",
+        "cough_with_mucus",
+        "rib_pain_after_coughing",
+        "back_pain_after_coughing"
+      ]
+    },
+    {
+      "id": "c11",
+      "category": "combo",
+      "query": "I have a swollen painful calf after a long flight and now I feel breathless",
+      "rank": 1,
+      "retrieved": [
+        "red_flag_leg_clot",
+        "train_seat_stiff",
+        "calf_tight_morning",
+        "swollen_ankles_evening"
+      ]
+    },
+    {
+      "id": "c12",
+      "category": "combo",
+      "query": "Fever and body aches after getting wet in the rain",
+      "rank": 1,
+      "retrieved": [
+        "monsoon_viral_fever",
+        "fever_after_rain_outing",
+        "fever_and_body_aches",
+        "body_aches_no_fever"
+      ]
+    },
+    {
+      "id": "d01",
+      "category": "condition",
+      "query": "What is a common cold?",
+      "rank": 1,
+      "retrieved": [
+        "common_cold",
+        "common_cold_vs_flu",
+        "influenza",
+        "covid_19"
+      ]
+    },
+    {
+      "id": "d02",
+      "category": "condition",
+      "query": "What is influenza?",
+      "rank": 1,
+      "retrieved": [
+        "influenza",
+        "common_cold_vs_flu",
+        "fever_and_body_aches",
+        "covid_19"
+      ]
+    },
+    {
+      "id": "d03",
+      "category": "condition",
+      "query": "What is asthma?",
+      "rank": 1,
+      "retrieved": [
+        "asthma_mild",
+        "what_is_asthma_simple",
+        "dry_cough_smoke",
+        "exercise_induced_asthma"
+      ]
+    },
+    {
+      "id": "d04",
+      "category": "condition",
+      "query": "What is acid reflux or GERD?",
+      "rank": 1,
+      "retrieved": [
+        "gerd",
+        "what_is_acidity_simple",
+        "barretts_esophagus",
+        "acidity_burning_chest"
+      ]
+    },
+    {
+      "id": "d05",
+      "category": "condition",
+      "query": "What is high blood pressure?",
+      "rank": 1,
+      "retrieved": [
+        "hypertension",
+        "what_is_high_bp_simple",
+        "postural_hypotension",
+        "headache_pressure_eyes"
+      ]
+    },
+    {
+      "id": "d06",
+      "category": "condition",
+      "query": "What is type 2 diabetes?",
+      "rank": 1,
+      "retrieved": [
+        "type2_diabetes",
+        "type1_diabetes",
+        "prediabetes",
+        "gestational_diabetes"
+      ]
+    },
+    {
+      "id": "d07",
+      "category": "condition",
+      "query": "What is a urinary tract infection?",
+      "rank": 1,
+      "retrieved": [
+        "urinary_tract_infection",
+        "pyelonephritis",
+        "urethritis",
+        "what_is_a_uti_simple"
+      ]
+    },
+    {
+      "id": "d08",
+      "category": "condition",
+      "query": "What is a migraine?",
+      "rank": 1,
+      "retrieved": [
+        "migraine",
+        "what_is_a_migraine_simple",
+        "migraine_light_sound",
+        "tension_headache"
+      ]
+    },
+    {
+      "id": "d09",
+      "category": "condition",
+      "query": "What is pneumonia?",
+      "rank": 1,
+      "retrieved": [
+        "pneumonia",
+        "cough_with_mucus",
+        "copd",
+        "covid_19"
+      ]
+    },
+    {
+      "id": "d10",
+      "category": "condition",
+      "query": "What is COVID-19?",
+      "rank": 1,
+      "retrieved": [
+        "covid_19",
+        "influenza",
+        "hiv",
+        "chikungunya"
+      ]
+    },
+    {
+      "id": "d11",
+      "category": "condition",
+      "query": "What is iron deficiency anaemia?",
+      "rank": 1,
+      "retrieved": [
+        "anemia",
+        "thalassemia",
+        "what_is_anaemia_simple",
+        "iron_deficiency_symptoms"
+      ]
+    },
+    {
+      "id": "d12",
+      "category": "condition",
+      "query": "What is hypothyroidism?",
+      "rank": 2,
+      "retrieved": [
+        "graves_disease",
+        "hashimotos",
+        "hyperthyroidism",
+        "hypothyroidism"
+      ]
+    },
+    {
+      "id": "d13",
+      "category": "condition",
+      "query": "I have felt sad and empty most days for weeks",
+      "rank": 1,
+      "retrieved": [
+        "seasonal_affective_disorder",
+        "depression",
+        "daytime_fatigue",
+        "when_to_see_doctor_weight_loss"
+      ]
+    },
+    {
+      "id": "d14",
+      "category": "condition",
+      "query": "I cannot get to sleep at night",
+      "rank": 1,
+      "retrieved": [
+        "difficulty_sleeping",
+        "fatigue_after_poor_sleep",
+        "self_care_sleep_routine",
+        "night_shift_body_ache"
+      ]
+    },
+    {
+      "id": "d15",
+      "category": "condition",
+      "query": "What is osteoarthritis?",
+      "rank": 1,
+      "retrieved": [
+        "osteoarthritis",
+        "what_is_joint_wear",
+        "rheumatoid_arthritis",
+        "joint_stiffness_morning"
+      ]
+    },
+    {
+      "id": "d16",
+      "category": "condition",
+      "query": "What is eczema?",
+      "rank": 1,
+      "retrieved": [
+        "eczema",
+        "actinic_keratosis",
+        "seborrheic_dermatitis",
+        "contact_dermatitis"
+      ]
+    },
+    {
+      "id": "d17",
+      "category": "condition",
+      "query": "What is irritable bowel syndrome?",
+      "rank": 3,
+      "retrieved": [
+        "constipation",
+        "constipation_painkillers",
+        "ibs",
+        "ulcerative_colitis"
+      ]
+    },
+    {
+      "id": "d18",
+      "category": "condition",
+      "query": "What are kidney stones?",
+      "rank": 1,
+      "retrieved": [
+        "kidney_stones",
+        "what_is_a_stone_pain",
+        "bladder_stones",
+        "nephrotic_syndrome"
+      ]
+    },
+    {
+      "id": "d19",
+      "category": "condition",
+      "query": "My big toe is red hot and extremely painful overnight",
+      "rank": null,
+      "retrieved": [
+        "big_toe_joint_ache",
+        "ingrown_toenail_pain_note",
+        "flip_flop_toe_pain",
+        "new_shoes_sore_feet"
+      ]
+    },
+    {
+      "id": "d20",
+      "category": "condition",
+      "query": "What is COPD?",
+      "rank": 1,
+      "retrieved": [
+        "copd",
+        "pulmonary_embolism",
+        "asthma_mild",
+        "pneumonia"
+      ]
+    },
+    {
+      "id": "p01",
+      "category": "prevention",
+      "query": "How can I prevent food poisoning at home?",
+      "rank": 1,
+      "retrieved": [
+        "food_safety_at_home",
+        "food_poisoning_mild",
+        "food_safety_at_home",
+        "food_related_upset"
+      ]
+    },
+    {
+      "id": "p02",
+      "category": "prevention",
+      "query": "Which vaccines should adults have?",
+      "rank": 1,
+      "retrieved": [
+        "adult_vaccination_overview",
+        "adult_vaccination_overview",
+        "vaccination_sore_arm",
+        "whooping_cough"
+      ]
+    },
+    {
+      "id": "p03",
+      "category": "prevention",
+      "query": "When should I have a smear test?",
+      "rank": 1,
+      "retrieved": [
+        "cervical_screening",
+        "bowel_cancer_screening",
+        "cervical_screening",
+        "breast_cancer_warning"
+      ]
+    },
+    {
+      "id": "p04",
+      "category": "prevention",
+      "query": "What is a mammogram and who is invited?",
+      "rank": 1,
+      "retrieved": [
+        "breast_screening",
+        "breast_lump",
+        "fibroadenoma",
+        "breast_cancer_warning"
+      ]
+    },
+    {
+      "id": "p05",
+      "category": "prevention",
+      "query": "How does bowel cancer screening work with a FIT kit?",
+      "rank": 1,
+      "retrieved": [
+        "bowel_cancer_screening",
+        "breast_screening",
+        "cervical_screening",
+        "colorectal_cancer_warning"
+      ]
+    },
+    {
+      "id": "p06",
+      "category": "prevention",
+      "query": "What is the winter vomiting bug?",
+      "rank": 1,
+      "retrieved": [
+        "norovirus",
+        "roundworm",
+        "festival_food_stomach",
+        "vomiting_stomach_bug"
+      ]
+    },
+    {
+      "id": "p07",
+      "category": "prevention",
+      "query": "How should I wash my hands to reduce infections?",
+      "rank": 2,
+      "retrieved": [
+        "dry_hands_washing",
+        "self_care_hand_washing",
+        "detergent_hand_rash",
+        "winter_finger_cracks"
+      ]
+    },
+    {
+      "id": "p08",
+      "category": "prevention",
+      "query": "How do I treat a sunburn on my shoulders?",
+      "rank": 1,
+      "retrieved": [
+        "sunburn_shoulders",
+        "sunburn",
+        "beach_foot_sunburn",
+        "sun_safety_prevention"
+      ]
+    },
+    {
+      "id": "p09",
+      "category": "prevention",
+      "query": "Does the HPV vaccine replace cervical screening?",
+      "rank": 1,
+      "retrieved": [
+        "cervical_screening",
+        "hpv_infection",
+        "adult_vaccination_overview",
+        "adult_vaccination_overview"
+      ]
+    },
+    {
+      "id": "p10",
+      "category": "prevention",
+      "query": "I am pregnant and worried about listeria from soft cheese",
+      "rank": 1,
+      "retrieved": [
+        "listeriosis",
+        "listeriosis",
+        "food_safety_at_home",
+        "rubella_note"
+      ]
+    },
+    {
+      "id": "p11",
+      "category": "prevention",
+      "query": "How can I quit smoking?",
+      "rank": 1,
+      "retrieved": [
+        "smoking_cessation",
+        "nicotine_dependence",
+        "diwali_smoke_cough",
+        "copd"
+      ]
+    },
+    {
+      "id": "p12",
+      "category": "prevention",
+      "query": "How can I protect my skin from the sun to lower skin cancer risk?",
+      "rank": 1,
+      "retrieved": [
+        "sun_safety_prevention",
+        "sunburn",
+        "actinic_keratosis",
+        "sunburn_shoulders"
+      ]
+    },
+    {
+      "id": "m01",
+      "category": "medication",
+      "query": "I started a blood pressure tablet and now I have a dry tickly cough",
+      "rank": 1,
+      "retrieved": [
+        "dry_cough_ace_note",
+        "tickly_throat_cough",
+        "cough_worse_lying_down",
+        "dry_cough_at_night"
+      ]
+    },
+    {
+      "id": "m02",
+      "category": "medication",
+      "query": "I have diarrhoea after a course of antibiotics",
+      "rank": 1,
+      "retrieved": [
+        "diarrhoea_after_antibiotics",
+        "c_difficile",
+        "diarrhea_after_meal",
+        "what_is_a_common_virus"
+      ]
+    },
+    {
+      "id": "m03",
+      "category": "medication",
+      "query": "I have itching after antibiotics that may be thrush",
+      "rank": 1,
+      "retrieved": [
+        "yeast_itch_after_antibiotics",
+        "yeast_infection",
+        "oral_thrush",
+        "white_tongue_coating"
+      ]
+    },
+    {
+      "id": "m04",
+      "category": "medication",
+      "query": "Codeine pain tablets made me constipated",
+      "rank": 1,
+      "retrieved": [
+        "constipation_painkillers",
+        "constipation",
+        "constipation_when_travelling",
+        "straining_on_toilet"
+      ]
+    },
+    {
+      "id": "m05",
+      "category": "medication",
+      "query": "Should I take antibiotics for a common cold?",
+      "rank": 1,
+      "retrieved": [
+        "common_cold_vs_flu",
+        "common_cold",
+        "what_is_a_common_virus",
+        "cough_with_mucus"
+      ]
+    },
+    {
+      "id": "m08",
+      "category": "medication",
+      "query": "Is ibuprofen safe if I have a stomach ulcer?",
+      "rank": 1,
+      "retrieved": [
+        "ibuprofen_nsaid_safety",
+        "ibuprofen_nsaid_safety",
+        "peptic_ulcer",
+        "gastritis"
+      ]
+    },
+    {
+      "id": "m09",
+      "category": "medication",
+      "query": "Can I give a child aspirin for a fever?",
+      "rank": 1,
+      "retrieved": [
+        "aspirin_and_children",
+        "child_fever_note",
+        "seasonal_flu_self_care",
+        "aspirin_and_children"
+      ]
+    },
+    {
+      "id": "m10",
+      "category": "medication",
+      "query": "What are the risks of taking too much paracetamol?",
+      "rank": 1,
+      "retrieved": [
+        "paracetamol_safety",
+        "ibuprofen_nsaid_safety",
+        "paracetamol_safety",
+        "ibuprofen_nsaid_safety"
+      ]
+    },
+    {
+      "id": "m11",
+      "category": "medication",
+      "query": "Which everyday pain medicines are safer in pregnancy?",
+      "rank": 1,
+      "retrieved": [
+        "medicines_in_pregnancy",
+        "paracetamol_safety",
+        "ibuprofen_nsaid_safety",
+        "aspirin_and_children"
+      ]
+    },
+    {
+      "id": "l01",
+      "category": "life_stage",
+      "query": "When does a child with fever need a doctor?",
+      "rank": 1,
+      "retrieved": [
+        "child_fever_note",
+        "when_fever_needs_a_doctor",
+        "hand_foot_mouth_disease",
+        "when_to_see_doctor_fever"
+      ]
+    },
+    {
+      "id": "l02",
+      "category": "life_stage",
+      "query": "My toddler had a seizure with a high fever",
+      "rank": 1,
+      "retrieved": [
+        "febrile_seizure",
+        "child_fever_note",
+        "hand_foot_mouth_disease",
+        "when_fever_needs_a_doctor"
+      ]
+    },
+    {
+      "id": "l03",
+      "category": "life_stage",
+      "query": "My baby has a red sore nappy rash",
+      "rank": 1,
+      "retrieved": [
+        "diaper_rash",
+        "eczema",
+        "perfume_wrist_rash",
+        "child_fever_note"
+      ]
+    },
+    {
+      "id": "l04",
+      "category": "life_stage",
+      "query": "My baby cries for hours every evening and draws the knees up",
+      "rank": 1,
+      "retrieved": [
+        "infant_colic",
+        "postpartum_depression",
+        "lifting_toddler_back",
+        "growing_pains_kids"
+      ]
+    },
+    {
+      "id": "l05",
+      "category": "life_stage",
+      "query": "I have morning sickness in pregnancy",
+      "rank": 4,
+      "retrieved": [
+        "morning_nausea",
+        "hyperemesis_gravidarum",
+        "morning_sickness",
+        "pregnancy_nausea_note"
+      ]
+    },
+    {
+      "id": "l06",
+      "category": "life_stage",
+      "query": "I am 28 weeks pregnant with a new severe headache, facial swelling, and high blood pressure",
+      "rank": 1,
+      "retrieved": [
+        "preeclampsia",
+        "medicines_in_pregnancy",
+        "hydrocephalus",
+        "forehead_pressure_pain"
+      ]
+    },
+    {
+      "id": "l07",
+      "category": "life_stage",
+      "query": "An older adult in my family keeps falling",
+      "rank": 1,
+      "retrieved": [
+        "older_adult_fall_note",
+        "osteoporosis",
+        "dislocated_shoulder",
+        "red_flag_stroke"
+      ]
+    },
+    {
+      "id": "l08",
+      "category": "life_stage",
+      "query": "What is dementia, and is it a normal part of ageing?",
+      "rank": 1,
+      "retrieved": [
+        "dementia",
+        "alzheimers",
+        "huntingtons",
+        "delirium"
+      ]
+    },
+    {
+      "id": "l09",
+      "category": "life_stage",
+      "query": "What is osteoporosis?",
+      "rank": 1,
+      "retrieved": [
+        "osteoporosis",
+        "rickets",
+        "osteoarthritis",
+        "obesity"
+      ]
+    },
+    {
+      "id": "l10",
+      "category": "life_stage",
+      "query": "My newborn looks yellow on day two",
+      "rank": 1,
+      "retrieved": [
+        "neonatal_jaundice",
+        "yellow_eyes_jaundice",
+        "itchy_skin_with_yellow_eyes",
+        "sticky_eyes_morning"
+      ]
+    },
+    {
+      "id": "l11",
+      "category": "life_stage",
+      "query": "My toddler has ear pain, a fever, and is pulling at one ear after a cold",
+      "rank": 1,
+      "retrieved": [
+        "ear_infection",
+        "when_fever_needs_a_doctor",
+        "ear_pain_when_chewing",
+        "child_fever_note"
+      ]
+    },
+    {
+      "id": "l12",
+      "category": "life_stage",
+      "query": "My father became suddenly confused over a few hours in hospital. Is that dementia?",
+      "rank": 1,
+      "retrieved": [
+        "dementia",
+        "alzheimers",
+        "delirium",
+        "delirium"
+      ]
+    },
+    {
+      "id": "r01",
+      "category": "rare",
+      "query": "What causes Fabry disease?",
+      "rank": 1,
+      "retrieved": [
+        "fabry_disease",
+        "gaucher_disease",
+        "acromegaly",
+        "thalassemia"
+      ]
+    },
+    {
+      "id": "r02",
+      "category": "rare",
+      "query": "What is Huntington's disease?",
+      "rank": 1,
+      "retrieved": [
+        "huntingtons",
+        "parkinsons",
+        "adhd",
+        "fabry_disease"
+      ]
+    },
+    {
+      "id": "r03",
+      "category": "rare",
+      "query": "What is Kawasaki disease?",
+      "rank": null,
+      "retrieved": [
+        "fifth_disease",
+        "diphtheria",
+        "leprosy",
+        "shigellosis"
+      ]
+    },
+    {
+      "id": "r04",
+      "category": "rare",
+      "query": "My eyelids droop and I get double vision that is worse by evening",
+      "rank": 3,
+      "retrieved": [
+        "double_vision_warning",
+        "drooping_eyelid",
+        "myasthenia_gravis",
+        "sudden_vision_loss_warning"
+      ]
+    },
+    {
+      "id": "r05",
+      "category": "rare",
+      "query": "Weakness starting in both feet and climbing up my legs after a stomach bug",
+      "rank": 1,
+      "retrieved": [
+        "guillain_barre",
+        "festival_food_stomach",
+        "long_queue_leg_ache",
+        "vomiting_stomach_bug"
+      ]
+    },
+    {
+      "id": "r06",
+      "category": "rare",
+      "query": "What is Gaucher disease?",
+      "rank": 1,
+      "retrieved": [
+        "gaucher_disease",
+        "gaucher_disease",
+        "fabry_disease",
+        "thalassemia"
+      ]
+    },
+    {
+      "id": "y01",
+      "category": "synonym",
+      "query": "stomach flu vomiting and diarrhoea suddenly",
+      "rank": 1,
+      "retrieved": [
+        "mild_gastroenteritis",
+        "vomiting_stomach_bug",
+        "norovirus",
+        "festival_food_stomach"
+      ]
+    },
+    {
+      "id": "y02",
+      "category": "synonym",
+      "query": "hay fever itchy eyes and sneezing in spring",
+      "rank": 1,
+      "retrieved": [
+        "hay_fever_itchy_eyes",
+        "seasonal_allergies",
+        "scratchy_throat_allergies",
+        "itchy_eyes_pollen"
+      ]
+    },
+    {
+      "id": "y03",
+      "category": "synonym",
+      "query": "What are piles?",
+      "rank": 1,
+      "retrieved": [
+        "what_is_piles_simple",
+        "itchy_bottom",
+        "straining_on_toilet",
+        "blood_on_toilet_paper"
+      ]
+    },
+    {
+      "id": "y04",
+      "category": "synonym",
+      "query": "My high BP monitor keeps showing 148 over 95",
+      "rank": 2,
+      "retrieved": [
+        "exam_eye_ache",
+        "hypertension",
+        "what_is_high_bp_simple",
+        "bradycardia"
+      ]
+    },
+    {
+      "id": "y05",
+      "category": "synonym",
+      "query": "I think I have a sugar problem, I am thirsty all the time",
+      "rank": 1,
+      "retrieved": [
+        "what_is_high_sugar_simple",
+        "what_is_low_sugar_simple",
+        "high_sugar_thirst",
+        "type2_diabetes"
+      ]
+    },
+    {
+      "id": "y06",
+      "category": "synonym",
+      "query": "I think I have cystitis, it stings when I pee",
+      "rank": 1,
+      "retrieved": [
+        "urinary_tract_infection",
+        "burning_when_urinating",
+        "burning_after_sex_urine",
+        "what_is_a_uti_simple"
+      ]
+    },
+    {
+      "id": "y07",
+      "category": "synonym",
+      "query": "smear test HPV cervix screening",
+      "rank": 1,
+      "retrieved": [
+        "cervical_screening",
+        "hpv_infection",
+        "bowel_cancer_screening",
+        "cervical_screening"
+      ]
+    },
+    {
+      "id": "y08",
+      "category": "synonym",
+      "query": "home stool test for hidden blood FIT",
+      "rank": 1,
+      "retrieved": [
+        "bowel_cancer_screening",
+        "bowel_cancer_screening",
+        "colon_polyps",
+        "stool_hard_then_loose"
+      ]
+    },
+    {
+      "id": "y09",
+      "category": "synonym",
+      "query": "I have a band-like pressure headache from stress",
+      "rank": 1,
+      "retrieved": [
+        "tension_headache",
+        "forehead_pressure_pain",
+        "upper_trap_ache",
+        "differential_headache"
+      ]
+    },
+    {
+      "id": "y10",
+      "category": "synonym",
+      "query": "Why does my knee hurt when I climb stairs?",
+      "rank": 1,
+      "retrieved": [
+        "knee_pain_stairs",
+        "knee_pain_walking",
+        "knee_pain_downhill",
+        "floor_sitting_knee"
+      ]
+    },
+    {
+      "id": "y11",
+      "category": "synonym",
+      "query": "I get a migrane with light hurting my eyes",
+      "rank": 1,
+      "retrieved": [
+        "migraine",
+        "flashing_lights_warning",
+        "light_hurts_eyes",
+        "exam_eye_ache"
+      ]
+    },
+    {
+      "id": "y12",
+      "category": "synonym",
+      "query": "I have diarrea after a meal out",
+      "rank": 1,
+      "retrieved": [
+        "diarrhea_after_meal",
+        "food_related_upset",
+        "food_poisoning_cramps",
+        "diarrhoea_when_travelling"
+      ]
+    },
+    {
+      "id": "y13",
+      "category": "synonym",
+      "query": "What is ashtma?",
+      "rank": 1,
+      "retrieved": [
+        "asthma_mild",
+        "what_is_asthma_simple",
+        "dry_cough_smoke",
+        "exercise_induced_asthma"
+      ]
+    },
+    {
+      "id": "y14",
+      "category": "synonym",
+      "query": "What is hypertention?",
+      "rank": 1,
+      "retrieved": [
+        "hypertension",
+        "postural_hypotension",
+        "what_is_high_bp_simple",
+        "headache_pressure_eyes"
+      ]
+    },
+    {
+      "id": "y15",
+      "category": "synonym",
+      "query": "I have ringworm on my arm",
+      "rank": 1,
+      "retrieved": [
+        "ringworm",
+        "ringworm_on_body",
+        "toddler_tummy_worms",
+        "pinworm"
+      ]
+    },
+    {
+      "id": "y16",
+      "category": "synonym",
+      "query": "Pins and needles burning in both feet at night and I have diabetes",
+      "rank": 1,
+      "retrieved": [
+        "peripheral_neuropathy",
+        "diabetic_neuropathy",
+        "numbness_foot",
+        "diabetes_foot_sore"
+      ]
+    },
+    {
+      "id": "y17",
+      "category": "synonym",
+      "query": "I twisted my ankle playing sport",
+      "rank": 2,
+      "retrieved": [
+        "football_ankle_twist_note",
+        "sports_day_sprain",
+        "minor_sprain_self_care",
+        "ankle_pain_after_twist"
+      ]
+    }
+  ]
+}

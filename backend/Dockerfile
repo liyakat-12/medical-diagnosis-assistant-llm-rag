@@ -23,12 +23,16 @@ RUN pip install --no-cache-dir -r requirements-prod.txt
 COPY backend ./backend
 COPY knowledge_base ./knowledge_base
 COPY scripts ./scripts
+COPY evaluation ./evaluation
 
-RUN mkdir -p "$HF_HOME" "$SENTENCE_TRANSFORMERS_HOME" \
+RUN mkdir -p "$HF_HOME" "$SENTENCE_TRANSFORMERS_HOME" evaluation/results \
     && EMBEDDING_BACKEND=fastembed EMBEDDING_MODE=general RERANK_ENABLED=false \
        python scripts/build_index.py general \
     && EMBEDDING_BACKEND=fastembed EMBEDDING_MODE=general RERANK_ENABLED=false \
-       python -c "from src.retrieval.retriever import retrieve; hits = retrieve('persistent cough', mode='general'); assert hits, 'general Chroma index is empty after Docker build'"
+       python -c "from src.retrieval.retriever import retrieve; hits = retrieve('persistent cough', mode='general'); assert hits, 'general Chroma index is empty after Docker build'" \
+    && EMBEDDING_BACKEND=fastembed EMBEDDING_MODE=general RERANK_ENABLED=false \
+       python evaluation/evaluate_kb_phase2.py --out evaluation/results/kb_phase2_production.json \
+    && python -c "import json; from pathlib import Path; p=Path('evaluation/results/kb_phase2_production.json'); d=json.loads(p.read_text()); assert d.get('per_query'), 'evaluation report missing per_query'; print('eval_recall@4', d.get('recall@4'), 'mrr', d.get('mrr'))"
 
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

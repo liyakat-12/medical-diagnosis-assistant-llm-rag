@@ -145,8 +145,37 @@ function MetricsBlock({ state, run }: { state: AsyncState<EvaluationOverview>; r
     );
   }
   if (state.status === "error") return null;
-  if (!run) return <EmptyState title="No stored evaluation run is available." />;
-  return <MetricCards run={run} />;
+  if (!run) {
+    const message =
+      state.data.retrieval_report_status?.missing_message ??
+      "No stored retrieval evaluation report was found. Live chat retrieval is separate and is not charted here.";
+    return (
+      <EmptyState title="No stored evaluation run is available.">
+        <p>{message}</p>
+      </EmptyState>
+    );
+  }
+  const generated = run.generated_at ? new Date(run.generated_at).toLocaleString() : "unknown date";
+  const dataset = run.dataset || state.data.retrieval_report_status?.dataset || "kb_expansion_phase2.jsonl";
+  const mode = run.config?.embedding_mode ?? state.data.knowledge_base.embedding_mode;
+  const backend = run.config?.embedding_backend ?? "unknown";
+  const rerank = run.config?.rerank_enabled ?? state.data.knowledge_base.rerank_enabled;
+  return (
+    <div className="space-y-3">
+      <p className="text-sm leading-6 text-slate-600">
+        Dataset <span className="font-semibold text-slate-800">{dataset}</span>
+        {" · "}
+        Run date <span className="font-semibold text-slate-800">{generated}</span>
+        {" · "}
+        Index <span className="font-semibold text-slate-800">{mode}</span>
+        {" / "}
+        <span className="font-semibold text-slate-800">{backend}</span>
+        {rerank ? " with re-ranker" : " without re-ranker"}
+        . These scores measure document retrieval, not diagnostic accuracy.
+      </p>
+      <MetricCards run={run} />
+    </div>
+  );
 }
 
 function ChartCard({ children, className }: { children: ReactNode; className?: string }) {
@@ -164,7 +193,16 @@ function ChartsBlock({ state, run }: { state: AsyncState<EvaluationOverview>; ru
     );
   }
   if (state.status === "error") return null;
-  if (!run) return <EmptyState title="No stored evaluation run to chart." />;
+  if (!run) {
+    const message =
+      state.data.retrieval_report_status?.missing_message ??
+      "No stored retrieval evaluation report was found to chart. Generate kb_phase2_*.json with evaluation/evaluate_kb_phase2.py.";
+    return (
+      <EmptyState title="No stored evaluation run to chart.">
+        <p>{message}</p>
+      </EmptyState>
+    );
+  }
 
   const runs = state.data.retrieval_runs;
   const embeddings = state.data.embedding_comparison;

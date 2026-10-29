@@ -84,6 +84,57 @@ def test_missing_result_files_are_reported_as_missing(tmp_path):
     assert evaluation_service.embedding_comparison(tmp_path) == []
     assert evaluation_service.quality_reports(tmp_path) == []
     assert evaluation_service.grounding_summary(tmp_path) is None
+    status = evaluation_service.retrieval_report_status(tmp_path)
+    assert status["valid_runs"] == 0
+    assert status["report_files"] == []
+    assert "evaluate_kb_phase2.py" in (status["missing_message"] or "")
+    assert "Live chat retrieval telemetry" in (status["missing_message"] or "")
+
+
+def test_malformed_retrieval_reports_are_skipped(tmp_path):
+    (tmp_path / "kb_phase2_broken.json").write_text("{not-json", encoding="utf-8")
+    (tmp_path / "kb_phase2_empty.json").write_text(json.dumps({"recall@1": 1.0}), encoding="utf-8")
+    (tmp_path / "kb_phase2_not_object.json").write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+    _write_run(
+        tmp_path,
+        "ok",
+        [{"id": "q1", "category": "symptom", "query": "fever", "rank": 1, "retrieved": ["what_is_a_fever"]}],
+    )
+    runs = evaluation_service.retrieval_runs(tmp_path)
+    assert [run["id"] for run in runs] == ["ok"]
+    status = evaluation_service.retrieval_report_status(tmp_path)
+    assert status["valid_runs"] == 1
+    assert status["missing_message"] is None
+    assert "kb_phase2_broken.json" in status["report_files"]
+
+
+def test_valid_retrieval_report_exposes_dataset_and_config(tmp_path):
+    payload = {
+        "corpus_docs": 10,
+        "query_count": 1,
+        "recall@1": 1.0,
+        "recall@4": 1.0,
+        "mrr": 1.0,
+        "dataset": "kb_expansion_phase2.jsonl",
+        "config": {
+            "embedding_mode": "general",
+            "embedding_backend": "fastembed",
+            "rerank_enabled": False,
+            "top_k": 4,
+            "dataset": "kb_expansion_phase2.jsonl",
+        },
+        "per_query": [
+            {"id": "q1", "category": "symptom", "query": "fever", "rank": 1, "retrieved": ["what_is_a_fever", "a", "b", "c"]}
+        ],
+    }
+    (tmp_path / "kb_phase2_production.json").write_text(json.dumps(payload), encoding="utf-8")
+    runs = evaluation_service.retrieval_runs(tmp_path)
+    assert len(runs) == 1
+    assert runs[0]["id"] == "production"
+    assert runs[0]["dataset"] == "kb_expansion_phase2.jsonl"
+    assert runs[0]["config"]["embedding_backend"] == "fastembed"
+    assert runs[0]["config"]["rerank_enabled"] is False
+    assert runs[0]["metrics"]["recall_at_1"] == pytest.approx(1.0)
 
 
 def test_embedding_comparison_reads_ranks_beyond_depth_as_misses(tmp_path):
@@ -115,6 +166,17 @@ def test_evaluation_overview_reports_knowledge_base_status(client):
     assert knowledge_base["index_ready"] is True
     assert body["test_suite"] is None
     assert isinstance(body["retrieval_runs"], list)
+    status = body["retrieval_report_status"]
+    assert status["dataset"] == evaluation_service.RETRIEVAL_DATASET
+    assert status["expected_glob"] == evaluation_service.RETRIEVAL_RUN_GLOB
+    assert status["valid_runs"] == len(body["retrieval_runs"])
+    if body["retrieval_runs"]:
+        assert status["missing_message"] is None
+        latest = body["retrieval_runs"][-1]
+        assert latest["metrics"]["n"] > 0
+        assert latest["file"].startswith("kb_phase2_")
+    else:
+        assert status["missing_message"]
 
 
 def test_live_retrieval_uses_the_real_index_and_reports_ranked_sources(client):

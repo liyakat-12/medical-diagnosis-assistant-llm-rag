@@ -30,7 +30,17 @@ RUN_DESCRIPTIONS = {
     "baseline": "Before the Phase 2 knowledge-base expansion.",
     "after": "After the Phase 2 knowledge-base expansion.",
     "batch4": "After the re-ranker batch-size change (batch_size=4).",
+    "production": "Production retrieval evaluation against the baked general knowledge-base index.",
 }
+
+MISSING_RETRIEVAL_RUNS_MESSAGE = (
+    "No stored retrieval evaluation report was found under evaluation/results "
+    f"(expected files matching {RETRIEVAL_RUN_GLOB}). "
+    "Generate one with `python evaluation/evaluate_kb_phase2.py "
+    "--out evaluation/results/kb_phase2_production.json` against the live index, "
+    "then include that report in the API image. "
+    "Live chat retrieval telemetry is separate and is not used for these metrics."
+)
 
 EMBEDDING_RUNS = (
     ("general", "General embeddings (MiniLM)", "Dense vector search only."),
@@ -117,22 +127,39 @@ def _clean_rank(value: Any) -> int | None:
 
 def _summarize_run(path: Path) -> dict:
     data = _load_json(path)
-    rows = data.get("per_query") or []
-    ranks = [_clean_rank(row.get("rank")) for row in rows]
-    depth = max((len(row.get("retrieved") or []) for row in rows), default=0) or max(RETRIEVAL_K_VALUES)
+    if not isinstance(data, dict):
+        raise ValueError(f"{path.name} is not a JSON object")
+    rows = data.get("per_query")
+    if not isinstance(rows, list):
+        raise ValueError(f"{path.name} is missing a per_query list")
+    ranks = [_clean_rank(row.get("rank") if isinstance(row, dict) else None) for row in rows]
+    depth = max(
+        (len(row.get("retrieved") or []) for row in rows if isinstance(row, dict)),
+        default=0,
+    ) or max(RETRIEVAL_K_VALUES)
     categories: dict[str, list[int | None]] = {}
     for row, rank in zip(rows, ranks):
+        if not isinstance(row, dict):
+            continue
         categories.setdefault(str(row.get("category") or "uncategorised"), []).append(rank)
     run_id = _run_id(path)
+    report_config = data.get("config") if isinstance(data.get("config"), dict) else {}
     return {
         "id": run_id,
         "label": run_id.replace("_", " ").title(),
         "description": RUN_DESCRIPTIONS.get(run_id, "Stored retrieval evaluation run."),
         "file": path.name,
         "generated_at": _mtime_iso(path),
+        "dataset": report_config.get("dataset") or data.get("dataset") or RETRIEVAL_DATASET,
         "corpus_docs": data.get("corpus_docs"),
         "query_count": data.get("query_count"),
         "depth": depth,
+        "config": {
+            "embedding_mode": report_config.get("embedding_mode"),
+            "embedding_backend": report_config.get("embedding_backend"),
+            "rerank_enabled": report_config.get("rerank_enabled"),
+            "top_k": report_config.get("top_k"),
+        },
         "metrics": rank_metrics(ranks),
         "stored_metrics": {
             "recall_at_1": data.get("recall@1"),
@@ -146,21 +173,30 @@ def _summarize_run(path: Path) -> dict:
 
 
 def retrieval_runs(results_dir: Path | None = None) -> list[dict]:
+    """Load valid kb_phase2_*.json reports. Malformed files are skipped, not invented."""
     results_dir = results_dir or config.EVAL_RESULTS_DIR
-    return [_summarize_run(path) for path in _run_files(results_dir)]
+    runs: list[dict] = []
+    for path in _run_files(results_dir):
+        try:
+            runs.append(_summarize_run(path))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError, KeyError):
+            continue
+    return runs
 
 
 def retrieval_cases(run_id: str | None = None, results_dir: Path | None = None, datasets_dir: Path | None = None) -> dict | None:
     results_dir = results_dir or config.EVAL_RESULTS_DIR
     datasets_dir = datasets_dir or config.EVAL_DATASETS_DIR
-    files = _run_files(results_dir)
-    if not files:
+    runs = retrieval_runs(results_dir)
+    if not runs:
         return None
-    path = next((item for item in files if _run_id(item) == run_id), None) if run_id else files[-1]
-    if path is None:
+    summary = next((item for item in runs if item["id"] == run_id), None) if run_id else runs[-1]
+    if summary is None:
+        return None
+    path = results_dir / summary["file"]
+    if not path.exists():
         return None
     labels = _dataset_labels(datasets_dir)
-    summary = _summarize_run(path)
     cases = []
     for row in _load_json(path).get("per_query") or []:
         rank = _clean_rank(row.get("rank"))
@@ -317,10 +353,28 @@ def knowledge_base_status() -> dict:
     return status
 
 
+def retrieval_report_status(results_dir: Path | None = None) -> dict:
+    """Explain whether packaged retrieval evaluation reports are available."""
+    results_dir = results_dir or config.EVAL_RESULTS_DIR
+    files = [path.name for path in _run_files(results_dir)]
+    valid = retrieval_runs(results_dir)
+    return {
+        "directory": str(results_dir),
+        "directory_exists": results_dir.exists(),
+        "expected_glob": RETRIEVAL_RUN_GLOB,
+        "dataset": RETRIEVAL_DATASET,
+        "report_files": files,
+        "valid_runs": len(valid),
+        "missing_message": None if valid else MISSING_RETRIEVAL_RUNS_MESSAGE,
+    }
+
+
 def overview() -> dict:
+    runs = retrieval_runs()
     return {
         "knowledge_base": knowledge_base_status(),
-        "retrieval_runs": retrieval_runs(),
+        "retrieval_runs": runs,
+        "retrieval_report_status": retrieval_report_status(),
         "embedding_comparison": embedding_comparison(),
         "quality_reports": quality_reports(),
         "grounding": grounding_summary(),

@@ -26,14 +26,18 @@ recommend consulting a doctor or pharmacist.
 4. Never claim the user has a disease. Use "may be" or "one possible explanation is". \
 Do not give probabilities or percentages.
 5. Use plain English. Explain a familiar idea before an unfamiliar medical term.
-6. Prefer a small set, at most 4 explanations from the notes. Put everyday explanations \
-that fit the reported symptoms first, then other relevant possibilities, then a serious \
-condition only when the notes or the user's warning signs make it relevant. Do not open \
-with a rare or severe disease only because it can cause headache, cough, stomach pain, \
-fever, or arm pain. Say in one short line why each possibility fits. Do not treat a \
+6. Prefer a small set, at most 4 clinical explanations grounded in note BODY text \
+(for example osteoarthritis, strain, Baker's cyst). Never list a document title such as \
+"Knee Pain When Walking" or "Pain Behind the Knee" as if it were a diagnosis. Those \
+titles are symptom patterns, not conditions. Do not list an unrelated condition \
+(for example a muscle cramp) unless the note body and the user's wording both support it. \
+Put everyday explanations that fit the reported symptoms first, then other relevant \
+possibilities, then a serious condition only when the notes or the user's warning signs \
+make it relevant. Say in one short line why each possibility fits. Do not treat a \
 note's assumed trigger (alcohol, anxiety, skipped meals, and similar) as a fact about \
 the user unless they reported it.
-7. Keep the answer under 160 words. Add at most 2 short next-step lines grounded in the \
+7. Keep the answer under 160 words. Start with a one-sentence overview, then brief \
+possibilities, then at most 2 short clarifying questions or next steps grounded in the \
 context. Do not repeat an urgency warning that is already stated.
 8. Previous conversation, if provided, is the same active complaint only. \
 Use it to interpret follow-up detail. If none is provided, ignore any earlier illness \
@@ -183,8 +187,11 @@ def _build_user_prompt(
     context = "\n\n".join(context_blocks)
     if mode == "symptom":
         instruction = (
-            "Using ONLY the context above, write a SHORT list of possible conditions with citations, "
-            "then 2 short next-step recommendations from that context. "
+            "Using ONLY the note text (not the Source titles), write: (1) one short overview of "
+            "what the notes say about these symptoms without claiming a diagnosis, "
+            "(2) up to 4 clinical possibilities named from the note bodies with (Source: <title>) "
+            "citations, (3) one or two targeted follow-up questions. "
+            "Do NOT copy document titles into the possibility list. "
             "If this is a follow-up, explain how the new detail relates to earlier possible matches."
         )
         label = "User symptom description"
@@ -260,9 +267,11 @@ def generate_notes_fallback_answer(
 ) -> str:
     """Write from retrieved notes when the configured assistant model fails."""
     from src.ai.providers.mock import MockProvider
+    from src.llm.notes_answer import rewrite_if_title_dump
 
     user_prompt = _build_user_prompt(query, context_blocks, history, mode=mode)
-    return MockProvider().generate(_prompt_for_mode(mode), user_prompt, grounded=True)
+    answer = MockProvider().generate(_prompt_for_mode(mode), user_prompt, grounded=True)
+    return rewrite_if_title_dump(answer, query, context_blocks, mode=mode)
 
 
 def generate_grounded_answer(
@@ -274,12 +283,14 @@ def generate_grounded_answer(
     mode: str = "symptom",
 ) -> str:
     """RAG-grounded generation: the LLM must cite the given context blocks."""
+    from src.llm.notes_answer import rewrite_if_title_dump
+
     user_prompt = _build_user_prompt(query, context_blocks, history, mode=mode)
     prompt = _prompt_for_mode(mode, weak_match=weak_match)
     try:
         answer = (_call_llm(prompt, user_prompt, grounded=True) or "").strip()
         if answer:
-            return answer
+            return rewrite_if_title_dump(answer, query, context_blocks, mode=mode)
     except Exception:
         if weak_match or not context_blocks:
             raise

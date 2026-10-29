@@ -48,6 +48,27 @@ def _conversational_mock(user_prompt: str) -> str:
     )
 
 
+def _extract_query(user_prompt: str) -> str:
+    for line in (user_prompt or "").splitlines():
+        lowered = line.lower()
+        if lowered.startswith("user symptom description:") or lowered.startswith("user question:"):
+            return line.split(":", 1)[-1].strip()
+    return ""
+
+
+def _context_blocks(user_prompt: str) -> list[str]:
+    marker = "Reference context (each block is a passage from a cited medical document):"
+    if marker not in (user_prompt or ""):
+        return []
+    after = user_prompt.split(marker, 1)[1]
+    for stop in ("\n\nUser symptom description:", "\n\nUser question:"):
+        if stop in after:
+            after = after.split(stop, 1)[0]
+            break
+    blocks = [part.strip() for part in after.split("\n\n") if part.strip() and "Source:" in part]
+    return blocks
+
+
 class MockProvider:
     name = "mock"
 
@@ -66,7 +87,6 @@ class MockProvider:
         if "Do not name specific diseases" in (system_prompt or ""):
             from src.safety.followups import weak_match_answer
 
-            # Pull the user line from the prompt when present so follow-ups stay relevant.
             query = ""
             for line in (user_prompt or "").splitlines():
                 if line.lower().startswith("user symptom description:"):
@@ -78,15 +98,12 @@ class MockProvider:
                 "No documents were retrieved, so this answer cannot be cited.\n"
                 "Not a diagnosis — see a clinician if needed."
             )
-        titles: list[str] = []
-        title_re = re.compile(r"Source:\s*(.+?)(?:\s*\(|$)", re.IGNORECASE)
-        for block in user_prompt.split("\n\n"):
-            if "Source:" in block:
-                match = title_re.search(block)
-                title = match.group(1).strip() if match else "Retrieved medical document"
-                if title not in titles:
-                    titles.append(title)
-        if not titles:
+
+        from src.llm.notes_answer import synthesize_notes_answer
+
+        blocks = _context_blocks(user_prompt)
+        query = _extract_query(user_prompt) or "these symptoms"
+        if not blocks:
             return (
                 "Not enough matching documents for a confident answer. "
                 "Please rephrase, or see a doctor.\n"
@@ -98,31 +115,40 @@ class MockProvider:
         treatment = "general treatment and management" in (system_prompt or "").lower()
         causes = "plausible causes supported" in (system_prompt or "").lower()
         symptom_edu = "what symptoms a named condition can cause" in (system_prompt or "").lower()
-        if educational or treatment or causes or symptom_edu:
-            lines = []
-            for title in titles[:3]:
-                lines.append(f"{title} (Source: {title}).")
-            lines.append("Not a diagnosis — this is general information from reference notes.")
-            return "\n".join(lines)
-        lines = ["Possible explanations:"]
-        for i, title in enumerate(titles[:4], start=1):
-            lines.append(f"{i}. {title} may fit these symptoms (Source: {title}).")
-        recs: list[str] = []
-        for sent in re.split(r"(?<=[.!?])\s+", user_prompt):
-            text = sent.strip()
-            if len(text) < 35 or len(text) > 220:
-                continue
-            if not re.search(r"\b(self-care|rest|fluid|see a doctor|seek|consult|monitor)\b", text, re.I):
-                continue
-            if text not in recs:
-                recs.append(text)
-            if len(recs) == 2:
-                break
-        if recs:
-            lines.append("Recommendations:")
-            lines.extend(f"- {rec}" for rec in recs)
-        lines.append("Not a diagnosis — see a clinician if needed.")
-        return "\n".join(lines)
+        mode = "symptom"
+        if educational:
+            mode = "education"
+        elif treatment:
+            mode = "treatment"
+        elif causes:
+            mode = "causes"
+        elif symptom_edu:
+            mode = "symptom_education"
+        answer = synthesize_notes_answer(query, blocks, mode=mode)
+        if mode == "symptom":
+            recs: list[str] = []
+            for sent in re.split(r"(?<=[.!?])\s+", user_prompt):
+                text = sent.strip()
+                if len(text) < 35 or len(text) > 220:
+                    continue
+                if not re.search(r"\b(self-care|rest|fluid|see a doctor|seek|consult|monitor)\b", text, re.I):
+                    continue
+                if text not in recs:
+                    recs.append(text)
+                if len(recs) == 2:
+                    break
+            if recs and "Recommendations:" not in answer:
+                lines = [answer.rstrip()]
+                # Keep recommendations before the closing disclaimer line.
+                disclaimer = "Not a diagnosis — see a clinician if needed."
+                if lines[-1].endswith(disclaimer):
+                    body = lines[-1][: -len(disclaimer)].rstrip()
+                    lines = [body, "Recommendations:", *[f"- {rec}" for rec in recs], disclaimer]
+                    return "\n".join(line for line in lines if line)
+                lines.append("Recommendations:")
+                lines.extend(f"- {rec}" for rec in recs)
+                return "\n".join(lines)
+        return answer
 
     def stream(
         self,

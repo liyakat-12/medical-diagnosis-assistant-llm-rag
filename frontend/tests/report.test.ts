@@ -80,7 +80,14 @@ describe("chat bubble rendering", () => {
     assert.match(bubbleSource, /evidenceStatusItems\(message\)\.length\) return null/);
     assert.equal(bubbleSource.includes("Urgency will appear after the notes are checked"), false);
     assert.match(chatSource, /assistantFromEvent/);
-    assert.match(sessionSource, /result\.answer \|\| fallback\.content/);
+    assert.match(sessionSource, /fromResult \|\| merged\.content/);
+    assert.match(bubbleSource, /numberedTitleDump/);
+    assert.match(bubbleSource, /possible explanations/);
     assert.equal(/groq|openai|chatgpt/i.test(bubbleSource), false);
+  });
+
+  it("prefers finalized API answer over streamed title-dump tokens", () => {
+    assert.match(sessionSource, /Prefer the finalized API result/);
+    assert.match(sessionSource, /resultConditions\.length/);
   });
 });

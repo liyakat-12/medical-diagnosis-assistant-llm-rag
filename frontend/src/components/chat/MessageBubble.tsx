@@ -72,8 +72,14 @@ function SectionTitle({ children }: { children: string }) {
 
 function visibleExplanation(content: string): string {
   const cut = content.search(/\n+(?:#{1,3}\s*)?(?:possible matches|possible explanations|recommendations)\s*:/i);
-  const text = (cut >= 0 ? content.slice(0, cut) : content).trim();
-  if (/^(?:#{1,3}\s*)?(?:possible matches|recommendations)\s*:/i.test(text)) return "";
+  let text = (cut >= 0 ? content.slice(0, cut) : content).trim();
+  // Title-dump answers put the whole body under "Possible explanations:" — do not show that as Explanation.
+  if (/^(?:#{1,3}\s*)?(?:possible matches|possible explanations|recommendations)\s*:/i.test(text)) return "";
+  const numberedTitleDump = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => /^\d+\.\s+.+\smay fit these symptoms/i.test(line));
+  if (numberedTitleDump.length >= 2) return "";
   return text;
 }
 
@@ -338,7 +344,7 @@ export const MessageBubble = memo(function MessageBubble({
                 <OutcomeList message={message} />
                 {message.possible_conditions.length ? (
                   <p className="mt-2 text-xs text-slate-500">
-                    These labels compare the retrieved notes with each other. They are not the chance of having a condition.
+                    These are clinical possibilities grounded in the note text, not document titles. Match labels compare retrieved notes with each other — not the chance of having a condition.
                   </p>
                 ) : null}
               </section>

@@ -71,24 +71,32 @@ export function assistantFromEvent(event: StreamEvent, fallback: ChatMessage): C
   const saved = event.message;
   const result = event.result || {};
   const merged = saved ? { ...fallback, ...saved } : fallback;
-  const answer = String(merged.content || result.answer || fallback.content || "").trim();
+  // Prefer the finalized API result so streamed title-dump tokens cannot override a corrected answer.
+  const fromResult = typeof result.answer === "string" ? result.answer.trim() : "";
+  const answer = String(fromResult || merged.content || fallback.content || "").trim();
   const triage = (() => {
-    const value = (merged.triage as ChatMessage["triage"]) || (result.triage as ChatMessage["triage"]) || fallback.triage;
+    const value = (result.triage as ChatMessage["triage"]) || (merged.triage as ChatMessage["triage"]) || fallback.triage;
     if (!value || value.level === "none") return null;
     return value;
   })();
+  const resultConditions = (result.possible_conditions as ChatMessage["possible_conditions"]) || [];
+  const resultCitations = (result.citations as ChatMessage["citations"]) || [];
   return publicMessage({
     ...merged,
     content: answer || fallback.content,
-    citations: merged.citations?.length ? merged.citations : (result.citations as ChatMessage["citations"]) || fallback.citations,
+    citations: resultCitations.length ? resultCitations : merged.citations?.length ? merged.citations : fallback.citations,
     triage,
-    possible_conditions: merged.possible_conditions?.length
-      ? merged.possible_conditions
-      : (result.possible_conditions as ChatMessage["possible_conditions"]) || fallback.possible_conditions,
-    faithfulness: merged.faithfulness ?? (result.faithfulness as ChatMessage["faithfulness"]) ?? fallback.faithfulness,
-    recommendations: merged.recommendations?.length
-      ? merged.recommendations
-      : (result.recommendations as ChatMessage["recommendations"]) || fallback.recommendations,
+    possible_conditions: resultConditions.length
+      ? resultConditions
+      : merged.possible_conditions?.length
+        ? merged.possible_conditions
+        : fallback.possible_conditions,
+    faithfulness: (result.faithfulness as ChatMessage["faithfulness"]) ?? merged.faithfulness ?? fallback.faithfulness,
+    recommendations: ((result.recommendations as string[]) || []).length
+      ? (result.recommendations as string[])
+      : merged.recommendations?.length
+        ? merged.recommendations
+        : fallback.recommendations,
     refused: Boolean(merged.refused ?? result.refused),
     disclaimer: merged.disclaimer || (result.disclaimer as string) || fallback.disclaimer,
     metadata: {

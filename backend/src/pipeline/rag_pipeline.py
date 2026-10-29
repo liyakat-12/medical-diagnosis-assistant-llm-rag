@@ -202,37 +202,32 @@ def match_percents(scores: list[float]) -> list[int]:
 
 
 def citations_from_evidence(evidence: list[Evidence]) -> list[dict]:
-    return [
-        {
+    """One citation per distinct source URL (or title when URL is missing)."""
+    best: dict[str, dict] = {}
+    order: list[str] = []
+    for ev in evidence:
+        url = (ev.url or "").strip()
+        key = url.lower() if url else f"title:{(ev.title or '').strip().lower()}"
+        if not key or key == "title:":
+            continue
+        row = {
             "title": ev.title,
             "source": ev.source,
             "url": ev.url,
             "condition": ev.condition,
             "relevance_score": round(ev.relevance_score, 4),
         }
-        for ev in evidence
-    ]
-
-
-def build_possible_conditions(citations: list[dict], limit: int = OUTCOME_LIMIT) -> list[dict]:
-    seen: set[str] = set()
-    rows: list[dict] = []
-    for item in citations:
-        key = (item.get("condition") or item.get("title") or "").strip().lower()
-        if not key or key in seen:
+        prior = best.get(key)
+        if prior is None:
+            best[key] = row
+            order.append(key)
             continue
-        seen.add(key)
-        rows.append(
-            {
-                "condition": _pretty_condition(str(item.get("condition") or item.get("title") or "Condition")),
-                "title": item.get("title") or "",
-                "source": item.get("source") or "",
-                "url": item.get("url") or "",
-                "relevance_score": item.get("relevance_score") or 0.0,
-            }
-        )
-        if len(rows) >= limit:
-            break
+        if float(row["relevance_score"]) > float(prior.get("relevance_score") or 0):
+            best[key] = row
+    return [best[key] for key in order]
+
+
+def _attach_match_labels(rows: list[dict]) -> list[dict]:
     scores = [float(row.get("relevance_score") or 0) for row in rows]
     best = max(scores) if scores else 0.0
     for row, score in zip(rows, scores):
@@ -245,15 +240,90 @@ def build_possible_conditions(citations: list[dict], limit: int = OUTCOME_LIMIT)
     return rows
 
 
+def build_possible_conditions(
+    citations: list[dict],
+    limit: int = OUTCOME_LIMIT,
+    *,
+    evidence: list[Evidence] | None = None,
+    query: str = "",
+) -> list[dict]:
+    """Clinical explanation cards from note bodies — never raw symptom-pattern titles."""
+    from src.llm.notes_answer import clinical_ideas_from_notes, is_symptom_pattern_label
+
+    notes: list[dict[str, str]] = []
+    score_by_title: dict[str, float] = {}
+    for ev in evidence or []:
+        notes.append(
+            {
+                "title": ev.title or "",
+                "source": ev.source or "",
+                "text": ev.text or "",
+                "url": ev.url or "",
+            }
+        )
+        score_by_title[(ev.title or "").strip().lower()] = float(ev.relevance_score)
+
+    ideas = clinical_ideas_from_notes(notes, limit=limit) if notes else []
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for idea in ideas:
+        key = (idea.get("condition") or "").strip().lower()
+        if not key or key in seen or is_symptom_pattern_label(key):
+            continue
+        seen.add(key)
+        title = idea.get("title") or ""
+        rows.append(
+            {
+                "condition": _pretty_condition(str(idea.get("condition") or "Condition")),
+                "title": title,
+                "source": idea.get("source") or "",
+                "url": next(
+                    (n.get("url") or "" for n in notes if (n.get("title") or "") == title),
+                    "",
+                ),
+                "relevance_score": score_by_title.get(title.strip().lower(), 0.0),
+            }
+        )
+        if len(rows) >= limit:
+            return _attach_match_labels(rows)
+
+    # Fallback: unique non-generic condition metadata (still never symptom-pattern titles).
+    for item in citations:
+        label = str(item.get("condition") or "").strip()
+        title = str(item.get("title") or "").strip()
+        if not label or is_symptom_pattern_label(label):
+            continue
+        if is_symptom_pattern_label(title) and label.lower() == title.lower():
+            continue
+        key = label.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(
+            {
+                "condition": _pretty_condition(label),
+                "title": title,
+                "source": item.get("source") or "",
+                "url": item.get("url") or "",
+                "relevance_score": item.get("relevance_score") or 0.0,
+            }
+        )
+        if len(rows) >= limit:
+            break
+    del query
+    return _attach_match_labels(rows)
+
+
 def outcomes_for_query(
     query: str,
     citations: list[dict],
     embedding_mode: str | None = None,
     pool: list[dict] | None = None,
+    evidence: list[Evidence] | None = None,
 ) -> list[dict]:
     """Build match rows from the retrieval already done for this query."""
-    del query, embedding_mode
-    return build_possible_conditions(pool or citations)
+    del embedding_mode
+    return build_possible_conditions(pool or citations, evidence=evidence, query=query)
 
 
 def _history_payload(history: list[dict] | None) -> list[dict]:
@@ -506,9 +576,16 @@ def _symptom_caution_answer(query: str) -> str:
 
 def _retain_relevant_evidence(query: str, evidence: list[Evidence]) -> list[Evidence]:
     """Topic filter, then drop individually weak hits so junk 0–2% cards disappear."""
+    from src.llm.notes_answer import evidence_matches_body_anchors
+
     if is_underspecified_medical_query(query) or is_broad_unnamed_medical_query(query):
         return []
     filtered = _evidence_matches_query_topics(query, evidence)
+    filtered = [
+        ev
+        for ev in filtered
+        if evidence_matches_body_anchors(query, ev.title, ev.condition, ev.text)
+    ]
     texts = [f"{ev.title} {ev.condition} {ev.doc_id} {ev.text[:500]}" for ev in filtered]
     if filtered and not evidence_supports_named_disease(query, texts):
         return []
@@ -736,7 +813,7 @@ def run_pipeline(
         citations = [*citations, general_ai_citation()]
         origin = "mixed"
     matches = (
-        outcomes_for_query(query, citations, embedding_mode, citations)
+        outcomes_for_query(query, citations, embedding_mode, citations, evidence=evidence)
         if strong
         else []
     )
@@ -1016,7 +1093,9 @@ def iter_pipeline_stream(
     mode = generation_mode(state.question_type, state.personal_context)
     citations = citations_from_evidence(evidence) if strong else []
     possible_conditions = (
-        outcomes_for_query(query, citations, embedding_mode, citations) if strong else []
+        outcomes_for_query(query, citations, embedding_mode, citations, evidence=evidence)
+        if strong
+        else []
     )
     if not uses_condition_cards(state.question_type, state.personal_context):
         possible_conditions = []
@@ -1027,6 +1106,8 @@ def iter_pipeline_stream(
     chunks: list[str] = []
     generate_started = time.perf_counter()
     if strong:
+        from src.llm.notes_answer import is_title_dump_answer, rewrite_if_title_dump
+
         context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
         banner = _with_emergency_banner(query, "", triage)
         if banner:
@@ -1041,6 +1122,10 @@ def iter_pipeline_stream(
             answer = "".join(chunks).strip()
             if not answer or answer == banner:
                 raise RuntimeError("empty grounded stream")
+            body = answer[len(banner) :].strip() if banner and answer.startswith(banner) else answer
+            if is_title_dump_answer(body):
+                rewritten = rewrite_if_title_dump(body, query, context_blocks, mode=mode)
+                answer = f"{banner}\n\n{rewritten}".strip() if banner else rewritten
         except Exception:
             logger.exception("Assistant generation failed after notes were found; answering from retrieved notes")
             fallback = generate_notes_fallback_answer(

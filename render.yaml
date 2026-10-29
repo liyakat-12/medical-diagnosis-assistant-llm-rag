@@ -21,8 +21,10 @@ services:
         value: groq
       - key: EMBEDDING_MODE
         value: general
+      - key: EMBEDDING_BACKEND
+        value: fastembed
       - key: RERANK_ENABLED
-        value: "true"
+        value: "false"
       - key: MONGODB_DB_NAME
         value: mediassist
       - key: EMERGENCY_REGION

@@ -169,6 +169,8 @@ GENERAL_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MEDICAL_EMBEDDING_MODEL = "pritamdeka/S-PubMedBert-MS-MARCO"
 
 EMBEDDING_MODE = os.getenv("EMBEDDING_MODE", "general").strip().lower()  # "general" | "medical"
+# sentence_transformers (Torch, local/dev) | fastembed (ONNX, low-memory production)
+EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "sentence_transformers").strip().lower()
 
 # ---------------------------------------------------------------------------
 # Retrieval

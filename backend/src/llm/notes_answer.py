@@ -109,6 +109,12 @@ def _split_entities(blob: str) -> list[str]:
     for part in parts:
         item = re.sub(r"\s+", " ", (part or "").strip(" ."))
         item = re.sub(r"^(?:a|an|the)\s+", "", item, flags=re.I)
+        item = re.sub(
+            r"^(?:relates? to|points? to|suggests?|often (?:from|due to)|include[sd]?)\s+",
+            "",
+            item,
+            flags=re.I,
+        )
         if len(item) < 3 or len(item) > 60:
             continue
         if _GENERIC_CONDITION.match(item):

@@ -30,7 +30,10 @@ CLAIM_HINT_RE = re.compile(
 )
 NON_CLAIM_RE = re.compile(
     r"not a diagnosis|consult a (qualified )?(healthcare|doctor|clinician)|"
-    r"possible explanations include|based on the retrieved|"
+    r"possible explanations include|possible explanations supported|"
+    r"retrieved notes describe common patterns|"
+    r"did this start after|is the area swollen|"
+    r"based on the retrieved|"
     r"i could not find enough|please rephrase|"
     r"without retrieval|no documents retrieved|"
     r"medical emergency|call \d+|automated detection is not infallible|"

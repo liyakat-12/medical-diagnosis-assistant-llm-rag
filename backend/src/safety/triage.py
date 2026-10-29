@@ -15,6 +15,7 @@ Levels, from least to most severe: self_care < consult_doctor < emergency
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from src.retrieval.retriever import Evidence
@@ -106,6 +107,13 @@ def _primary_evidence_level(evidence: list[Evidence]) -> str:
     return level
 
 
+_FEVER_WITH_JOINT = re.compile(
+    r"\bfever\b.{0,48}\b(swell\w*|swollen|joint|knee|red(?:ness)?|hot)\b|"
+    r"\b(swell\w*|swollen|joint|knee)\b.{0,48}\bfever\b",
+    re.I,
+)
+
+
 def classify_triage(query: str, evidence: list[Evidence], history: list[dict] | None = None) -> TriageResult:
     guard = check_emergency(query, history)
     if guard.triggered:
@@ -134,6 +142,15 @@ def classify_triage(query: str, evidence: list[Evidence], history: list[dict] | 
             label=TRIAGE_LABELS[level],
             guidance=chest_caution_guidance(),
             reason="Chest discomfort needs assessment. The wording did not meet emergency criteria.",
+            matched_emergency_terms=[],
+        )
+    if _FEVER_WITH_JOINT.search(query or "") and level == "self_care":
+        level = "consult_doctor"
+        return TriageResult(
+            level=level,
+            label=TRIAGE_LABELS[level],
+            guidance=TRIAGE_GUIDANCE[level],
+            reason="Fever with joint pain or swelling needs a clinician review. This is not a diagnosis.",
             matched_emergency_terms=[],
         )
     return TriageResult(

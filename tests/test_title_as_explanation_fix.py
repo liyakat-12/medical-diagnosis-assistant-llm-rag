@@ -186,7 +186,7 @@ def test_pipeline_knee_fever_swelling_keeps_triage():
     result = run_pipeline("knee pain with fever and swelling")
     assert result.refused is False
     assert result.triage is not None
-    assert result.triage.level in {"consult_doctor", "emergency", "self_care"}
+    assert result.triage.level in {"consult_doctor", "emergency"}
     assert not is_title_dump_answer(result.answer)
 
 

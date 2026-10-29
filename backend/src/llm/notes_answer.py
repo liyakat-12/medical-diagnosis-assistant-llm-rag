@@ -113,6 +113,8 @@ def _split_entities(blob: str) -> list[str]:
             continue
         if _GENERIC_CONDITION.match(item):
             continue
+        if re.match(r"^(?:how|what|why|when|where|which|whether)\b", item, re.I):
+            continue
         key = item.lower()
         if key in seen:
             continue

@@ -145,7 +145,7 @@ def clinical_ideas_from_notes(notes: list[dict[str, str]], *, limit: int = 4) ->
                     "condition": name,
                     "title": note.get("title") or "",
                     "source": note.get("source") or "",
-                    "why": f"Mentioned in the note “{note.get('title') or 'retrieved reference'}”.",
+                    "why": f"Mentioned in the note \"{note.get('title') or 'retrieved reference'}\".",
                 }
             )
             if len(ideas) >= limit:
@@ -182,14 +182,14 @@ def synthesize_notes_answer(
 
     topic = re.sub(r"\s+", " ", (query or "").strip()) or "these symptoms"
     lines.append(
-        f"For “{topic}”, the retrieved notes describe common patterns rather than a single diagnosis."
+        f'For "{topic}", the retrieved notes describe common patterns rather than a single diagnosis.'
     )
     if ideas:
         lines.append("Possible explanations supported by those notes:")
         for idea in ideas[:4]:
             source_title = idea.get("title") or cite
             lines.append(
-                f"- {idea['condition']} — a possibility discussed in the notes "
+                f"- {idea['condition']} - a possibility discussed in the notes "
                 f"(Source: {source_title})."
             )
     else:

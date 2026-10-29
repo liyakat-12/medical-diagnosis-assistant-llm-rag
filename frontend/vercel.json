@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REPLACE_WITH_RENDER_HOST.onrender.com/api/:path*"
+      "destination": "https://mediassist-api-9yvb.onrender.com/api/:path*"
     }
   ]
 }

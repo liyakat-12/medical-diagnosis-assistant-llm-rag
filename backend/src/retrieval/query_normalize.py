@@ -151,15 +151,32 @@ _TOPIC_GROUPS: dict[str, tuple[str, ...]] = {
     "skin": ("rash", "itch", "skin", "hives"),
 }
 
+# Additive / refinement language that can keep an active complaint.
+# Do NOT include bare severity words like "little"/"mild"/"severe" here: those
+# appear in brand-new complaints ("finger injured little") and previously caused
+# unrelated prior chest evidence to be reused as if it were a follow-up.
 _FOLLOW_HINT = re.compile(
     r"\b(also|as well|with that|tell me more|more about|second (one|condition|match)|"
     r"first (one|condition|match)|third (one|condition)|what about|how about|"
     r"worse|(getting|feeling|feels) better|it'?s better|it is better|is it better|"
     r"still have|and a |plus a |"
     r"left|right|both|side|since|yesterday|today|tonight|weeks?|days?|hours?|"
-    r"when i|after|before|morning|walking|stairs|sitting|lifting|mild|severe|"
-    r"little|extra detail:|more simply|in simple(r)? (words|language|terms)|"
+    r"when i|after|before|morning|walking|stairs|sitting|lifting|"
+    r"extra detail:|more simply|in simple(r)? (words|language|terms)|"
     r"more detail|explain (that|this|it))\b",
+    re.I,
+)
+_ADDITIVE_FOLLOW = re.compile(
+    r"\b(also|as well|with that|plus a |still have|and a )\b",
+    re.I,
+)
+# Untagged new symptom statements (often typos) must not inherit prior complaints.
+_NEW_SYMPTOM_CUE = re.compile(
+    r"\b("
+    r"pain|hurt|hurts|aching|ache|sore|injured?|injure|injury|"
+    r"swollen|swelling|bleed(?:ing)?|cut|burn(?:ed|ing)?|rash|fever|"
+    r"cough(?:ing)?|dizzy|nause(?:a|ous)?|vomit(?:ing)?"
+    r")\w*\b",
     re.I,
 )
 # Everyday advice/cause questions that keep the active complaint (fu01–fu04).
@@ -268,7 +285,7 @@ _EXACT_TOPIC_TERMS = {"head", "arm", "back", "hand", "hip", "leg", "foot", "rib"
 
 def retrieval_topics(text: str) -> set[str]:
     """Return coarse symptom-area labels present in a query or note."""
-    lowered = (text or "").lower()
+    lowered = _apply_typos(text or "").lower()
     if not lowered:
         return set()
     found: set[str] = set()
@@ -344,6 +361,11 @@ def related_history_texts(query: str, prior_texts: list[str]) -> list[str]:
         return prior_texts[-3:]
     current = retrieval_topics(query)
     if not current:
+        if is_follow_question(query) or _ADDITIVE_FOLLOW.search(query or ""):
+            return prior_texts[-1:]
+        # "finger injured little" (typos / untagged) is a new complaint, not a follow-up.
+        if _NEW_SYMPTOM_CUE.search(query or ""):
+            return []
         return prior_texts[-1:] if _is_follow_language(query) else []
     related = [text for text in prior_texts if retrieval_topics(text) & current]
     return related[-3:]
@@ -359,12 +381,26 @@ def should_reuse_retrieval_history(query: str, prior_texts: list[str]) -> bool:
         prior |= retrieval_topics(text)
     if is_symptom_correction(query):
         return True
+    if is_travel_calf_breathless_followup(query, prior_texts):
+        return True
     if _REFINEMENT.search(query or "") and prior_texts:
+        # Refinement of an active complaint (e.g. "no fever now") may reuse.
+        # A disjoint new body area must not.
+        if current and prior and current.isdisjoint(prior):
+            return False
         return True
     if current and prior and current.isdisjoint(prior):
-        return is_travel_calf_breathless_followup(query, prior_texts)
+        return False
     if _NEW_COMPLAINT_SHAPE.search(query or "") and not _REFINEMENT.search(query or ""):
         return False
+    if not current:
+        # Explicit advice / additive follow-ups keep the active complaint.
+        if is_follow_question(query) or _ADDITIVE_FOLLOW.search(query or ""):
+            return True
+        # Untagged new symptom text must start a fresh retrieval thread.
+        if _NEW_SYMPTOM_CUE.search(query or ""):
+            return False
+        return _is_follow_language(query)
     if _is_follow_language(query):
         return True
     if current and prior and current & prior:
@@ -377,6 +413,8 @@ _TYPO_SUBS = [
     (re.compile(r"\bdiarrea\b", re.I), "diarrhoea"),
     (re.compile(r"\bashtma\b", re.I), "asthma"),
     (re.compile(r"\bhypertention\b", re.I), "hypertension"),
+    (re.compile(r"\bfingure\b", re.I), "finger"),
+    (re.compile(r"\bfinguer\b", re.I), "finger"),
 ]
 _PAIN_INJECT = {
     "knee pain",

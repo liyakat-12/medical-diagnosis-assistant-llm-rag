@@ -1,13 +1,43 @@
 from __future__ import annotations
 
+import hashlib
+import logging
 import re
 from collections.abc import Iterator
 
 from src import config
+from src.pipeline.conversation_state import build_conversation_state
 from src.pipeline.rag_pipeline import iter_pipeline_stream, result_to_dict, run_pipeline
 
 from app.repositories import chat_repository, message_repository
 from app.services.chat_service import get_chat, make_title
+
+logger = logging.getLogger("mediassist.messages")
+
+
+def _query_fingerprint(text: str) -> str:
+    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()[:12]
+
+
+def _log_turn_isolation(query: str, chat_history: list[dict] | None, body_regions: list[str] | None) -> None:
+    """Privacy-safe diagnostics for same-chat stale-answer regressions."""
+    composed = retrieval_query(query, body_regions)
+    state = build_conversation_state(composed, chat_history)
+    prior_fp = [
+        _query_fingerprint(str(item.get("content") or ""))
+        for item in (chat_history or [])
+        if item.get("role") == "user"
+    ][-3:]
+    logger.info(
+        "turn_isolation status=%s reuse=%s query_fp=%s search_fp=%s prior_user_fps=%s body_regions=%s gen_turns=%s",
+        state.status,
+        state.reuse_history,
+        _query_fingerprint(composed),
+        _query_fingerprint(state.search_query),
+        prior_fp,
+        list(body_regions or []),
+        len(state.generation_history),
+    )
 
 _REGION_WORDS = {
     "head": "head",
@@ -119,6 +149,7 @@ def diagnose_sync(
     chat_history: list[dict] | None = None,
     body_regions: list[str] | None = None,
 ) -> dict:
+    _log_turn_isolation(query, chat_history, body_regions)
     return result_to_dict(run_pipeline(retrieval_query(query, body_regions), top_k=top_k, chat_history=chat_history))
 
 
@@ -128,4 +159,5 @@ def stream_events(
     chat_history: list[dict] | None = None,
     body_regions: list[str] | None = None,
 ) -> Iterator[dict]:
+    _log_turn_isolation(query, chat_history, body_regions)
     yield from iter_pipeline_stream(retrieval_query(query, body_regions), top_k=top_k, chat_history=chat_history)

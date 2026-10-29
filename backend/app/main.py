@@ -23,20 +23,26 @@ def _warmup_rag() -> None:
     import time
 
     started = time.perf_counter()
-    try:
-        from src import config
-        from src.embeddings.embedding_models import get_embedding_model
-        from src.retrieval.retriever import retrieve
+    from src import config
+    from src.embeddings.embedding_models import get_embedding_model
+    from src.retrieval.retriever import _get_store, retrieve
 
-        get_embedding_model(config.EMBEDDING_MODE).encode(["headache"])
-        retrieve("headache", top_k=4)
-        if config.RERANK_ENABLED:
-            from src.retrieval.reranker import _load_model
+    get_embedding_model(config.EMBEDDING_MODE).encode(["headache"])
+    store = _get_store(config.EMBEDDING_MODE)
+    count = int(store.count())
+    if count <= 0:
+        raise RuntimeError(
+            "Retrieval index is empty. Rebuild with `python scripts/build_index.py general` "
+            "or use the production Docker image that bakes the index at build time."
+        )
+    hits = retrieve("headache", top_k=4)
+    if not hits:
+        raise RuntimeError("Retrieval index is populated but returned no results for a smoke query.")
+    if config.RERANK_ENABLED:
+        from src.retrieval.reranker import _load_model
 
-            _load_model()
-        logger.info("RAG models warmed in %.1fs", time.perf_counter() - started)
-    except Exception:
-        logger.exception("RAG warmup skipped")
+        _load_model()
+    logger.info("RAG models warmed in %.1fs documents=%s", time.perf_counter() - started, count)
 
 
 @asynccontextmanager
@@ -47,7 +53,13 @@ async def lifespan(_app: FastAPI):
     await connect()
     await ensure_indexes()
     await seed_demo_user()
-    await asyncio.to_thread(_warmup_rag)
+    try:
+        await asyncio.to_thread(_warmup_rag)
+    except Exception:
+        logger.exception("RAG warmup failed")
+        if config.is_production():
+            raise
+        logger.warning("Continuing without RAG warmup outside production")
     logger.info("MediAssist API ready")
     yield
     await disconnect()

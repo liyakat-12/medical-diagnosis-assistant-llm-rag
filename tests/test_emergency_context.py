@@ -5,14 +5,23 @@ from src.safety.guardrails import check_emergency, check_prescription_request, e
 
 def test_emergency_paraphrases():
     positives = [
-        "I have chest pain",
-        "pain in my chest since this morning",
         "pressure on my chest and sweating",
         "I can't catch my breath",
         "thunderclap headache started suddenly",
+        "I have crushing chest pain spreading to my arm",
+        "I have a sudden, extremely severe headache",
+        "I am coughing up blood",
     ]
     for query in positives:
         assert check_emergency(query).triggered, query
+    not_automatic = [
+        "I have chest pain",
+        "pain in my chest since this morning",
+        "I have a mild chest ache only when coughing",
+        "I have a persistent cough with blood",
+    ]
+    for query in not_automatic:
+        assert not check_emergency(query).triggered, query
 
 
 def test_negated_emergency_does_not_trigger():
@@ -85,7 +94,8 @@ def test_breathless_followup_is_emergency_without_retrieval(monkeypatch):
     result = run_pipeline("Now I feel breathless", chat_history=history)
     assert result.triage is not None
     assert result.triage.level == "emergency"
-    assert "112" in result.answer
+    assert "112" in (result.answer + " " + (result.triage.guidance or ""))
+    assert "call 112" not in (result.answer or "").lower()
     assert "diagnosis" not in result.answer.lower() or "not a diagnosis" in result.answer.lower()
 
 

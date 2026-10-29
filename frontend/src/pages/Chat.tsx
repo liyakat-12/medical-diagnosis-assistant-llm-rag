@@ -1,10 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, MapPin, Menu, PanelLeft } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
-import { ChatInput, type ChatInputHandle } from "../components/chat/ChatInput";
-import { BodyFigure } from "../components/bodymap/BodyMap";
-import { REGION_LABELS, REGION_ORDER, type BodyRegion } from "../utils/bodyMap";
+import { ChatInput, type BodySelection, type ChatInputHandle } from "../components/chat/ChatInput";
+import { BodyMapCard } from "../components/bodymap/BodyMap";
+import { type BodyRegion } from "../utils/bodyMap";
 import { MessageBubble } from "../components/chat/MessageBubble";
 import { formatFollowUpQuery, type FollowUpAnswers } from "../components/chat/FollowUpCard";
 import { EmergencyCallButton } from "../components/chat/EmergencyCallButton";
@@ -14,7 +14,7 @@ import { useChat } from "../context/ChatContext";
 import { useApp } from "../context/AppContext";
 import { isIncompleteMessage } from "../utils/chatSession";
 import { conversationChrome } from "../utils/conversationChrome";
-import { looksEmergency } from "../utils/emergency";
+import { looksEmergency, needsPromptAssessment } from "../utils/emergency";
 import { needsSymptomIntake } from "../utils/intent";
 
 const HospitalFinderModal = lazy(() =>
@@ -26,6 +26,7 @@ const SymptomIntakeModal = lazy(() =>
 
 export function Chat() {
   const { chatId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { loadChats, openChat, showBlankChat, activeChatId, messages, messagesLoading, sendMessage, stopGeneration, retryLast, sending, streaming, status, error, clearError } = useChat();
   const { setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useApp();
   const composerRef = useRef<ChatInputHandle>(null);
@@ -34,12 +35,22 @@ export function Chat() {
   const lastChatId = useRef<string | undefined>(undefined);
   const lastFocusedUser = useRef<string | null>(null);
   const [pendingSymptoms, setPendingSymptoms] = useState<string | null>(null);
+  const pendingRegions = useRef<BodyRegion[]>([]);
+  const [bodySelection, setBodySelection] = useState<BodySelection>({ regions: [], view: "front" });
   const [hospitalsOpen, setHospitalsOpen] = useState(false);
   const [showJump, setShowJump] = useState(false);
 
   useEffect(() => {
     void loadChats();
   }, [loadChats]);
+
+  useEffect(() => {
+    if (searchParams.get("map") !== "1") return;
+    composerRef.current?.openMap();
+    const next = new URLSearchParams(searchParams);
+    next.delete("map");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (chatId) {
@@ -82,9 +93,11 @@ export function Chat() {
 
   const handleSend = useCallback(
     (value: string) => {
-        if (looksEmergency(value, messages) || !needsSymptomIntake(value, messages)) {
+      const bodyRegions = composerRef.current?.sentBodyRegions() ?? [];
+      pendingRegions.current = bodyRegions;
+        if (looksEmergency(value, messages) || needsPromptAssessment(value) || !needsSymptomIntake(value, messages)) {
         setPendingSymptoms(null);
-        void sendMessage(value);
+        void sendMessage(value, { bodyRegions });
         return;
       }
       setPendingSymptoms(value);
@@ -97,7 +110,7 @@ export function Chat() {
       if (!pendingSymptoms) return;
       const query = formatFollowUpQuery(pendingSymptoms, answers);
       setPendingSymptoms(null);
-      void sendMessage(query);
+      void sendMessage(query, { bodyRegions: pendingRegions.current });
     },
     [pendingSymptoms, sendMessage],
   );
@@ -155,31 +168,16 @@ export function Chat() {
             <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-5">
               {messagesLoading ? <Spinner label="Loading conversation..." /> : null}
               {!messagesLoading && !messages.length && !pendingSymptoms ? (
-                <div className="m-auto w-full max-w-xl px-2 py-6 text-center">
-                  <h2 className="text-xl font-extrabold text-slate-900">Tap where it hurts</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Click a body region, then choose symptoms. You can also type in your own words. This is not a diagnosis.
-                  </p>
-                  <div className="mt-5 rounded-3xl border border-sky-200 bg-sky-50 px-4 py-5 shadow-sm">
-                    <BodyFigure
-                      view="front"
-                      selected={[]}
-                      focused={null}
-                      onToggle={(region: BodyRegion) => composerRef.current?.openMap(region)}
-                    />
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      {REGION_ORDER.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className="min-h-11 rounded-full border border-sky-300 bg-white px-3 text-xs font-bold text-sky-900 hover:bg-sky-100"
-                          onClick={() => composerRef.current?.openMap(id)}
-                        >
-                          {REGION_LABELS[id]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div className="m-auto w-full max-w-3xl py-4">
+                  <BodyMapCard
+                    view={bodySelection.view}
+                    onViewChange={(view) => composerRef.current?.setView(view)}
+                    selectedRegions={bodySelection.regions}
+                    onToggleRegion={(region: BodyRegion) => composerRef.current?.toggleRegion(region)}
+                    onClear={() => composerRef.current?.clearRegions()}
+                    onDescribe={() => composerRef.current?.openMap()}
+                    disabled={sending}
+                  />
                 </div>
               ) : null}
               {messages.map((message) => (
@@ -223,7 +221,7 @@ export function Chat() {
             </button>
           ) : null}
         </div>
-        <ChatInput ref={composerRef} disabled={sending || Boolean(pendingSymptoms)} streaming={streaming} error={error} onSend={handleSend} onStop={stopGeneration} />
+        <ChatInput ref={composerRef} disabled={sending || Boolean(pendingSymptoms)} streaming={streaming} error={error} onSend={handleSend} onStop={stopGeneration} onSelectionChange={setBodySelection} />
       </section>
       {pendingSymptoms ? (
         <Suspense fallback={null}>
@@ -233,7 +231,7 @@ export function Chat() {
             onSkip={() => {
               const text = pendingSymptoms;
               setPendingSymptoms(null);
-              void sendMessage(text);
+              void sendMessage(text, { bodyRegions: pendingRegions.current });
             }}
           />
         </Suspense>

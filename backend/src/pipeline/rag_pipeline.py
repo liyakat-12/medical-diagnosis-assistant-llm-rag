@@ -51,6 +51,10 @@ from src.llm.kb_miss import (
 from src.retrieval.query_normalize import (
     evidence_supports_named_disease,
     is_underspecified_medical_query,
+    is_warning_sign_note,
+    note_addresses_hemoptysis,
+    note_claims_unreported_context,
+    note_context_fit,
     retrieval_topics,
 )
 from src.retrieval.retriever import Evidence, retrieve_candidates
@@ -64,11 +68,19 @@ from src.safety.guardrails import (
     conversational_reply,
     emergency_banner_message,
     has_chest_pain_signal,
+    hemoptysis_needs_prompt_care,
+    hemoptysis_present,
     is_general_intent,
 )
 
 GENERAL_CHAT_FAILURE = "I could not finish this reply. Please try again in a moment."
-from src.safety.triage import CHEST_PAIN_SAFETY_QUESTIONS, TriageResult, classify_triage
+from src.safety.triage import (
+    CHEST_PAIN_SAFETY_QUESTIONS,
+    TriageResult,
+    chest_caution_guidance,
+    classify_triage,
+    hemoptysis_guidance,
+)
 
 logger = logging.getLogger("mediassist.pipeline")
 OUTCOME_LIMIT = 4
@@ -132,9 +144,9 @@ def _apply_question_policy(
 
 
 def _recommendations(triage: TriageResult | None, evidence: list[Evidence]) -> list[str]:
+    """Next steps from the notes. Urgency text stays in the triage card."""
+    del triage
     items: list[str] = []
-    if triage and triage.guidance:
-        items.append(triage.guidance)
     for ev in evidence[:2]:
         for sent in re.split(r"(?<=[.!?])\s+", ev.text or ""):
             text = sent.strip()
@@ -221,9 +233,15 @@ def build_possible_conditions(citations: list[dict], limit: int = OUTCOME_LIMIT)
         )
         if len(rows) >= limit:
             break
-    percents = match_percents([float(row.get("relevance_score") or 0) for row in rows])
-    for row, percent in zip(rows, percents):
-        row["match_percent"] = percent
+    scores = [float(row.get("relevance_score") or 0) for row in rows]
+    best = max(scores) if scores else 0.0
+    for row, score in zip(rows, scores):
+        if best <= 0:
+            row["evidence_match_label"] = "Retrieved note"
+        elif score >= best:
+            row["evidence_match_label"] = "Closest evidence match"
+        else:
+            row["evidence_match_label"] = "Related evidence match"
     return rows
 
 
@@ -267,7 +285,8 @@ def _evidence_is_strong(evidence: list[Evidence]) -> bool:
 
 
 def _emergency_answer(query: str, *, with_retrieval_note: bool = False) -> str:
-    lines = [emergency_banner_message()]
+    """Body text for emergencies. Call-112 wording lives on triage.guidance / the urgency card."""
+    lines: list[str] = []
     if has_chest_pain_signal(query):
         lines.append(
             "Chest pain can be serious. If it is severe, persistent, or comes with "
@@ -275,6 +294,10 @@ def _emergency_answer(query: str, *, with_retrieval_note: bool = False) -> str:
             "jaw, back, or shoulder, seek emergency care now."
         )
         lines.extend(CHEST_PAIN_SAFETY_QUESTIONS)
+    else:
+        lines.append(
+            "Follow the urgency instructions shown with this reply and seek emergency care now."
+        )
     if with_retrieval_note:
         lines.append(
             "I could not rely on matching knowledge-base notes for this urgency assessment; "
@@ -344,30 +367,141 @@ def _result_from_kb_miss(query: str, bundle: KbMissBundle) -> DiagnosisResponse:
     )
 
 
-_EMERGENCY_NOTE = re.compile(
-    r"\b(chest|heart|cardiac|stroke|bleed|breath|anaphyla|seizure|suicid|poison|overdose)\b",
-    re.I,
-)
-
-
 def _evidence_matches_query_topics(query: str, evidence: list[Evidence]) -> list[Evidence]:
-    """Keep notes for the current complaint only. Empty is safer than leftover cards."""
+    """Keep notes for the current complaint. Do not drop non-cardiac notes during an emergency."""
     topics = retrieval_topics(query)
     if not topics or not evidence:
-        filtered = list(evidence)
-    else:
-        filtered = [
-            ev
-            for ev in evidence
-            if retrieval_topics(f"{ev.title} {ev.condition} {ev.text[:500]}") & topics
-        ]
-    if not check_emergency(query).triggered:
-        return filtered
+        return list(evidence)
     return [
         ev
-        for ev in filtered
-        if _EMERGENCY_NOTE.search(f"{ev.title} {ev.condition} {ev.doc_id}")
+        for ev in evidence
+        if retrieval_topics(f"{ev.title} {ev.condition} {ev.text[:500]}") & topics
     ]
+
+
+def _compatible_evidence(user_query: str, evidence: list[Evidence]) -> list[Evidence]:
+    """Drop notes whose title assumes a trigger the user never reported."""
+    return [
+        ev
+        for ev in evidence
+        if not note_claims_unreported_context(user_query, ev.title, ev.condition, ev.doc_id)
+    ]
+
+
+def _rank_key(user_query: str, ev: Evidence) -> tuple:
+    """Order by reported-context fit, then retrieval score. Warning-sign notes last."""
+    return (
+        0 if is_warning_sign_note(ev.title, ev.condition, ev.doc_id) else 1,
+        note_context_fit(user_query, ev.title, ev.condition, ev.text[:500]),
+        float(ev.relevance_score),
+        float(ev.vector_score),
+    )
+
+
+def _hemoptysis_rank_key(user_query: str, ev: Evidence) -> tuple:
+    return (
+        note_addresses_hemoptysis(ev.title, ev.condition, ev.doc_id, ev.text),
+        note_context_fit(user_query, ev.title, ev.condition, ev.text[:500]),
+        float(ev.relevance_score),
+        float(ev.vector_score),
+    )
+
+
+def _select_emergency_explanation_notes(user_query: str, kept: list[Evidence]) -> list[Evidence]:
+    """Prefer concise serious/warning notes; never lead with unreported situational cards."""
+    ranked = sorted(
+        kept,
+        key=lambda ev: (
+            note_addresses_hemoptysis(ev.title, ev.condition, ev.doc_id, ev.text)
+            if hemoptysis_present(user_query)
+            else 0,
+            1
+            if (ev.triage_level or "").lower() in {"emergency", "warning"}
+            or is_warning_sign_note(ev.title, ev.condition, ev.doc_id)
+            else 0,
+            note_context_fit(user_query, ev.title, ev.condition, ev.text[:500]),
+            float(ev.relevance_score),
+            float(ev.vector_score),
+        ),
+        reverse=True,
+    )
+    preferred = [
+        ev
+        for ev in ranked
+        if (ev.triage_level or "").lower() in {"emergency", "warning"}
+        or is_warning_sign_note(ev.title, ev.condition, ev.doc_id)
+        or (
+            hemoptysis_present(user_query)
+            and note_addresses_hemoptysis(ev.title, ev.condition, ev.doc_id, ev.text) > 0
+        )
+    ]
+    return preferred[:2]
+
+
+def _select_hemoptysis_explanation_notes(user_query: str, kept: list[Evidence]) -> list[Evidence]:
+    """Prefer retrieved notes that address blood in sputum / related lung findings."""
+    ranked = sorted(kept, key=lambda ev: _hemoptysis_rank_key(user_query, ev), reverse=True)
+    blood = [
+        ev
+        for ev in ranked
+        if note_addresses_hemoptysis(ev.title, ev.condition, ev.doc_id, ev.text) > 0
+    ]
+    other = [
+        ev
+        for ev in ranked
+        if note_addresses_hemoptysis(ev.title, ev.condition, ev.doc_id, ev.text) == 0
+    ]
+    if not blood:
+        # Do not invent a disease card; keep at most one ordinary cough note for context.
+        return other[:1]
+    # Prefer blood-related evidence only; do not pad with unrelated dry-cough cards.
+    return blood[:OUTCOME_LIMIT]
+
+
+def _select_explanation_notes(user_query: str, retain_query: str, pool: list[Evidence]) -> list[Evidence]:
+    """Choose a short list from notes that already pass the retrieval cutoff.
+
+    Notes that claim an unreported trigger are removed. Remaining notes are
+    ordered by how well they fit reported context, then by retrieval score.
+    For a non-emergency description, everyday notes lead and the top emergency
+    note is kept when clinically still in the candidate pool. True emergencies
+    keep only concise serious/warning (or hemoptysis-relevant) notes.
+    """
+    kept = _compatible_evidence(user_query, _retain_relevant_evidence(retain_query, pool))
+    if not kept:
+        return []
+    if check_emergency(user_query).triggered:
+        return _select_emergency_explanation_notes(user_query, kept)
+    if hemoptysis_present(user_query):
+        return _select_hemoptysis_explanation_notes(user_query, kept)
+    ranked = sorted(kept, key=lambda ev: _rank_key(user_query, ev), reverse=True)
+    ordinary = [ev for ev in ranked if (ev.triage_level or "") != "emergency"]
+    serious = [ev for ev in ranked if (ev.triage_level or "") == "emergency"]
+    if not ordinary:
+        return ranked[:OUTCOME_LIMIT]
+    if not serious:
+        return ordinary[:OUTCOME_LIMIT]
+    chosen = ordinary[:OUTCOME_LIMIT]
+    top_serious = serious[0]
+    if top_serious not in chosen:
+        if len(chosen) >= OUTCOME_LIMIT:
+            chosen = chosen[: OUTCOME_LIMIT - 1]
+        chosen = [*chosen, top_serious]
+    return chosen
+
+
+def _needs_symptom_caution(query: str) -> bool:
+    return has_chest_pain_signal(query) or hemoptysis_needs_prompt_care(query)
+
+
+def _symptom_caution_answer(query: str) -> str:
+    if hemoptysis_needs_prompt_care(query):
+        lead = hemoptysis_guidance()
+    else:
+        lead = chest_caution_guidance()
+    questions = clarifying_questions(query, limit=2)
+    extra = "\n".join(f"- {item}" for item in questions)
+    return f"{lead}\n\n{extra}\n\nNot a diagnosis — see a clinician if needed.".strip()
 
 
 def _retain_relevant_evidence(query: str, evidence: list[Evidence]) -> list[Evidence]:
@@ -406,23 +540,39 @@ def _needs_general_knowledge_disclosure(audit: FaithfulnessAudit | None) -> bool
     )
 
 
+def _strip_leading_emergency_banner(answer: str) -> str:
+    """Remove a duplicated Call-112 banner when triage.guidance already carries it."""
+    text = (answer or "").strip()
+    if not text:
+        return text
+    banner = emergency_banner_message().strip()
+    number = str(getattr(config, "EMERGENCY_NUMBER", "112"))
+    if banner and text.startswith(banner):
+        return text[len(banner) :].lstrip("\n ").strip()
+    # Model sometimes paraphrases the same banner; drop a leading 112 emergency block.
+    lines = text.splitlines()
+    if lines and number in lines[0] and re.search(r"\bemergency\b", lines[0], re.I):
+        rest = "\n".join(lines[1:]).lstrip()
+        if rest.startswith("\n"):
+            rest = rest.lstrip("\n")
+        return rest.strip()
+    return text
+
+
 def _with_emergency_banner(query: str, answer: str, triage: TriageResult | None) -> str:
-    """Keep emergency guidance in the answer body even when notes also matched."""
+    """Attach chest safety detail without repeating the triage urgency card's 112 banner."""
     if not triage or triage.level != "emergency":
         return answer
-    banner = emergency_banner_message()
-    number = str(getattr(config, "EMERGENCY_NUMBER", "112"))
-    if number in (answer or "") and re.search(r"\bemergency\b", answer or "", re.I):
-        return answer
-    extra = ""
-    if has_chest_pain_signal(query) and "Chest pain can be serious" not in (answer or ""):
+    text = _strip_leading_emergency_banner(answer)
+    if has_chest_pain_signal(query) and "Chest pain can be serious" not in (text or ""):
         extra = (
-            "\nChest pain can be serious. If it is severe, persistent, or comes with "
+            "Chest pain can be serious. If it is severe, persistent, or comes with "
             "breathlessness, sweating, fainting, nausea, or pain spreading to an arm, "
             "jaw, back, or shoulder, seek emergency care now.\n"
             + "\n".join(CHEST_PAIN_SAFETY_QUESTIONS)
         )
-    return f"{banner}{extra}\n\n{answer}".strip()
+        return f"{extra}\n\n{text}".strip() if text else extra
+    return text
 
 
 def synthesize_retrieval_query(query: str, history: list[dict] | None = None) -> str:
@@ -492,8 +642,8 @@ def run_pipeline(
     except Exception:
         evidence, pool = [], []
     retain_query = state.search_query or query
-    evidence = _retain_relevant_evidence(retain_query, evidence)
-    pool = _retain_relevant_evidence(retain_query, pool)
+    evidence = _select_explanation_notes(query, retain_query, pool or evidence)
+    pool = evidence
     timings["retrieve_ms"] = round((time.perf_counter() - retrieve_started) * 1000, 2)
     strong = _evidence_is_strong(evidence)
     # Emergency always; evidence-based triage only when retrieval is strong.
@@ -501,6 +651,8 @@ def run_pipeline(
         triage = early_triage
     elif strong and uses_personalized_triage(state.question_type, state.personal_context):
         triage = classify_triage(query, evidence, history)
+    elif _needs_symptom_caution(query):
+        triage = classify_triage(query, [], history)
     else:
         triage = None
 
@@ -518,7 +670,30 @@ def run_pipeline(
                     answer=answer,
                     citations=[],
                     faithfulness=None,
-                    recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
+                    recommendations=[*clarifying_questions(query, limit=2)],
+                    possible_conditions=[],
+                    evidence_origin="none",
+                ),
+                state,
+            ),
+            timings,
+        )
+
+    if triage and _needs_symptom_caution(query) and not strong:
+        answer = _symptom_caution_answer(query)
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        logger.info("pipeline timings %s", timings)
+        return _with_timings(
+            _attach_state(
+                DiagnosisResponse(
+                    query=query,
+                    refused=False,
+                    refusal_reason=None,
+                    triage=triage,
+                    answer=answer,
+                    citations=[],
+                    faithfulness=None,
+                    recommendations=[*clarifying_questions(query, limit=2)],
                     possible_conditions=[],
                     evidence_origin="none",
                 ),
@@ -561,7 +736,7 @@ def run_pipeline(
         citations = [*citations, general_ai_citation()]
         origin = "mixed"
     matches = (
-        outcomes_for_query(query, citations, embedding_mode, citations_from_evidence(pool))
+        outcomes_for_query(query, citations, embedding_mode, citations)
         if strong
         else []
     )
@@ -716,8 +891,8 @@ def iter_pipeline_stream(
     except Exception:
         evidence, pool = [], []
     retain_query = state.search_query or query
-    evidence = _retain_relevant_evidence(retain_query, evidence)
-    pool = _retain_relevant_evidence(retain_query, pool)
+    evidence = _select_explanation_notes(query, retain_query, pool or evidence)
+    pool = evidence
     timings["retrieve_ms"] = round((time.perf_counter() - retrieve_started) * 1000, 2)
     strong = _evidence_is_strong(evidence)
     if early_triage and early_triage.level == "emergency":
@@ -732,6 +907,15 @@ def iter_pipeline_stream(
                 "guidance": triage.guidance,
                 "reason": triage.reason,
             }
+    elif _needs_symptom_caution(query):
+        triage = classify_triage(query, [], history)
+        yield {
+            "type": "triage",
+            "level": triage.level,
+            "label": triage.label,
+            "guidance": triage.guidance,
+            "reason": triage.reason,
+        }
     else:
         triage = None
 
@@ -750,7 +934,35 @@ def iter_pipeline_stream(
                     answer=answer,
                     citations=[],
                     faithfulness=None,
-                    recommendations=[triage.guidance, *clarifying_questions(query, limit=2)],
+                    recommendations=[*clarifying_questions(query, limit=2)],
+                    possible_conditions=[],
+                    evidence_origin="none",
+                ),
+                state,
+            ),
+            timings,
+        )
+        payload = result_to_dict(result)
+        yield {"type": "metadata", "recommendations": payload["recommendations"], "faithfulness": None}
+        yield {"type": "done", "result": payload}
+        return
+
+    if triage and _needs_symptom_caution(query) and not strong:
+        answer = _symptom_caution_answer(query)
+        yield {"type": "token", "content": answer}
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 2)
+        logger.info("pipeline timings %s", timings)
+        result = _with_timings(
+            _attach_state(
+                DiagnosisResponse(
+                    query=query,
+                    refused=False,
+                    refusal_reason=None,
+                    triage=triage,
+                    answer=answer,
+                    citations=[],
+                    faithfulness=None,
+                    recommendations=[*clarifying_questions(query, limit=2)],
                     possible_conditions=[],
                     evidence_origin="none",
                 ),
@@ -804,7 +1016,7 @@ def iter_pipeline_stream(
     mode = generation_mode(state.question_type, state.personal_context)
     citations = citations_from_evidence(evidence) if strong else []
     possible_conditions = (
-        outcomes_for_query(query, citations, embedding_mode, citations_from_evidence(pool)) if strong else []
+        outcomes_for_query(query, citations, embedding_mode, citations) if strong else []
     )
     if not uses_condition_cards(state.question_type, state.personal_context):
         possible_conditions = []

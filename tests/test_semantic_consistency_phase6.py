@@ -46,7 +46,8 @@ def test_asthma_emergency_is_not_normalized_away():
     result = run_pipeline("I have asthma and cannot breathe.")
     assert check_emergency(result.query).triggered
     assert result.triage and result.triage.level == "emergency"
-    assert "112" in (result.answer or "")
+    assert "112" in ((result.answer or "") + " " + ((result.triage.guidance if result.triage else "") or ""))
+    assert "call 112" not in (result.answer or "").lower()
 
 
 def test_prescription_still_refused():

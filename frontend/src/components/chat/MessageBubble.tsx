@@ -7,7 +7,7 @@ import { useApp } from "../../context/AppContext";
 import { cn } from "../../lib/cn";
 import { normalizeMarkdownTables } from "../../utils/markdown";
 import { isIncompleteMessage } from "../../utils/chatSession";
-import { evidenceStatusItems, formatAssistantCopy, formatConditionName, isSymptomCardMessage, retrievedCitations, withPercents } from "../../utils/report";
+import { evidenceStatusItems, formatAssistantCopy, formatConditionName, isSymptomCardMessage, retrievedCitations } from "../../utils/report";
 import { EMERGENCY_NUMBER, EMERGENCY_TEL } from "../../utils/emergency";
 
 const URGENCY_COPY: Record<string, string> = {
@@ -71,7 +71,7 @@ function SectionTitle({ children }: { children: string }) {
 }
 
 function visibleExplanation(content: string): string {
-  const cut = content.search(/\n+(?:#{1,3}\s*)?(?:possible matches|recommendations)\s*:/i);
+  const cut = content.search(/\n+(?:#{1,3}\s*)?(?:possible matches|possible explanations|recommendations)\s*:/i);
   const text = (cut >= 0 ? content.slice(0, cut) : content).trim();
   if (/^(?:#{1,3}\s*)?(?:possible matches|recommendations)\s*:/i.test(text)) return "";
   return text;
@@ -109,7 +109,7 @@ function ThinkingIndicator({ status }: { status?: string }) {
 }
 
 function OutcomeList({ message }: { message: ChatMessage }) {
-  const outcomes = withPercents(message.possible_conditions);
+  const outcomes = message.possible_conditions.slice(0, 4);
   if (message.streaming && !outcomes.length) {
     return (
       <ul className="space-y-2">
@@ -121,24 +121,20 @@ function OutcomeList({ message }: { message: ChatMessage }) {
   }
   if (!outcomes.length) return null;
   return (
-    <ul className="space-y-2">
-      {outcomes.map((item) => {
-        const percent = item.match_percent || 0;
-        return (
-          <li key={`${item.condition}-${item.title}`} className="rounded-xl bg-teal-50/80 px-3 py-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="min-w-0 break-anywhere text-sm font-bold text-slate-900">{formatConditionName(item.condition)}</span>
-              <span className="shrink-0 text-xs font-extrabold text-teal-800" title="Retrieval-match share among listed notes, not a diagnosis probability">
-                {percent}% retrieval match
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
-              <div className="h-full rounded-full bg-teal-600" style={{ width: `${Math.max(percent, 4)}%` }} />
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <ol className="space-y-2">
+      {outcomes.map((item, index) => (
+        <li key={`${item.condition}-${item.title}`} className="rounded-xl bg-teal-50/80 px-3 py-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span className="min-w-0 break-anywhere text-sm font-bold text-slate-900">
+              {index + 1}. {formatConditionName(item.condition)}
+            </span>
+            {item.evidence_match_label ? (
+              <span className="text-xs font-semibold text-teal-800">{item.evidence_match_label}</span>
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -338,19 +334,11 @@ export const MessageBubble = memo(function MessageBubble({
             ) : null}
             {showMatches ? (
               <section>
-                <SectionTitle>Possible matches</SectionTitle>
+                <SectionTitle>Possible explanations</SectionTitle>
                 <OutcomeList message={message} />
                 {message.possible_conditions.length ? (
                   <p className="mt-2 text-xs text-slate-500">
-                    {(message.metadata?.evidence_origin === "llm" ||
-                    message.metadata?.evidence_origin === "mixed" ||
-                    message.citations.some((item) =>
-                      /not verified|General AI medical knowledge|not in local notes/i.test(
-                        `${item.source || ""} ${item.title || ""}`,
-                      ),
-                    ))
-                      ? "These matches come from MediAssist general medical knowledge because no close local note was found. Percentages are retrieval-match shares, not a diagnosis chance."
-                      : "Percentages are retrieval-match shares among these notes, not the chance of a diagnosis."}
+                    These labels compare the retrieved notes with each other. They are not the chance of having a condition.
                   </p>
                 ) : null}
               </section>

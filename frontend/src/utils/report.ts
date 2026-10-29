@@ -1,4 +1,4 @@
-import type { ChatMessage, Citation, PossibleCondition } from "../types";
+import type { ChatMessage, Citation } from "../types";
 
 const EVIDENCE_STATUS =
   /not verified|General AI medical knowledge|No matching sources|not retrieved from the (MediAssist )?knowledge base/i;
@@ -10,36 +10,6 @@ export function formatConditionName(value?: string): string {
     return text.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
   return text;
-}
-
-export function withPercents(items: PossibleCondition[], limit = 4): PossibleCondition[] {
-  const rows = items.slice(0, limit);
-  if (!rows.length) return [];
-  if (rows.every((item) => typeof item.match_percent === "number")) {
-    return rows;
-  }
-  const scores = rows.map((item) => Math.max(0, item.relevance_score || 0));
-  const total = scores.reduce((sum, score) => sum + score, 0);
-  if (total <= 0) {
-    const share = Math.floor(100 / rows.length);
-    return rows.map((item, index) => ({
-      ...item,
-      match_percent: share + (index < 100 % rows.length ? 1 : 0),
-    }));
-  }
-  const raw = scores.map((score) => (score / total) * 100);
-  const floors = raw.map((value) => Math.floor(value));
-  let leftover = 100 - floors.reduce((sum, value) => sum + value, 0);
-  const order = raw
-    .map((value, index) => ({ index, frac: value - floors[index] }))
-    .sort((a, b) => b.frac - a.frac);
-  const percents = [...floors];
-  for (const item of order) {
-    if (leftover <= 0) break;
-    percents[item.index] += 1;
-    leftover -= 1;
-  }
-  return rows.map((item, index) => ({ ...item, match_percent: percents[index] }));
 }
 
 export function uniqueCitations(message: ChatMessage) {
@@ -71,7 +41,7 @@ export function isSymptomCardMessage(message: ChatMessage): boolean {
 
 export function formatAssistantCopy(message: ChatMessage): string {
   if (message.refused) return message.content;
-  const outcomes = withPercents(message.possible_conditions);
+  const outcomes = message.possible_conditions.slice(0, 4);
   const citations = retrievedCitations(message);
   const statusItems = evidenceStatusItems(message);
   const lines: string[] = [];
@@ -84,10 +54,11 @@ export function formatAssistantCopy(message: ChatMessage): string {
 
   if (symptomLayout) {
     if (lines.length) lines.push("");
-    lines.push("Possible matches");
+    lines.push("Possible explanations");
     if (outcomes.length) {
       for (const item of outcomes) {
-        lines.push(`• ${formatConditionName(item.condition)} — ${item.match_percent}%`);
+        const label = item.evidence_match_label ? ` — ${item.evidence_match_label}` : "";
+        lines.push(`• ${formatConditionName(item.condition)}${label}`);
       }
     }
     if (message.triage && message.triage.level !== "none") {

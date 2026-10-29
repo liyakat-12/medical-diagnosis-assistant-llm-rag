@@ -256,7 +256,7 @@ export function NearbyHospitals({ active }: { active: boolean }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p id="hospital-finder-title" className="text-sm font-extrabold text-slate-900">Nearby hospitals</p>
-          <p className="text-xs text-slate-500">Uses your live location. Bengaluru shows Bengaluru hospitals; Srinagar shows Srinagar hospitals.</p>
+          <p className="text-xs text-slate-500">Uses your live location.</p>
         </div>
         <a
           href={EMERGENCY_TEL}

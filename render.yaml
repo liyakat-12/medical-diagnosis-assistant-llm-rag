@@ -1,0 +1,42 @@
+# Blueprint for the MediAssist API on Render.
+# Set secret env vars in the Render dashboard (never commit real values).
+# Docker build context is the repository root so backend/Dockerfile COPY paths work.
+services:
+  - type: web
+    name: mediassist-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    # Matches Dockerfile CMD --port 8000 (Render default target is often 10000).
+    port: 8000
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: PYTHONPATH
+        value: backend
+      - key: LLM_PROVIDER
+        value: groq
+      - key: EMBEDDING_MODE
+        value: general
+      - key: RERANK_ENABLED
+        value: "true"
+      - key: MONGODB_DB_NAME
+        value: mediassist
+      - key: EMERGENCY_REGION
+        value: IN
+      - key: EMERGENCY_NUMBER
+        value: "112"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GROQ_MODEL
+        sync: false

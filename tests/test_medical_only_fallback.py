@@ -179,7 +179,7 @@ def test_ambiguous_asks_for_clarification():
     assert result.possible_conditions == []
 
 
-def test_emergency_without_notes_still_uses_guardrails(monkeypatch):
+def test_chest_discomfort_without_notes_stays_urgent_not_emergency(monkeypatch):
     from src.pipeline import rag_pipeline as rp
 
     monkeypatch.setattr(rp, "retrieve_candidates", lambda *_a, **_k: ([], []))
@@ -187,8 +187,9 @@ def test_emergency_without_notes_still_uses_guardrails(monkeypatch):
     monkeypatch.setattr(rp, "generate_kb_miss_bundle", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("no groq")))
     result = run_pipeline("I have chest pain")
     assert result.triage is not None
-    assert result.triage.level == "emergency"
+    assert result.triage.level == "consult_doctor"
     assert "112" in (result.answer + " " + (result.triage.guidance or ""))
+    assert "heart attack" not in result.answer.lower()
 
 
 def test_groq_api_failure_does_not_use_mock_matches(monkeypatch):

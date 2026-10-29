@@ -158,7 +158,7 @@ def test_outcomes_for_query_reuses_pool_without_second_retrieve(monkeypatch):
         ],
     )
     assert [row["condition"] for row in rows] == ["cold", "flu"]
-    assert sum(row["match_percent"] for row in rows) == 100
+    assert "match_percent" not in rows[0]
 
 
 def test_build_possible_conditions_returns_four_unique():
@@ -170,8 +170,11 @@ def test_build_possible_conditions_returns_four_unique():
     ]
     rows = build_possible_conditions(citations)
     assert len(rows) == 4
-    assert sum(row["match_percent"] for row in rows) == 100
+    assert "match_percent" not in rows[0]
     assert rows[0]["condition"] == "Condition 0"
+    assert rows[0]["evidence_match_label"] == "Closest evidence match"
+    assert rows[1]["evidence_match_label"] == "Related evidence match"
+    assert "match_percent" not in rows[0]
 
 
 if __name__ == "__main__":

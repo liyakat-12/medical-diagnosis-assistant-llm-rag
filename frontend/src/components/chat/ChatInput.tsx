@@ -6,6 +6,7 @@ import {
   REGION_LABELS,
   REGION_SYMPTOMS,
   buildBodyMapQuery,
+  buildMessagePayload,
   formatReviewLine,
   summarizeSelection,
   toggleItem,
@@ -16,7 +17,13 @@ import { cn } from "../../lib/cn";
 
 export type ChatInputHandle = {
   openMap: (region?: BodyRegion) => void;
+  sentBodyRegions: () => BodyRegion[];
+  toggleRegion: (region: BodyRegion) => void;
+  clearRegions: () => void;
+  setView: (view: BodyView) => void;
 };
+
+export type BodySelection = { regions: BodyRegion[]; view: BodyView };
 
 export const ChatInput = forwardRef<
   ChatInputHandle,
@@ -26,8 +33,9 @@ export const ChatInput = forwardRef<
     error?: string;
     onSend: (value: string) => void;
     onStop: () => void;
+    onSelectionChange?: (selection: BodySelection) => void;
   }
->(function ChatInput({ disabled, streaming, error, onSend, onStop }, ref) {
+>(function ChatInput({ disabled, streaming, error, onSend, onStop, onSelectionChange }, ref) {
   const [value, setValue] = useState("");
   const [regions, setRegions] = useState<BodyRegion[]>([]);
   const [symptoms, setSymptoms] = useState<string[]>([]);
@@ -53,9 +61,22 @@ export const ChatInput = forwardRef<
         }
         setMapOpen(true);
       },
+      sentBodyRegions() {
+        return buildMessagePayload(draftRef.current.value, draftRef.current.regions, draftRef.current.symptoms).body_regions;
+      },
+      toggleRegion,
+      clearRegions() {
+        setRegions([]);
+        setActiveRegion(null);
+      },
+      setView,
     }),
     [],
   );
+
+  useEffect(() => {
+    onSelectionChange?.({ regions, view });
+  }, [regions, view, onSelectionChange]);
 
   useEffect(() => {
     const node = textareaRef.current;

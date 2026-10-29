@@ -29,12 +29,7 @@ def _load_model():
 
     device = _device()
     try:
-        return CrossEncoder(config.RERANK_MODEL, device=device, automodel_args={"local_files_only": True})
-    except TypeError:
-        try:
-            return CrossEncoder(config.RERANK_MODEL, device=device, local_files_only=True)
-        except TypeError:
-            return CrossEncoder(config.RERANK_MODEL, device=device)
+        return CrossEncoder(config.RERANK_MODEL, device=device, local_files_only=True)
     except Exception:
         return CrossEncoder(config.RERANK_MODEL, device=device)
 

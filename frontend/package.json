@@ -9,7 +9,7 @@
     "dev": "vite --port 5173 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 5173 --strictPort",
-    "test": "tsx --test tests/bodyMap.test.ts tests/intent.test.ts tests/publicText.test.ts tests/markdown.test.ts tests/report.test.ts tests/conversationChrome.test.ts tests/conversationPhase4Ui.test.ts"
+    "test": "tsx --test tests/bodyMap.test.ts tests/intent.test.ts tests/publicText.test.ts tests/markdown.test.ts tests/report.test.ts tests/conversationChrome.test.ts tests/conversationPhase4Ui.test.ts tests/bodyMapRegions.test.ts tests/evaluationMetrics.test.ts tests/dashboardStats.test.ts tests/dashboardView.test.ts tests/pipelineTrace.test.ts tests/bodyMapComponent.test.ts tests/evaluationDashboard.test.ts"
   },
   "engines": {
     "node": ">=18"

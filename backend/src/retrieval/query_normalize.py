@@ -38,6 +38,26 @@ _SYNONYM_EXPAND: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\babdominal\s+(pain|ache|discomfort)\b", re.I), "abdomen stomach pain"),
     (re.compile(r"\bhead\s+(pain|ache|discomfort)\b", re.I), "headache"),
     (re.compile(r"\bchest\s+(discomfort|tightness|pressure)\b", re.I), "chest pain"),
+    # Keep wording broad: help sleep-related headache notes compete without naming a disease.
+    (
+        re.compile(
+            r"\b(headache|head pain).{0,48}\b(sleep(?:ing)? poorly|poor sleep|bad night|little sleep|"
+            r"not sleep(?:ing)?|insomni\w*)\b|"
+            r"\b(sleep(?:ing)? poorly|poor sleep|bad night|little sleep|not sleep(?:ing)?|insomni\w*)"
+            r".{0,48}\b(headache|head pain)\b",
+            re.I,
+        ),
+        "poor sleep headache tension-type headache",
+    ),
+    (
+        re.compile(
+            r"\b(chest (?:pain|ache|discomfort|pressure|tightness)|pain in (?:my |the )?chest)"
+            r".{0,40}\bcough|"
+            r"\bcough.{0,40}\b(chest (?:pain|ache|discomfort|pressure)|pain in (?:my |the )?chest)\b",
+            re.I,
+        ),
+        "cough related chest wall pain",
+    ),
     (re.compile(r"\b(knee|kneecap)\b", re.I), "knee pain"),
     (re.compile(r"\b(leg|thigh|calf|shin)\s+(pain|ache|hurt|issue|problem)\b", re.I), "leg pain"),
     (re.compile(r"\b(swollen|painful)\s+(calf|leg)\b", re.I), "calf swelling"),
@@ -45,6 +65,68 @@ _SYNONYM_EXPAND: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bdiarrea\b", re.I), "diarrhoea"),
     (re.compile(r"\bashtma\b", re.I), "asthma"),
     (re.compile(r"\bhypertention\b", re.I), "hypertension"),
+]
+
+# If a note's title/condition names a specific trigger, that same trigger must appear
+# in the user's words. Body text can mention many differentials; titles are the claim.
+_NOTE_CONTEXT_REQUIREMENTS: list[tuple[re.Pattern[str], re.Pattern[str]]] = [
+    (
+        re.compile(r"\b(alcohol|drinking|hangover)\b", re.I),
+        re.compile(r"\b(alcohol|drink(?:ing|s)?|drank|drunk|hangover|beer|wine|liquor)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(anxiety|anxious|panic)\b", re.I),
+        re.compile(r"\b(anxiety|anxious|panic|worried|worry|fear(?:ful)?|stressed|stress)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(caffeine|coffee)\b", re.I),
+        re.compile(r"\b(caffeine|coffee|tea|energy drink)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(screens?|computer|phone)\b", re.I),
+        re.compile(r"\b(screens?|computer|phone|laptop|monitor|tv)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(grind(?:ing)?|bruxism|clench(?:ing)?)\b", re.I),
+        re.compile(r"\b(grind(?:ing)?|bruxism|clench(?:ing)?|teeth grinding)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(skip(?:ping)? breakfast|missed meal|fasting)\b", re.I),
+        re.compile(r"\b(breakfast|meal|food|eating|ate|fast(?:ing)?|hungry|skip(?:ped|ping)?)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(days? off|weekend)\b", re.I),
+        re.compile(r"\b(days? off|weekend|holiday|vacation|day off)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(pregnan|postpartum)\b", re.I),
+        re.compile(r"\b(pregnan|postpartum|post[- ]partum)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(gym|workout|after exercise)\b", re.I),
+        re.compile(r"\b(gym|workout|exercise|exercising|lifting|training|run(?:ning)?)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(exam|exams|board[- ]?exam)\b", re.I),
+        re.compile(
+            r"\b(exam|exams|board[- ]?exam|test(?:ing)?|stud(?:y|ying)|revision)\b",
+            re.I,
+        ),
+    ),
+]
+
+_WARNING_SIGN_NOTE = re.compile(
+    r"\b(warning signs?|red[- ]?flag|when (?:a |the )?\w+ needs a check|when to (?:see|seek))\b",
+    re.I,
+)
+
+_CONTEXT_CUES: list[tuple[str, re.Pattern[str]]] = [
+    ("sleep", re.compile(r"\b(sleep|slept|sleeping|insomni\w*|bad night|poor sleep)\b", re.I)),
+    ("cough", re.compile(r"\b(cough|coughing)\b", re.I)),
+    ("exercise", re.compile(r"\b(exercise|exercising|gym|workout|lifting|training|movement)\b", re.I)),
+    ("eating", re.compile(r"\b(eat(?:ing)?|ate|meal|food|after (?:meals?|eating)|indigestion)\b", re.I)),
+    ("alcohol", re.compile(r"\b(alcohol|drink(?:ing|s)?|drank|drunk|hangover|beer|wine)\b", re.I)),
+    ("anxiety", re.compile(r"\b(anxiety|anxious|panic|worried|worry|fear(?:ful)?)\b", re.I)),
 ]
 
 # Distinct symptom areas used to avoid mixing a new complaint with an old one.
@@ -378,6 +460,115 @@ def evidence_supports_named_disease(query: str, texts: list[str]) -> bool:
         return True
     blob = " ".join(texts).lower()
     return any(phrase in blob for phrase in phrases)
+
+
+def reported_context_cues(query: str) -> set[str]:
+    """Coarse context labels the user actually mentioned."""
+    text = query or ""
+    return {name for name, pattern in _CONTEXT_CUES if pattern.search(text)}
+
+
+def note_claims_unreported_context(query: str, title: str, condition: str = "", doc_id: str = "") -> bool:
+    """True when the note's title asserts a trigger the user never reported.
+
+    Only title/condition/id are checked. Body text often lists many differentials.
+    """
+    claim = f"{title or ''} {condition or ''} {doc_id or ''}"
+    if not claim.strip():
+        return False
+    for note_pattern, query_pattern in _NOTE_CONTEXT_REQUIREMENTS:
+        if note_pattern.search(claim) and not query_pattern.search(query or ""):
+            return True
+    return False
+
+
+def is_warning_sign_note(title: str, condition: str = "", doc_id: str = "") -> bool:
+    return bool(_WARNING_SIGN_NOTE.search(f"{title or ''} {condition or ''} {doc_id or ''}"))
+
+
+# Avoid matching "blood pressure" / "blood-pressure" compounds as hemoptysis evidence.
+_BLOOD_TOKEN = re.compile(r"(?<![\w-])blood(?!(?:-|\s+)pressure)(?![\w-])", re.I)
+_HEMOPTYSIS_NOTE_STRONG = re.compile(
+    r"(?<![\w-])(hemoptysis|haemoptysis)(?![\w-])|"
+    r"cough(?:ing)?\s+up\s+(?:large\s+amounts?\s+of\s+)?blood|"
+    r"coughing\s+blood|"
+    r"blood\s+in\s+(?:the\s+)?(?:sputum|phlegm|mucus)|"
+    r"bloody\s+(?:sputum|phlegm|mucus)",
+    re.I,
+)
+_TB_TITLE = re.compile(r"(?<![\w-])(tuberculosis|tb)(?![\w-])", re.I)
+_COUGH_BLOOD_MENTION = re.compile(
+    r"(?:you\s+)?cough(?:ing)?\s+(?:up\s+)?(?:large\s+amounts?\s+of\s+)?blood|"
+    r"mucus\s+is\s+bloody",
+    re.I,
+)
+_IRRELEVANT_BLOOD_NOTE = re.compile(
+    r"(?<![\w-])(toilet|stool|semen|urine|period|menstrual|nosebleed|gum|rectal)(?![\w-])",
+    re.I,
+)
+
+
+def _clinical_note_body(text: str) -> str:
+    """Drop trailing see-a-doctor / seek-emergency footers that mention cough blood generically."""
+    raw = text or ""
+    parts = re.split(
+        r"(?i)\n\s*(?:see a doctor|seek (?:emergency )?care|seek urgent care)\b",
+        raw,
+        maxsplit=1,
+    )
+    return parts[0]
+
+
+def note_addresses_hemoptysis(
+    title: str,
+    condition: str = "",
+    doc_id: str = "",
+    text: str = "",
+) -> int:
+    """How well a note supports blood-in-sputum / hemoptysis explanations.
+
+    Returns 0 when the note is not useful for that presentation. Higher values
+    prefer notes that discuss coughing blood or related lung conditions without
+    treating a bare \"blood\" token (e.g. blood-pressure tablets) as a match.
+    Ordinary cough notes that only mention blood in a standard footer score 0.
+    """
+    head = f"{title or ''} {condition or ''} {doc_id or ''}"
+    body = (text or "")[:700]
+    clinical = f"{head} {_clinical_note_body(body)}"
+    blob = f"{head} {body}"
+    if not blob.strip():
+        return 0
+    if _IRRELEVANT_BLOOD_NOTE.search(head):
+        return 0
+    if _HEMOPTYSIS_NOTE_STRONG.search(clinical):
+        return 3
+    if _TB_TITLE.search(head) and _BLOOD_TOKEN.search(clinical):
+        return 3
+    if re.search(r"\bcough", head, re.I) and _BLOOD_TOKEN.search(head):
+        return 2
+    if is_warning_sign_note(title, condition, doc_id) and _COUGH_BLOOD_MENTION.search(blob):
+        return 2
+    return 0
+
+
+def note_context_fit(query: str, title: str, condition: str = "", text: str = "") -> int:
+    """How many reported context cues also appear in the note title or condition.
+
+    Body text is ignored so a warning line like "wake you from sleep" cannot
+    outrank a better-fitting explanation.
+    """
+    del text
+    cues = reported_context_cues(query)
+    if not cues:
+        return 0
+    blob = f"{title or ''} {condition or ''}"
+    score = 0
+    for name in cues:
+        for cue_name, pattern in _CONTEXT_CUES:
+            if cue_name == name and pattern.search(blob):
+                score += 1
+                break
+    return score
 
 
 def is_underspecified_medical_query(query: str) -> bool:

@@ -104,9 +104,9 @@ class MockProvider:
                 lines.append(f"{title} (Source: {title}).")
             lines.append("Not a diagnosis — this is general information from reference notes.")
             return "\n".join(lines)
-        lines = ["Possible matches:"]
-        for i, title in enumerate(titles[:3], start=1):
-            lines.append(f"{i}. {title} (Source: {title}).")
+        lines = ["Possible explanations:"]
+        for i, title in enumerate(titles[:4], start=1):
+            lines.append(f"{i}. {title} may fit these symptoms (Source: {title}).")
         recs: list[str] = []
         for sent in re.split(r"(?<=[.!?])\s+", user_prompt):
             text = sent.strip()

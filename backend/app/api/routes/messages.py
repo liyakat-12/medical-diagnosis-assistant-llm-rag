@@ -32,12 +32,15 @@ async def send_message(
     user: dict = Depends(get_current_user),
 ) -> list[MessageResponse]:
     history = await message_service.recent_history(user["id"], chat_id)
-    user_msg = await message_service.add_user_message(user["id"], chat_id, payload.content.strip())
+    user_msg = await message_service.add_user_message(
+        user["id"], chat_id, payload.content.strip(), body_regions=payload.body_regions
+    )
     result = await asyncio.to_thread(
         message_service.diagnose_sync,
         payload.content.strip(),
         payload.top_k,
-        chat_history=history,
+        history,
+        payload.body_regions,
     )
     assistant = await message_service.add_assistant_message(user["id"], chat_id, result)
     return [MessageResponse(**user_msg), MessageResponse(**assistant)]
@@ -50,7 +53,7 @@ async def stream_message(
     user: dict = Depends(get_current_user),
 ):
     history = await message_service.recent_history(user["id"], chat_id)
-    await message_service.add_user_message(user["id"], chat_id, payload.content.strip())
+    await message_service.add_user_message(user["id"], chat_id, payload.content.strip(), body_regions=payload.body_regions)
 
     async def event_source():
         loop = asyncio.get_running_loop()
@@ -60,7 +63,7 @@ async def stream_message(
         def produce() -> None:
             try:
                 for event in message_service.stream_events(
-                    payload.content.strip(), payload.top_k, chat_history=history
+                    payload.content.strip(), payload.top_k, history, payload.body_regions
                 ):
                     asyncio.run_coroutine_threadsafe(queue.put(event), loop).result()
                 asyncio.run_coroutine_threadsafe(queue.put(done_marker), loop).result()

@@ -124,6 +124,7 @@ describe("accessibility and collapse markup", () => {
     assert.match(chatPageSource, /SymptomIntakeModal/);
     assert.match(chatPageSource, /needsSymptomIntake/);
     assert.match(chatPageSource, /looksEmergency/);
+    assert.match(chatPageSource, /needsPromptAssessment/);
     assert.match(chatPageSource, /HospitalFinderModal/);
     assert.equal(chatPageSource.includes("<NearbyHospitals"), false);
   });

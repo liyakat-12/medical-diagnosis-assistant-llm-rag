@@ -32,11 +32,11 @@ from src.retrieval.query_normalize import (
 # ---------------------------------------------------------------------------
 # Grouped by theme purely for readability/maintainability.
 _EMERGENCY_PHRASES: list[str] = [
-    # Cardiac
-    r"chest pain", r"pain in (my )?chest", r"pressure (in|on) (my )?(the )?chest",
-    r"chest tightness", r"sudden (chest|cardiac) (pain|pressure)",
-    r"crushing (chest|pain|pressure)", r"tight(ness)? in (my|the) chest",
-    r"pain (radiating|spreading) (to|down) (my )?(left |right )?(arm|jaw|neck|back)",
+    # Cardiac combinations. Isolated "chest pain" is urgent assessment, not an
+    # automatic emergency. Companion signs are checked separately below.
+    r"sudden (chest|cardiac) (pain|pressure)",
+    r"crushing (chest|pain|pressure)",
+    r"pain (radiating|spreading) (to|down) (my )?(left |right )?(arm|jaw|neck|back|shoulder)",
     r"heart attack",
     # Respiratory
     r"can'?t breathe", r"cannot breathe", r"difficulty breathing",
@@ -57,7 +57,7 @@ _EMERGENCY_PHRASES: list[str] = [
     r"stroke",
     # Bleeding / trauma
     r"severe bleeding", r"won'?t stop bleeding", r"heavy blood loss",
-    r"coughing up blood", r"vomiting blood", r"blood in (my )?vomit",
+    r"vomiting blood", r"blood in (my )?vomit",
     r"deep wound", r"compound fracture", r"bone (is )?sticking out",
     # Allergic / anaphylaxis
     r"anaphyla", r"throat.{0,20}closing", r"swelling of (my )?(throat|tongue|face)",
@@ -84,6 +84,58 @@ _EMERGENCY_PHRASES: list[str] = [
     r"heavy bleeding.*pregnan", r"pregnan.*heavy bleeding",
 ]
 EMERGENCY_PATTERNS = [re.compile(p, re.IGNORECASE) for p in _EMERGENCY_PHRASES]
+
+# Chest discomfort alone is not an emergency. It becomes one with a companion
+# warning sign, or when the pain itself is described as severe or crushing.
+_CHEST_DISCOMFORT = re.compile(
+    r"\b("
+    r"chest pain|chest ache|chest pressure|chest tightness|chest discomfort|"
+    r"pain in (?:my |the )?chest|"
+    r"pressure (?:in|on) (?:my |the )?chest|"
+    r"tight(?:ness)? in (?:my |the )?chest|"
+    r"(?:my )?chest (?:hurts|hurt|is sore|muscles? hurt)"
+    r")\b",
+    re.IGNORECASE,
+)
+_CHEST_COMPANION = re.compile(
+    r"\b(sweat\w*|faint\w*|collapse[d]?|unconscious|breathless|"
+    r"short(?:ness)? of breath|difficulty breathing|can'?t breathe|cannot breathe|"
+    r"gasping|nausea|vomit\w*|jaw|crushing)\b",
+    re.IGNORECASE,
+)
+_CHEST_SEVERE = re.compile(
+    r"\b(severe|crushing|worst)\b.{0,48}\bchest\b|\bchest\b.{0,48}\b(severe|crushing|worst)\b",
+    re.IGNORECASE,
+)
+# Optional quantity between "up" and "blood" (e.g. "coughing up a large amount of blood").
+_HEMOPTYSIS_AMOUNT = r"(?:(?:a\s+)?(?:large|huge)\s+amount\s+of\s+|lots?\s+of\s+|a\s+lot\s+of\s+|amounts?\s+of\s+)?"
+_FRANK_HEMOPTYSIS = re.compile(
+    rf"\bcough(?:ing)?\s+up\s+{_HEMOPTYSIS_AMOUNT}blood\b|\bcoughing\s+blood\b",
+    re.IGNORECASE,
+)
+_HEMOPTYSIS = re.compile(
+    r"\b("
+    rf"cough(?:ing)?\s+up\s+{_HEMOPTYSIS_AMOUNT}blood|coughing\s+blood|"
+    r"blood when i cough|blood when coughing|"
+    r"blood in (?:my |the )?(?:cough|sputum|phlegm|mucus)|"
+    r"(?:my )?cough has blood(?: in it)?|"
+    r"(?:persistent )?cough with blood"
+    r")\b",
+    re.IGNORECASE,
+)
+_HEMOPTYSIS_EMERGENCY = re.compile(
+    r"\b(a lot of blood|lots of blood|large amount of blood|cup of blood|mouthful of blood|"
+    r"severe bleeding|breathless|difficulty breathing|can'?t breathe|cannot breathe|"
+    r"faint\w*|collapse|dizzy|dizziness|chest pain|chest pressure)\b",
+    re.IGNORECASE,
+)
+_SUDDEN_SEVERE_HEADACHE = re.compile(
+    r"\b(?:sudden(?:ly)?|thunderclap)\b.{0,40}\b(?:severe|worst|extremely severe|extreme severity)\b.{0,24}\bheadache\b|"
+    r"\bheadache\b.{0,48}\b(?:sudden(?:ly)?|thunderclap)\b.{0,32}\b(?:severe|worst|extreme(?:ly)?\s+severity|extreme severity)\b|"
+    r"\b(?:extremely severe|worst)\b.{0,24}\bheadache\b|"
+    r"\bheadache\b.{0,30}\b(?:thunderclap|worst of my life)\b",
+    re.IGNORECASE,
+)
 
 # ---------------------------------------------------------------------------
 # Prescription / dosage request patterns
@@ -160,11 +212,54 @@ def _scan_emergency_text(raw: str) -> list[str]:
     return matches
 
 
+def _affirmed(pattern: re.Pattern[str], raw: str) -> bool:
+    match = pattern.search(raw or "")
+    if not match:
+        return False
+    window = raw[max(0, match.start() - 48) : match.start()]
+    return _NEGATION_PREFIX.search(window) is None
+
+
+def chest_discomfort_present(text: str) -> bool:
+    return _affirmed(_CHEST_DISCOMFORT, text or "")
+
+
+def chest_combination_is_emergency(text: str) -> bool:
+    raw = text or ""
+    if not chest_discomfort_present(raw):
+        return False
+    return _affirmed(_CHEST_COMPANION, raw) or _affirmed(_CHEST_SEVERE, raw)
+
+
+def hemoptysis_present(text: str) -> bool:
+    return _affirmed(_HEMOPTYSIS, text or "")
+
+
+def hemoptysis_is_emergency(text: str) -> bool:
+    raw = text or ""
+    if not hemoptysis_present(raw):
+        return False
+    if _affirmed(_FRANK_HEMOPTYSIS, raw):
+        return True
+    return _affirmed(_HEMOPTYSIS_EMERGENCY, raw)
+
+
+def hemoptysis_needs_prompt_care(text: str) -> bool:
+    """Blood with a cough that is not already an emergency still needs a clinician."""
+    return hemoptysis_present(text) and not hemoptysis_is_emergency(text)
+
+
 def check_emergency(text: str, history: list[dict] | None = None) -> GuardrailResult:
     raw = text or ""
     matches = _scan_emergency_text(raw)
+    if _affirmed(_SUDDEN_SEVERE_HEADACHE, raw):
+        matches.append("sudden_severe_headache")
+    if chest_combination_is_emergency(raw):
+        matches.append("chest_with_warning_signs")
+    if hemoptysis_is_emergency(raw):
+        matches.append("hemoptysis_emergency")
     if matches:
-        return GuardrailResult(triggered=True, matched_terms=matches)
+        return GuardrailResult(triggered=True, matched_terms=list(dict.fromkeys(matches)))
     prior = _user_history_texts(history)
     if prior and is_travel_calf_breathless_followup(raw, prior):
         return GuardrailResult(triggered=True, matched_terms=["contextual:calf_travel_breathless"])
@@ -386,13 +481,8 @@ def emergency_banner_message() -> str:
 
 EMERGENCY_BANNER_MESSAGE = emergency_banner_message()
 
-# Chest-pain wording that should escalate even when retrieval is empty/weak.
-_CHEST_PAIN = re.compile(
-    r"\b(chest pain|crushing (chest|pain|pressure)|tight(ness)? in (my|the) chest|"
-    r"left[-\s]?sided?\s+chest|pain .{0,24}(arm|jaw|neck|back|shoulder))\b",
-    re.IGNORECASE,
-)
+_CHEST_PAIN = _CHEST_DISCOMFORT
 
 
 def has_chest_pain_signal(text: str) -> bool:
-    return bool(_CHEST_PAIN.search(text or ""))
+    return chest_discomfort_present(text)

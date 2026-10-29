@@ -48,8 +48,9 @@ def test_emergency_answer_includes_banner_when_notes_match():
     result = run_pipeline("The left side of my face is drooping and my speech is slurred")
     assert check_emergency(result.query).triggered
     assert result.triage and result.triage.level == "emergency"
-    assert "112" in result.answer
-    assert "emergency" in result.answer.lower()
+    assert "112" in (result.answer + " " + (result.triage.guidance or ""))
+    assert "call 112" not in (result.answer or "").lower()
+    assert "emergency" in ((result.answer or "") + " " + (result.triage.guidance or "")).lower()
 
 
 def test_uncovered_named_disease_does_not_reuse_unrelated_note():

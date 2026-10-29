@@ -75,7 +75,7 @@ export function FollowUpCard({
       <div className="min-w-0 flex-1 rounded-3xl border border-teal-100 bg-white px-4 py-4 shadow-sm">
         <p id="symptom-intake-title" className="text-sm font-extrabold text-slate-900">A few quick details first</p>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Answer these three questions, then I will look up possible matches and urgency. You can open nearby hospitals anytime from the header.
+          Answer these three questions, then I will look up possible explanations and urgency. You can open nearby hospitals anytime from the header.
         </p>
         <p className="mt-3 max-h-32 overflow-y-auto rounded-2xl bg-teal-50 px-3 py-2 text-sm leading-6 break-anywhere text-slate-700">“{symptoms}”</p>
         <div className="mt-4 space-y-4">

@@ -52,3 +52,10 @@ frontend/coverage/
 # Build
 dist/
 build/
+
+# Local / image model caches (downloaded by sentence-transformers)
+.cache/
+**/.cache/
+*.onnx
+huggingface/
+.huggingface/

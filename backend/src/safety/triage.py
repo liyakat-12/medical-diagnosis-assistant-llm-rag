@@ -18,7 +18,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from src.retrieval.retriever import Evidence
-from src.safety.guardrails import check_emergency
+from src.safety.guardrails import (
+    check_emergency,
+    has_chest_pain_signal,
+    hemoptysis_needs_prompt_care,
+)
 
 SEVERITY_ORDER = {"self_care": 0, "consult_doctor": 1, "emergency": 2}
 
@@ -55,6 +59,27 @@ CHEST_PAIN_SAFETY_QUESTIONS = [
     "Do you also have breathlessness, sweating, fainting, nausea, or pain spreading to an arm, jaw, back, or shoulder?",
 ]
 
+def chest_caution_guidance() -> str:
+    from src import config
+
+    number = config.EMERGENCY_NUMBER
+    return (
+        "Chest discomfort has several possible causes and cannot be diagnosed from a chat message. "
+        f"Call {number} or seek emergency care now if it is severe, getting worse, or comes with "
+        "breathlessness, sweating, fainting, nausea, or pain spreading to an arm, jaw, back, or shoulder. "
+        "Otherwise arrange a medical assessment."
+    )
+
+
+def hemoptysis_guidance() -> str:
+    from src import config
+
+    number = config.EMERGENCY_NUMBER
+    return (
+        "Blood when you cough needs a prompt in-person medical assessment. This chat cannot tell how serious it is. "
+        f"Call {number} now if there is a large amount of blood, trouble breathing, chest pain, fainting, or dizziness."
+    )
+
 
 @dataclass
 class TriageResult:
@@ -66,17 +91,19 @@ class TriageResult:
 
 
 def _primary_evidence_level(evidence: list[Evidence]) -> str:
-    """Use the top-ranked (most relevant) document's triage level.
+    """Use the top-ranked document's triage level, never above consult_doctor.
 
-    Earlier we used the most severe level among all top-k hits, which was
-    overly conservative and often escalated mild queries when one unrelated
-    emergency passage appeared in the shortlist. The emergency regex
-    guardrail still provides a hard override for true red-flag wording.
+    Emergency is decided only by the symptom rules in guardrails. A retrieved
+    heart-attack note must not turn an everyday symptom into an emergency label.
     """
     if not evidence:
-        return "consult_doctor"  # safe default when nothing was retrieved
+        return "consult_doctor"
     level = evidence[0].triage_level
-    return level if level in SEVERITY_ORDER else "consult_doctor"
+    if level not in SEVERITY_ORDER:
+        return "consult_doctor"
+    if level == "emergency":
+        return "consult_doctor"
+    return level
 
 
 def classify_triage(query: str, evidence: list[Evidence], history: list[dict] | None = None) -> TriageResult:
@@ -86,11 +113,29 @@ def classify_triage(query: str, evidence: list[Evidence], history: list[dict] | 
             level="emergency",
             label=TRIAGE_LABELS["emergency"],
             guidance=emergency_guidance(),
-            reason="Rule-based safety layer detected emergency red-flag symptoms in your description.",
+            reason="Rule-based safety layer detected emergency warning signs in your description.",
             matched_emergency_terms=guard.matched_terms,
         )
 
     level = _primary_evidence_level(evidence)
+    if hemoptysis_needs_prompt_care(query):
+        return TriageResult(
+            level="consult_doctor",
+            label=TRIAGE_LABELS["consult_doctor"],
+            guidance=hemoptysis_guidance(),
+            reason="Blood with a cough needs prompt assessment. This is not a diagnosis.",
+            matched_emergency_terms=[],
+        )
+    if has_chest_pain_signal(query):
+        if level == "self_care":
+            level = "consult_doctor"
+        return TriageResult(
+            level=level,
+            label=TRIAGE_LABELS[level],
+            guidance=chest_caution_guidance(),
+            reason="Chest discomfort needs assessment. The wording did not meet emergency criteria.",
+            matched_emergency_terms=[],
+        )
     return TriageResult(
         level=level,
         label=TRIAGE_LABELS[level],

@@ -57,6 +57,11 @@ export function Home() {
               >
                 How it works
               </Button>
+              {user ? (
+                <Link to="/dashboard" className="inline-flex min-h-12 items-center px-2 text-sm font-bold text-teal-800 hover:underline">
+                  Open your dashboard
+                </Link>
+              ) : null}
             </div>
           </div>
           <img src="/images/hero-rag.png" alt="Symptom description matched to medical documents" width={960} height={640} decoding="async" fetchPriority="high" className="h-auto w-full rounded-[2rem] object-cover shadow-xl shadow-teal-900/10" />

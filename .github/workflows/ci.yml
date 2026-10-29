@@ -22,6 +22,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Build retrieval index
         run: python scripts/build_index.py general
+      - name: Verify retrieval index
+        run: python -c "import sys; from src.retrieval.retriever import retrieve; hits = retrieve('How can I prevent food poisoning at home?', mode='general'); print(f'retrieved {len(hits)} hits'); sys.exit(0 if hits else 'general index returned no hits')"
       - name: Run backend tests
         run: pytest tests -q
 

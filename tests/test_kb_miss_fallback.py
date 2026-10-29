@@ -48,7 +48,7 @@ def test_parse_kb_miss_payload_builds_same_cards():
     assert bundle is not None
     assert bundle.triage.level == "self_care"
     assert len(bundle.possible_conditions) == 3
-    assert sum(row["match_percent"] for row in bundle.possible_conditions) == 100
+    assert all("match_percent" not in row for row in bundle.possible_conditions)
     assert any("knowledge base" in (row.get("title") or "").lower() for row in bundle.citations)
     assert any("not verified" in f"{row.get('title') or ''} {row.get('source') or ''}".lower() for row in bundle.citations)
     assert all(not (row.get("url") or "").startswith("http") for row in bundle.citations)
@@ -120,4 +120,5 @@ def test_emergency_still_skips_llm_match_cards(monkeypatch):
     assert result.triage.level == "emergency"
     assert result.possible_conditions == []
     assert result.citations == []
-    assert "112" in result.answer
+    assert "112" in (result.answer + " " + (result.triage.guidance or ""))
+    assert "call 112" not in (result.answer or "").lower()

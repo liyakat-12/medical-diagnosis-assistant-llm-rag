@@ -2,9 +2,12 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import { useNavigate } from "react-router-dom";
 import * as chatApi from "../services/chat";
 import type { Chat, ChatMessage } from "../types";
+import type { BodyRegion } from "../utils/bodyMap";
 import { assistantFromEvent, markAssistantIncomplete, publicMessage, shouldAcceptStreamEvent } from "../utils/chatSession";
 import { PUBLIC_SEND_ERROR, publicError, publicStatus } from "../utils/publicText";
 import { useApp } from "./AppContext";
+
+export type SendOptions = { reuseFailed?: boolean; bodyRegions?: BodyRegion[] };
 
 interface ChatContextValue {
   chats: Chat[];
@@ -20,7 +23,7 @@ interface ChatContextValue {
   openChat: (chatId: string) => Promise<void>;
   showBlankChat: () => void;
   startNewChat: () => Promise<Chat>;
-  sendMessage: (content: string, options?: { reuseFailed?: boolean }) => Promise<void>;
+  sendMessage: (content: string, options?: SendOptions) => Promise<void>;
   stopGeneration: () => void;
   retryLast: () => Promise<void>;
   renameChat: (chatId: string, title: string) => Promise<void>;
@@ -134,7 +137,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string, options?: { reuseFailed?: boolean }) => {
+    async (content: string, options?: SendOptions) => {
       const text = content.trim();
       if (!text || sendingRef.current) return;
       setError("");
@@ -169,6 +172,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           possible_conditions: [],
           recommendations: [],
           refused: false,
+          metadata: options?.bodyRegions?.length ? { body_regions: options.bodyRegions } : {},
         };
         assistantId = `temp-asst-${now}`;
         const assistantMsg: ChatMessage = {
@@ -289,6 +293,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             }
           },
           controller.signal,
+          options?.bodyRegions,
         );
         setChats((current) => {
           const updated = current.map((item) =>

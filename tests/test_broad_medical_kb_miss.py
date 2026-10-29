@@ -371,4 +371,5 @@ def test_emergency_symptom_questions_still_use_triage(monkeypatch):
     result = run_pipeline("crushing chest pain spreading to my jaw")
     assert result.triage is not None
     assert result.triage.level == "emergency"
-    assert "112" in result.answer
+    assert "112" in (result.answer + " " + (result.triage.guidance or ""))
+    assert "call 112" not in (result.answer or "").lower()

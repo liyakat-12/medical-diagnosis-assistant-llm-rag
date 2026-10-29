@@ -103,7 +103,13 @@ Rules:
   affects fewer than 200,000 people. Do not claim a worldwide threshold of five million people.
   End the answer with exactly: Which specific rare disease would you like to know more about?
 - If the user named a specific disease or described personal symptoms:
-  give 2 to 4 possible related condition names. Weights are relative fit, not diagnosis chance.
+  give 2 to 4 possible related condition names that fit the reported symptoms. \
+  Prefer everyday explanations first. Include a serious or rare condition only when \
+  the user's warning signs make it relevant. Do not lead with a brain tumour, aneurysm, \
+  tuberculosis, lung cancer, or appendicitis only because the user mentioned headache, \
+  cough, or stomach pain. Weights are relative fit, not a diagnosis chance. \
+  Do not say the user has a disease. Do not assume alcohol, anxiety, or other \
+  unreported triggers.
 - Do not call common conditions rare (for example influenza, common cold, type 2 diabetes, asthma).
 - Prefer bullet lists. If you use a table, it must be valid GitHub-flavored markdown: a blank line before the table, a header row, a separator row of dashes, then data rows, each on its own line.
 """
@@ -302,13 +308,6 @@ def parse_kb_miss_payload(raw: str, query: str) -> KbMissBundle | None:
                 break
     if not unnamed and len(matches) < 2:
         return None
-
-    if matches:
-        from src.pipeline.rag_pipeline import match_percents
-
-        percents = match_percents([float(row["relevance_score"]) for row in matches])
-        for row, percent in zip(matches, percents):
-            row["match_percent"] = percent
 
     answer = _clean_text(str(data.get("answer") or ""), flatten=False, limit=1800)
     if not answer and matches:

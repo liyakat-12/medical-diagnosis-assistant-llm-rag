@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, MessageSquarePlus, PanelLeft, Pencil, Search, Stethoscope, Trash2, UserRound, X } from "lucide-react";
+import { BarChart3, LayoutDashboard, LogOut, MessageSquarePlus, PanelLeft, Pencil, Search, Stethoscope, Trash2, UserRound, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useChat } from "../../context/ChatContext";
 import { SIDEBAR_RAIL, useApp } from "../../context/AppContext";
@@ -8,6 +8,11 @@ import { groupChats } from "../../utils/dates";
 import { Button } from "../common/Button";
 import { Modal } from "../common/Spinner";
 import { cn } from "../../lib/cn";
+
+const WORKSPACE_LINKS = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/evaluation", label: "Evaluation", icon: BarChart3 },
+];
 
 export function ChatSidebar() {
   const { user, logout } = useAuth();
@@ -178,6 +183,11 @@ export function ChatSidebar() {
         <div className={cn("border-t border-teal-100 p-3", sidebarCollapsed && "px-2")}>
           {sidebarCollapsed ? (
             <div className="flex flex-col items-center gap-2">
+              {WORKSPACE_LINKS.map((link) => (
+                <Link key={link.to} to={link.to} className="grid h-11 w-11 place-items-center rounded-xl text-slate-700 hover:bg-white" aria-label={link.label} title={link.label}>
+                  <link.icon size={18} />
+                </Link>
+              ))}
               <button type="button" className="grid h-11 w-11 place-items-center rounded-xl hover:bg-white" aria-label="Profile" title="Profile" onClick={() => navigate("/profile")}>
                 <UserRound size={18} />
               </button>
@@ -187,6 +197,19 @@ export function ChatSidebar() {
             </div>
           ) : (
             <>
+              <nav aria-label="Workspace" className="mb-3 space-y-0.5">
+                {WORKSPACE_LINKS.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-bold text-slate-700 hover:bg-white hover:text-teal-800"
+                  >
+                    <link.icon size={16} className="shrink-0 text-slate-500" aria-hidden />
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
               <p className="truncate text-sm font-bold text-slate-800">{user?.name}</p>
               <div className="mt-2 flex gap-2">
                 <Button variant="secondary" size="sm" onClick={() => navigate("/profile")}>

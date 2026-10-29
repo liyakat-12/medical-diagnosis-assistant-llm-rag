@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { looksEmergency } from "../src/utils/emergency.ts";
+import { looksEmergency, needsPromptAssessment } from "../src/utils/emergency.ts";
 import { looksMedical, needsSymptomIntake } from "../src/utils/intent.ts";
 import type { ChatMessage } from "../src/types/index.ts";
 
@@ -68,8 +68,20 @@ describe("looksMedical", () => {
 
 describe("looksEmergency", () => {
   it("catches paraphrases and skips negated or quoted wording", () => {
-    assert.equal(looksEmergency("I have chest pain"), true);
+    assert.equal(looksEmergency("I have chest pain"), false);
     assert.equal(looksEmergency("I have shortness of breath"), true);
+    assert.equal(looksEmergency("chest pain spreading to my jaw"), true);
+    assert.equal(looksEmergency("I have a sudden, extremely severe headache"), true);
+    assert.equal(looksEmergency("I am coughing up blood"), true);
+    assert.equal(
+      looksEmergency("I am coughing up a large amount of blood and struggling to breathe"),
+      true,
+    );
+    assert.equal(looksEmergency("I have a persistent cough with blood"), false);
+    assert.equal(needsPromptAssessment("I have a persistent cough with blood"), true);
+    assert.equal(needsPromptAssessment("I am coughing up blood"), false);
+    assert.equal(needsSymptomIntake("I have chest pain", []), true);
+    assert.equal(needsSymptomIntake("I have a sudden, extremely severe headache", []), false);
     assert.equal(looksEmergency("I don't have chest pain"), false);
     assert.equal(looksEmergency('What does "chest pain" mean?'), false);
   });

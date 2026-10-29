@@ -50,19 +50,25 @@ describe("informational knowledge-base miss copy", () => {
 
   it("still copies urgency for emergency symptom replies", () => {
     const item = message({
-      content: "This may be urgent. Seek emergency care now.",
+      // On-screen answer omits the Call-112 banner; triage.guidance still carries it for copy.
+      content: "Follow the urgency instructions shown with this reply.",
       triage: {
         level: "emergency",
         label: "Emergency",
         guidance: "Call 112 now.",
       },
-      possible_conditions: [{ condition: "Heart attack", match_percent: 100 }],
+      possible_conditions: [{ condition: "Heart attack", match_percent: 100, evidence_match_label: "Closest evidence match" }],
     });
     assert.equal(isSymptomCardMessage(item), true);
     const copy = formatAssistantCopy(item);
-    assert.match(copy, /This may be urgent/);
+    assert.match(copy, /Follow the urgency instructions/);
+    assert.equal(/call 112/i.test(item.content), false);
+    assert.match(copy, /Call 112 now/);
     assert.match(copy, /Emergency/);
     assert.match(copy, /Heart attack/);
+    assert.match(copy, /Closest evidence match/);
+    assert.equal(copy.includes("%"), false);
+    assert.match(copy, /Possible explanations/);
   });
 });
 

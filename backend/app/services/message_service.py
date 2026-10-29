@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 
 from src import config
@@ -8,19 +9,54 @@ from src.pipeline.rag_pipeline import iter_pipeline_stream, result_to_dict, run_
 from app.repositories import chat_repository, message_repository
 from app.services.chat_service import get_chat, make_title
 
+_REGION_WORDS = {
+    "head": "head",
+    "neck": "neck",
+    "chest": "chest",
+    "abdomen": "abdomen",
+    "upper_back": "upper back",
+    "lower_back": "lower back",
+    "shoulder": "shoulder",
+    "arm": "arm",
+    "elbow": "elbow",
+    "wrist_hand": "wrist",
+    "hip": "hip",
+    "thigh": "thigh",
+    "knee": "knee",
+    "lower_leg": "lower leg",
+    "ankle_foot": "ankle",
+    "back": "back",
+    "leg": "leg",
+}
+
+
+def retrieval_query(content: str, body_regions: list[str] | None = None) -> str:
+    """Add a body-map location only when the typed message does not already name it."""
+    text = (content or "").strip()
+    missing: list[str] = []
+    for region in body_regions or []:
+        phrase = _REGION_WORDS.get(str(region))
+        if not phrase or re.search(rf"\b{re.escape(phrase)}\b", text, re.IGNORECASE):
+            continue
+        missing.append(phrase)
+    if not missing:
+        return text
+    return f"{text}\nBody map location: {', '.join(missing)} discomfort."
+
 
 async def list_messages(user_id: str, chat_id: str) -> list[dict]:
     await get_chat(user_id, chat_id)
     return await message_repository.list_for_chat(chat_id, user_id)
 
 
-async def add_user_message(user_id: str, chat_id: str, content: str) -> dict:
+async def add_user_message(user_id: str, chat_id: str, content: str, body_regions: list[str] | None = None) -> dict:
     chat = await get_chat(user_id, chat_id)
     message = await message_repository.create_message(
         chat_id=chat_id,
         user_id=user_id,
         role="user",
         content=content,
+        metadata={"body_regions": list(body_regions)} if body_regions else None,
     )
     title = None
     if chat["title"] in {"New chat", ""} and chat["message_count"] == 0:
@@ -77,9 +113,19 @@ async def recent_history(user_id: str, chat_id: str, limit: int | None = None) -
     return history_for_pipeline(messages)
 
 
-def diagnose_sync(query: str, top_k: int | None = None, chat_history: list[dict] | None = None) -> dict:
-    return result_to_dict(run_pipeline(query, top_k=top_k, chat_history=chat_history))
+def diagnose_sync(
+    query: str,
+    top_k: int | None = None,
+    chat_history: list[dict] | None = None,
+    body_regions: list[str] | None = None,
+) -> dict:
+    return result_to_dict(run_pipeline(retrieval_query(query, body_regions), top_k=top_k, chat_history=chat_history))
 
 
-def stream_events(query: str, top_k: int | None = None, chat_history: list[dict] | None = None) -> Iterator[dict]:
-    yield from iter_pipeline_stream(query, top_k=top_k, chat_history=chat_history)
+def stream_events(
+    query: str,
+    top_k: int | None = None,
+    chat_history: list[dict] | None = None,
+    body_regions: list[str] | None = None,
+) -> Iterator[dict]:
+    yield from iter_pipeline_stream(retrieval_query(query, body_regions), top_k=top_k, chat_history=chat_history)

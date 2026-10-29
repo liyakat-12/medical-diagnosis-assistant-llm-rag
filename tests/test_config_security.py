@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from src.config import jwt_secret_is_unsafe, mongo_uri_mode, validate_runtime_config
+from src.config import (
+    jwt_secret_is_unsafe,
+    mongo_uri_mode,
+    resolve_llm_provider,
+    validate_runtime_config,
+)
 
 
 def test_default_jwt_secret_is_unsafe():
@@ -26,6 +31,7 @@ def test_production_rejects_default_jwt(monkeypatch):
     monkeypatch.setattr("src.config.JWT_SECRET", "dev-only-change-me")
     monkeypatch.setattr("src.config.CORS_ORIGINS", ["http://localhost:5173"])
     monkeypatch.setattr("src.config.MONGODB_URI", "memory")
+    monkeypatch.setattr("src.config.LLM_PROVIDER", "mock")
     with pytest.raises(RuntimeError, match="JWT_SECRET"):
         validate_runtime_config()
 
@@ -35,6 +41,7 @@ def test_production_rejects_wildcard_cors(monkeypatch):
     monkeypatch.setattr("src.config.JWT_SECRET", "a-sufficiently-long-unique-dev-secret")
     monkeypatch.setattr("src.config.CORS_ORIGINS", ["*"])
     monkeypatch.setattr("src.config.MONGODB_URI", "memory")
+    monkeypatch.setattr("src.config.LLM_PROVIDER", "mock")
     with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
         validate_runtime_config()
 
@@ -44,4 +51,31 @@ def test_development_allows_default_jwt_with_valid_mongo(monkeypatch):
     monkeypatch.setattr("src.config.JWT_SECRET", "dev-only-change-me")
     monkeypatch.setattr("src.config.CORS_ORIGINS", ["http://localhost:5173"])
     monkeypatch.setattr("src.config.MONGODB_URI", "memory")
+    monkeypatch.setattr("src.config.LLM_PROVIDER", "mock")
     validate_runtime_config()
+
+
+def test_production_rejects_groq_without_key(monkeypatch):
+    monkeypatch.setattr("src.config.APP_ENV", "production")
+    monkeypatch.setattr("src.config.JWT_SECRET", "a-sufficiently-long-unique-dev-secret")
+    monkeypatch.setattr("src.config.CORS_ORIGINS", ["https://app.example.com"])
+    monkeypatch.setattr("src.config.MONGODB_URI", "mongodb+srv://cluster.example.net")
+    monkeypatch.setattr("src.config.LLM_PROVIDER", "groq")
+    monkeypatch.setattr("src.config.GROQ_API_KEY", "")
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
+        validate_runtime_config()
+
+
+def test_development_falls_back_to_mock_when_groq_key_missing(monkeypatch):
+    monkeypatch.setattr("src.config.APP_ENV", "development")
+    monkeypatch.setattr("src.config.LLM_PROVIDER", "groq")
+    monkeypatch.setattr("src.config.GROQ_API_KEY", "")
+    assert resolve_llm_provider() == "mock"
+
+
+def test_production_resolve_llm_does_not_silently_mock_groq(monkeypatch):
+    monkeypatch.setattr("src.config.APP_ENV", "production")
+    monkeypatch.setattr("src.config.LLM_PROVIDER", "groq")
+    monkeypatch.setattr("src.config.GROQ_API_KEY", "gsk_")
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
+        resolve_llm_provider()

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { AppProvider } from "./context/AppContext";
@@ -15,6 +15,16 @@ import { NotFound } from "./pages/NotFound";
 const Chat = lazy(() => import("./pages/Chat").then((mod) => ({ default: mod.Chat })));
 const ChatHistory = lazy(() => import("./pages/ChatHistory").then((mod) => ({ default: mod.ChatHistory })));
 const Profile = lazy(() => import("./pages/Profile").then((mod) => ({ default: mod.Profile })));
+const Dashboard = lazy(() => import("./pages/Dashboard").then((mod) => ({ default: mod.Dashboard })));
+const Evaluation = lazy(() => import("./pages/Evaluation").then((mod) => ({ default: mod.Evaluation })));
+
+function ProtectedPage({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<PageSpinner label={label} />}>{children}</Suspense>
+    </ProtectedRoute>
+  );
+}
 
 function ProtectedChatLayout() {
   return (
@@ -60,6 +70,22 @@ export default function App() {
                   <Profile />
                 </Suspense>
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedPage label="Loading dashboard...">
+                <Dashboard />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/evaluation"
+            element={
+              <ProtectedPage label="Loading evaluation...">
+                <Evaluation />
+              </ProtectedPage>
             }
           />
           <Route element={<ProtectedChatLayout />}>

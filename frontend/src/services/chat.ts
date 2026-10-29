@@ -1,4 +1,5 @@
 import type { Chat, ChatMessage, StreamEvent } from "../types";
+import type { BodyRegion } from "../utils/bodyMap";
 import { apiFetch, readSse } from "./api";
 
 export function listChats(query?: string): Promise<Chat[]> {
@@ -37,6 +38,12 @@ export function streamMessage(
   content: string,
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
+  bodyRegions?: BodyRegion[],
 ): Promise<void> {
-  return readSse(`/chats/${chatId}/messages/stream`, { content }, (raw) => onEvent(raw as unknown as StreamEvent), signal);
+  return readSse(`/chats/${chatId}/messages/stream`, streamRequestBody(content, bodyRegions), (raw) => onEvent(raw as unknown as StreamEvent), signal);
+}
+
+export function streamRequestBody(content: string, bodyRegions?: BodyRegion[]): { content: string; body_regions?: BodyRegion[] } {
+  const regions = Array.from(new Set(bodyRegions ?? []));
+  return regions.length ? { content, body_regions: regions } : { content };
 }

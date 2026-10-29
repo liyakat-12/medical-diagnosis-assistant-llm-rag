@@ -131,6 +131,23 @@ def validate_runtime_config() -> None:
         if production:
             raise RuntimeError(message)
         log.warning(message)
+    provider = LLM_PROVIDER.strip().lower()
+    if provider == "groq" and _looks_like_placeholder(GROQ_API_KEY):
+        message = (
+            "LLM_PROVIDER=groq but GROQ_API_KEY is missing or a placeholder. "
+            "Set a real Groq key, or set LLM_PROVIDER=mock for offline template answers."
+        )
+        if production:
+            raise RuntimeError(message)
+        log.warning(message)
+    if provider == "openai" and _looks_like_placeholder(OPENAI_API_KEY):
+        message = (
+            "LLM_PROVIDER=openai but OPENAI_API_KEY is missing or a placeholder. "
+            "Set a real OpenAI key, or set LLM_PROVIDER=mock for offline template answers."
+        )
+        if production:
+            raise RuntimeError(message)
+        log.warning(message)
 
 for _dir in (PROCESSED_DIR, VECTOR_STORE_GENERAL_DIR, VECTOR_STORE_MEDICAL_DIR, EVAL_RESULTS_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
@@ -201,13 +218,26 @@ def _looks_like_placeholder(key: str) -> bool:
 
 
 def resolve_llm_provider() -> str:
-    """Return the effective LLM provider, falling back to mock when keys are missing."""
+    """Return the effective LLM provider.
+
+    Development may fall back to mock when a cloud key is missing.
+    Production never silently substitutes mock for a misconfigured cloud provider;
+    validate_runtime_config() fails closed at startup instead.
+    """
     provider = LLM_PROVIDER.strip().lower()
     if provider == "mock":
         return "mock"
     if provider == "groq" and _looks_like_placeholder(GROQ_API_KEY):
+        if is_production():
+            raise RuntimeError(
+                "LLM_PROVIDER=groq but GROQ_API_KEY is missing or a placeholder."
+            )
         return "mock"
     if provider == "openai" and _looks_like_placeholder(OPENAI_API_KEY):
+        if is_production():
+            raise RuntimeError(
+                "LLM_PROVIDER=openai but OPENAI_API_KEY is missing or a placeholder."
+            )
         return "mock"
     return provider
 

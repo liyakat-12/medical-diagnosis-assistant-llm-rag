@@ -123,4 +123,47 @@ describe("chat bubble rendering", () => {
       /<a href=\{item\.url\} target="_blank" rel="noreferrer" className=\{SOURCE_LINK_CLASS\}>\s*\{title\}\s*<\/a>/,
     );
   });
+
+  it("renders Possible explanations and Sources headings in bold black, leaving other section titles muted", () => {
+    assert.match(bubbleSource, /tone\?: "muted" \| "strong"/);
+    assert.match(bubbleSource, /tone === "strong" \? "text-black" : "text-slate-400"/);
+    assert.match(bubbleSource, /font-extrabold/);
+    assert.match(bubbleSource, /<SectionTitle tone="strong">Possible explanations<\/SectionTitle>/);
+    assert.match(bubbleSource, /<SectionTitle tone="strong">Sources<\/SectionTitle>/);
+    // Other medical cards keep the muted heading treatment.
+    assert.match(bubbleSource, /<SectionTitle>Urgency<\/SectionTitle>/);
+    assert.match(bubbleSource, /<SectionTitle>Recommendations<\/SectionTitle>/);
+    assert.match(bubbleSource, /<SectionTitle>Explanation<\/SectionTitle>/);
+    assert.match(bubbleSource, /<SectionTitle>Evidence status<\/SectionTitle>/);
+  });
+
+  it("keeps possible explanations capped at four in the bubble and copy helpers", () => {
+    assert.match(bubbleSource, /message\.possible_conditions\.slice\(0, 4\)/);
+    const item = message({
+      content: "Overview from notes.",
+      triage: { level: "self_care", label: "Self care", guidance: "Monitor." },
+      possible_conditions: [
+        { condition: "A", explanation: "a" },
+        { condition: "B", explanation: "b" },
+        { condition: "C", explanation: "c" },
+        { condition: "D", explanation: "d" },
+        { condition: "E", explanation: "e" },
+      ],
+      citations: [
+        { title: "S1", url: "https://example.test/1", source: "NHS" },
+        { title: "S2", url: "https://example.test/2", source: "NHS" },
+        { title: "S3", url: "https://example.test/3", source: "NHS" },
+        { title: "S4", url: "https://example.test/4", source: "NHS" },
+      ],
+    });
+    const copy = formatAssistantCopy(item);
+    assert.match(copy, /Possible explanations/);
+    assert.match(copy, /Sources/);
+    assert.match(copy, /• A/);
+    assert.match(copy, /• D/);
+    assert.equal(copy.includes("• E"), false);
+    assert.match(copy, /S1/);
+    assert.match(copy, /S4/);
+    assert.match(bubbleSource, /text-blue-700/);
+  });
 });

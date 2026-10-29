@@ -66,8 +66,23 @@ function EvidenceNote({ message }: { message: ChatMessage }) {
   return <p className="mt-3 text-xs leading-5 text-slate-500">{caption}</p>;
 }
 
-function SectionTitle({ children }: { children: string }) {
-  return <h3 className="mb-2 text-xs font-extrabold uppercase tracking-[0.14em] text-slate-400">{children}</h3>;
+function SectionTitle({
+  children,
+  tone = "muted",
+}: {
+  children: string;
+  tone?: "muted" | "strong";
+}) {
+  return (
+    <h3
+      className={cn(
+        "mb-2 text-xs font-extrabold uppercase tracking-[0.14em]",
+        tone === "strong" ? "text-black" : "text-slate-400",
+      )}
+    >
+      {children}
+    </h3>
+  );
 }
 
 function visibleExplanation(content: string): string {
@@ -248,7 +263,7 @@ function EvidenceSections({ message }: { message: ChatMessage }) {
   if (message.streaming && !retrieved.length && !statusItems.length) {
     return (
       <section className="mt-5">
-        <SectionTitle>Sources</SectionTitle>
+        <SectionTitle tone="strong">Sources</SectionTitle>
         <p className="text-sm font-semibold text-slate-500">Collecting sources...</p>
       </section>
     );
@@ -257,7 +272,7 @@ function EvidenceSections({ message }: { message: ChatMessage }) {
     <>
       {retrieved.length ? (
         <section className="mt-5">
-          <SectionTitle>Sources</SectionTitle>
+          <SectionTitle tone="strong">Sources</SectionTitle>
           <CitationBullets message={message} />
           {message.faithfulness && typeof message.faithfulness.summary === "string" ? (
             <p className="mt-2 text-xs text-slate-500">Citation check: {String(message.faithfulness.summary)}</p>
@@ -344,7 +359,7 @@ export const MessageBubble = memo(function MessageBubble({
             ) : null}
             {showMatches ? (
               <section>
-                <SectionTitle>Possible explanations</SectionTitle>
+                <SectionTitle tone="strong">Possible explanations</SectionTitle>
                 <OutcomeList message={message} />
                 {message.possible_conditions.length ? (
                   <p className="mt-2 text-xs text-slate-500">

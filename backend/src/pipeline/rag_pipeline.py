@@ -554,7 +554,13 @@ def _hemoptysis_rank_key(user_query: str, ev: Evidence) -> tuple:
 
 
 def _select_emergency_explanation_notes(user_query: str, kept: list[Evidence]) -> list[Evidence]:
-    """Prefer concise serious/warning notes; never lead with unreported situational cards."""
+    """Prefer concise serious/warning notes; never lead with unreported situational cards.
+
+    Cap matches OUTCOME_LIMIT (4) when enough serious/warning notes exist. Do not
+    invent sources or pad with weak everyday cards — if fewer preferred notes are
+    available, return only those. Emergency triage itself is decided before
+    retrieval and is unaffected by this list length.
+    """
     ranked = sorted(
         kept,
         key=lambda ev: (
@@ -581,7 +587,7 @@ def _select_emergency_explanation_notes(user_query: str, kept: list[Evidence]) -
             and note_addresses_hemoptysis(ev.title, ev.condition, ev.doc_id, ev.text) > 0
         )
     ]
-    return preferred[:2]
+    return preferred[:OUTCOME_LIMIT]
 
 
 def _select_hemoptysis_explanation_notes(user_query: str, kept: list[Evidence]) -> list[Evidence]:
@@ -611,7 +617,8 @@ def _select_explanation_notes(user_query: str, retain_query: str, pool: list[Evi
     ordered by how well they fit reported context, then by retrieval score.
     For a non-emergency description, everyday notes lead and the top emergency
     note is kept when clinically still in the candidate pool. True emergencies
-    keep only concise serious/warning (or hemoptysis-relevant) notes.
+    keep up to OUTCOME_LIMIT concise serious/warning (or hemoptysis-relevant)
+    notes — never more, and never fabricated fillers.
     """
     kept = _compatible_evidence(user_query, _retain_relevant_evidence(retain_query, pool))
     if not kept:

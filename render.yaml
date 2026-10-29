@@ -6,10 +6,9 @@ services:
     name: mediassist-api
     runtime: docker
     plan: free
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerContext: .
-    # Matches Dockerfile CMD --port 8000 (Render default target is often 10000).
-    port: 8000
+    # Container listens on PORT (Dockerfile defaults to 8000). Set service port in Dashboard if needed.
     healthCheckPath: /api/v1/health
     envVars:
       - key: APP_ENV

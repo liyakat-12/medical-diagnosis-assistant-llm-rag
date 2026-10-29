@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 from src.retrieval.query_normalize import (
     apply_symptom_correction,
+    clarification_for_prior_modifiers,
+    is_ambiguous_symptom_restatement,
     is_symptom_correction,
     normalize_retrieval_query,
     related_history_texts,
@@ -41,6 +43,7 @@ class ConversationState:
     generation_history: list[dict]
     question_type: str = "SYMPTOM_INFORMATION"
     personal_context: bool = False
+    context_clarification: str = ""
 
 
 def _is_medical_user_text(text: str, history: list[dict]) -> bool:
@@ -156,7 +159,11 @@ def build_conversation_state(query: str, history: list[dict] | None = None) -> C
         reuse = True
         gen_hist = None
     else:
-        status = "new_complaint"
+        # Same body area with dropped modifiers: do not merge prior fever/swelling/etc.
+        if intent == "medical" and is_ambiguous_symptom_restatement(query, prior_texts):
+            status = "ambiguous_follow_up"
+        else:
+            status = "new_complaint"
         reuse = False
         gen_hist = None
 
@@ -174,6 +181,9 @@ def build_conversation_state(query: str, history: list[dict] | None = None) -> C
 
     question_type = classify_question_type(query, intent=intent, status=status, history=rows)
     personal_context = infer_personal_context(query, related, reuse)
+    clarification = ""
+    if status == "ambiguous_follow_up":
+        clarification = clarification_for_prior_modifiers(query, prior_texts)
 
     return ConversationState(
         intent=intent,
@@ -189,4 +199,5 @@ def build_conversation_state(query: str, history: list[dict] | None = None) -> C
         generation_history=gen_hist,
         question_type=question_type,
         personal_context=personal_context,
+        context_clarification=clarification,
     )

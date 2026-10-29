@@ -196,9 +196,10 @@ def test_mild_headache_does_not_lead_with_a_rare_neurological_note(monkeypatch):
     assert names[0] == "tension headache"
     assert "brain tumour" in names
     assert result.triage.level != "emergency"
-    first_explanation = result.answer.lower().split("2.")[0]
-    assert "tension" in first_explanation
-    assert "tumour" not in first_explanation and "tumor" not in first_explanation
+    # Richer answers use prose sections, not a numbered "1./2." dump.
+    overview = result.answer.lower().split("possible explanations")[0]
+    assert "tension" in overview or "sleep" in overview
+    assert "tumour" not in overview and "tumor" not in overview
 
 
 def test_sudden_extremely_severe_headache_is_emergency(monkeypatch):

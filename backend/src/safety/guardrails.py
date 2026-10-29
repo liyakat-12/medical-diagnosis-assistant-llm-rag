@@ -99,8 +99,12 @@ _CHEST_DISCOMFORT = re.compile(
 )
 _CHEST_COMPANION = re.compile(
     r"\b(sweat\w*|faint\w*|collapse[d]?|unconscious|breathless|"
-    r"short(?:ness)? of breath|difficulty breathing|can'?t breathe|cannot breathe|"
-    r"gasping|nausea|vomit\w*|jaw|crushing)\b",
+    r"short(?:ness)? of breath|difficulty breathing|breathing difficulty|"
+    r"can'?t breathe|cannot breathe|"
+    r"gasping|nausea|vomit\w*|jaw|crushing|"
+    r"rapid heart(?:beat| rate)?|rapid pulse|fast heart(?:beat| rate)?|fast pulse|"
+    r"racing heart|palpitation[s]?|"
+    r"heart (?:racing|pounding|beating (?:fast|hard|rapidly)))\b",
     re.IGNORECASE,
 )
 _CHEST_SEVERE = re.compile(

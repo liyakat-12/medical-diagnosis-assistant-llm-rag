@@ -43,6 +43,8 @@ export interface PossibleCondition {
   source?: string;
   url?: string;
   relevance_score?: number;
+  /** Short note-grounded explanation; not a diagnosis probability. */
+  explanation?: string;
   /** Comparison among retrieved notes. Not a disease probability. */
   evidence_match_label?: string;
   match_percent?: number;

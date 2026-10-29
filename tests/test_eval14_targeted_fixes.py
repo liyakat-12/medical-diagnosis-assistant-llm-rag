@@ -221,7 +221,8 @@ def test_sudden_severe_headache_emergency_skips_exam_card(monkeypatch):
     names = [row["condition"].lower() for row in result.possible_conditions]
     assert "exam headache" not in names
     assert "migraine" not in names
-    assert names == ["brain tumour warning signs"]
+    # Warning-category tails are stripped; the serious condition name remains.
+    assert names == ["brain tumour"]
     assert "112" in (result.triage.guidance or "")
     assert (result.answer or "").lower().count("call 112") == 0
 

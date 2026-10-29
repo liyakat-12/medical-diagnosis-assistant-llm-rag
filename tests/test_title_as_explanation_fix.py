@@ -96,7 +96,7 @@ def test_clinical_ideas_ignore_titles_and_extract_body_terms():
     assert any("osteoarthritis" in name or "strain" in name or "baker" in name for name in names)
 
 
-def test_citations_dedupe_by_url():
+def test_citations_keep_sibling_notes_sharing_url():
     evidence = [
         Evidence(
             text="a",
@@ -127,9 +127,10 @@ def test_citations_dedupe_by_url():
         ),
     ]
     citations = citations_from_evidence(evidence)
-    urls = [item["url"] for item in citations]
-    assert len(urls) == len(set(urls))
-    assert len(citations) == 2
+    titles = [item["title"] for item in citations]
+    assert len(titles) == len(set(titles))
+    assert len(citations) == 3
+    assert "Knee Pain When Climbing Stairs" in titles
 
 
 def test_possible_conditions_use_clinical_labels_not_titles():
@@ -169,8 +170,9 @@ def test_pipeline_knee_pain_answer_not_title_dump():
     conditions = [str(item.get("condition") or "").lower() for item in (result.possible_conditions or [])]
     assert not any("when walking" in name or "climbing stairs" in name for name in conditions)
     assert "muscle cramp" not in conditions
-    urls = [str(item.get("url") or "") for item in (result.citations or []) if item.get("url")]
-    assert len(urls) == len(set(urls))
+    titles = [str(item.get("title") or "") for item in (result.citations or []) if item.get("title")]
+    assert len(titles) == len(set(titles))
+    assert len(titles) >= 2
 
 
 def test_pipeline_knee_stairs_and_behind_knee():

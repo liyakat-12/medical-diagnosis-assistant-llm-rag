@@ -32,7 +32,11 @@ NON_CLAIM_RE = re.compile(
     r"not a diagnosis|consult a (qualified )?(healthcare|doctor|clinician)|"
     r"possible explanations include|possible explanations supported|"
     r"retrieved notes describe common patterns|"
+    r"self-care ideas mentioned|when to seek care|"
+    r"earlier you also mentioned|are those still present|"
     r"did this start after|is the area swollen|"
+    r"how long has|how many days|how high is the fever|"
+    r"where exactly is|what associated symptoms|"
     r"based on the retrieved|"
     r"i could not find enough|please rephrase|"
     r"without retrieval|no documents retrieved|"
@@ -40,6 +44,7 @@ NON_CLAIM_RE = re.compile(
     r"chest pain can be serious|seek emergency care now",
     re.IGNORECASE,
 )
+_ORPHAN_SOURCE = re.compile(r"^\(?\s*Source:\s*[^)]+\)?\s*\.?$", re.I)
 
 
 @dataclass
@@ -86,7 +91,14 @@ def _split_units(answer: str) -> list[str]:
                 units.append(part)
     if not units and (answer or "").strip():
         units.append(answer.strip())
-    return units
+    # Re-attach orphaned "(Source: ...)" fragments split after a mid-sentence period.
+    merged: list[str] = []
+    for unit in units:
+        if merged and _ORPHAN_SOURCE.match(unit) and "(Source:" not in merged[-1]:
+            merged[-1] = f"{merged[-1].rstrip()} {unit.lstrip()}"
+        else:
+            merged.append(unit)
+    return merged
 
 
 def _extract_citation(sentence: str) -> str | None:

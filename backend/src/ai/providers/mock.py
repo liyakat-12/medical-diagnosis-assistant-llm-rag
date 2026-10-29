@@ -65,8 +65,10 @@ def _context_blocks(user_prompt: str) -> list[str]:
         if stop in after:
             after = after.split(stop, 1)[0]
             break
-    blocks = [part.strip() for part in after.split("\n\n") if part.strip() and "Source:" in part]
-    return blocks
+    # Split on numbered Source headers — note bodies often contain blank lines,
+    # so splitting on "\n\n" dropped self-care / warning paragraphs.
+    parts = re.split(r"(?=\[\d+\]\s*Source:)", after.strip())
+    return [part.strip() for part in parts if part.strip() and "Source:" in part]
 
 
 class MockProvider:

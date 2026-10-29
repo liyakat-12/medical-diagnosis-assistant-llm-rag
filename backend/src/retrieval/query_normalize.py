@@ -113,6 +113,22 @@ _NOTE_CONTEXT_REQUIREMENTS: list[tuple[re.Pattern[str], re.Pattern[str]]] = [
             re.I,
         ),
     ),
+    (
+        re.compile(r"\b(incense|agarbatti|smoke|smok(?:e|ing)|kitchen fire|fumes?)\b", re.I),
+        re.compile(r"\b(incense|agarbatti|smoke|smok(?:e|ing)|cigarette|fire|fumes?)\b", re.I),
+    ),
+    (
+        re.compile(r"\bdry air\b", re.I),
+        re.compile(r"\b(dry air|humid|heater|air[- ]?condition(?:ing|er)?|dehumidifier)\b", re.I),
+    ),
+    (
+        re.compile(r"\b(shouting|after shouting|screaming)\b", re.I),
+        re.compile(r"\b(shout(?:ing)?|scream(?:ing)?|yell(?:ing)?|hoarse)\b", re.I),
+    ),
+    (
+        re.compile(r"\bafter laughing\b", re.I),
+        re.compile(r"\b(laugh(?:ing|ed)?)\b", re.I),
+    ),
 ]
 
 _WARNING_SIGN_NOTE = re.compile(
@@ -120,13 +136,16 @@ _WARNING_SIGN_NOTE = re.compile(
     re.I,
 )
 
+# Prefer situational cues. Primary symptoms (cough) are scored only when the note
+# title/condition also carries that symptom — see note_context_fit.
 _CONTEXT_CUES: list[tuple[str, re.Pattern[str]]] = [
     ("sleep", re.compile(r"\b(sleep|slept|sleeping|insomni\w*|bad night|poor sleep)\b", re.I)),
-    ("cough", re.compile(r"\b(cough|coughing)\b", re.I)),
     ("exercise", re.compile(r"\b(exercise|exercising|gym|workout|lifting|training|movement)\b", re.I)),
     ("eating", re.compile(r"\b(eat(?:ing)?|ate|meal|food|after (?:meals?|eating)|indigestion)\b", re.I)),
     ("alcohol", re.compile(r"\b(alcohol|drink(?:ing|s)?|drank|drunk|hangover|beer|wine)\b", re.I)),
     ("anxiety", re.compile(r"\b(anxiety|anxious|panic|worried|worry|fear(?:ful)?)\b", re.I)),
+    ("screens", re.compile(r"\b(screens?|computer|phone|laptop|monitor)\b", re.I)),
+    ("cough", re.compile(r"\b(cough|coughing)\b", re.I)),
 ]
 
 # Distinct symptom areas used to avoid mixing a new complaint with an old one.
@@ -361,7 +380,11 @@ def related_history_texts(query: str, prior_texts: list[str]) -> list[str]:
         return prior_texts[-3:]
     current = retrieval_topics(query)
     if not current:
-        if is_follow_question(query) or _ADDITIVE_FOLLOW.search(query or ""):
+        if (
+            has_continuity_language(query)
+            or is_follow_question(query)
+            or _ADDITIVE_FOLLOW.search(query or "")
+        ):
             return prior_texts[-1:]
         # "finger injured little" (typos / untagged) is a new complaint, not a follow-up.
         if _NEW_SYMPTOM_CUE.search(query or ""):
@@ -369,6 +392,106 @@ def related_history_texts(query: str, prior_texts: list[str]) -> list[str]:
         return prior_texts[-1:] if _is_follow_language(query) else []
     related = [text for text in prior_texts if retrieval_topics(text) & current]
     return related[-3:]
+
+
+_CLINICAL_MODIFIER = re.compile(
+    r"\b("
+    r"fever|febrile|chills|swell\w*|swollen|puffy|"
+    r"breath\w*|short(?:ness)? of breath|palpitation[s]?|rapid heart|"
+    r"nausea|vomit\w*|diarrh(?:oea|ea)|dehydrat\w*|"
+    r"rash|bleed\w*|dizzy|dizziness|faint\w*|"
+    r"lock(?:ing|ed)?|giving way|red and hot|injury|injured|trauma|fracture|"
+    r"stiff neck|confusion|seizure"
+    r")\b",
+    re.I,
+)
+_CONTINUITY_LANGUAGE = re.compile(
+    r"\b("
+    r"still|same|that|those|as before|again|worse|"
+    r"(?:getting|feeling|feels|it'?s|it is|is it) better|"
+    r"also|as well|with that|"
+    r"the fever|the swelling|the cough|the pain|"
+    r"no longer|not anymore|gone now|resolved"
+    r")\b",
+    re.I,
+)
+
+
+def clinical_modifier_terms(text: str) -> set[str]:
+    return {match.group(0).lower() for match in _CLINICAL_MODIFIER.finditer(text or "")}
+
+
+def has_continuity_language(query: str) -> bool:
+    return bool(
+        _is_follow_language(query)
+        or is_follow_question(query)
+        or _ADDITIVE_FOLLOW.search(query or "")
+        or _REFINEMENT.search(query or "")
+        or _CONTINUITY_LANGUAGE.search(query or "")
+    )
+
+
+def prior_modifiers_missing_from_query(query: str, prior_texts: list[str]) -> set[str]:
+    """Modifiers present in recent related history but absent from the new query."""
+    current_topics = retrieval_topics(query)
+    related = [
+        text
+        for text in (prior_texts or [])
+        if not current_topics or (retrieval_topics(text) & current_topics)
+    ] or list(prior_texts or [])[-1:]
+    prior_mods: set[str] = set()
+    for text in related[-3:]:
+        prior_mods |= clinical_modifier_terms(text)
+    current_mods = clinical_modifier_terms(query)
+    # Normalize swell* variants to one token family for comparison.
+    def _family(term: str) -> str:
+        if term.startswith("swell") or term == "swollen" or term == "puffy":
+            return "swelling"
+        if "breath" in term or "short" in term:
+            return "breath"
+        return term
+
+    prior_f = {_family(item) for item in prior_mods}
+    current_f = {_family(item) for item in current_mods}
+    return prior_f - current_f
+
+
+def is_ambiguous_symptom_restatement(query: str, prior_texts: list[str]) -> bool:
+    """Same body area as before, but older modifiers are not clearly carried forward."""
+    if not prior_texts:
+        return False
+    if has_continuity_language(query):
+        return False
+    current = retrieval_topics(query)
+    prior: set[str] = set()
+    for text in prior_texts:
+        prior |= retrieval_topics(text)
+    if not current or not prior or current.isdisjoint(prior):
+        return False
+    return bool(prior_modifiers_missing_from_query(query, prior_texts))
+
+
+def clarification_for_prior_modifiers(query: str, prior_texts: list[str]) -> str:
+    missing = sorted(prior_modifiers_missing_from_query(query, prior_texts))
+    if not missing:
+        return ""
+    pretty = ", ".join(missing[:3])
+    topic = "these symptoms"
+    topics = retrieval_topics(query)
+    if "knee_leg" in topics:
+        topic = "your knee symptoms"
+    elif "chest_lung" in topics:
+        topic = "your chest symptoms"
+    elif "head" in topics:
+        topic = "your headache"
+    elif "throat" in topics:
+        topic = "your throat symptoms"
+    elif "abdomen" in topics:
+        topic = "your stomach symptoms"
+    return (
+        f"Earlier you also mentioned {pretty}. "
+        f"Are those still present with {topic}, or should I focus only on what you wrote just now?"
+    )
 
 
 def should_reuse_retrieval_history(query: str, prior_texts: list[str]) -> bool:
@@ -394,16 +517,23 @@ def should_reuse_retrieval_history(query: str, prior_texts: list[str]) -> bool:
     if _NEW_COMPLAINT_SHAPE.search(query or "") and not _REFINEMENT.search(query or ""):
         return False
     if not current:
-        # Explicit advice / additive follow-ups keep the active complaint.
-        if is_follow_question(query) or _ADDITIVE_FOLLOW.search(query or ""):
+        # Explicit continuity / advice / additive follow-ups keep the active complaint.
+        if (
+            has_continuity_language(query)
+            or is_follow_question(query)
+            or _ADDITIVE_FOLLOW.search(query or "")
+        ):
             return True
         # Untagged new symptom text must start a fresh retrieval thread.
         if _NEW_SYMPTOM_CUE.search(query or ""):
             return False
         return _is_follow_language(query)
-    if _is_follow_language(query):
+    if _is_follow_language(query) or has_continuity_language(query):
         return True
+    # Same body area alone is not enough when older modifiers would silently change triage.
     if current and prior and current & prior:
+        if is_ambiguous_symptom_restatement(query, prior_texts):
+            return False
         return True
     return False
 
@@ -593,9 +723,13 @@ def note_context_fit(query: str, title: str, condition: str = "", text: str = ""
     """How many reported context cues also appear in the note title or condition.
 
     Body text is ignored so a warning line like "wake you from sleep" cannot
-    outrank a better-fitting explanation.
+    outrank a better-fitting explanation. Trigger-specific notes that claim an
+    unreported trigger (incense, alcohol, etc.) score 0 here because they are
+    removed earlier by note_claims_unreported_context.
     """
     del text
+    if note_claims_unreported_context(query, title, condition):
+        return 0
     cues = reported_context_cues(query)
     if not cues:
         return 0

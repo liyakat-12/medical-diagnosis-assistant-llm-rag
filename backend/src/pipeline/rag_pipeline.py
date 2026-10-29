@@ -202,16 +202,22 @@ def match_percents(scores: list[float]) -> list[int]:
 
 
 def citations_from_evidence(evidence: list[Evidence]) -> list[dict]:
-    """One citation per distinct source URL (or title when URL is missing)."""
+    """One citation per retrieved note title.
+
+    Multiple chunks often share one publisher URL (e.g. NHS knee-pain page).
+    Deduping by URL alone dropped sibling titles that the answer still cites,
+    which falsely triggered fabricated_citation → mixed / general-knowledge.
+    """
     best: dict[str, dict] = {}
     order: list[str] = []
     for ev in evidence:
+        title = (ev.title or "").strip()
         url = (ev.url or "").strip()
-        key = url.lower() if url else f"title:{(ev.title or '').strip().lower()}"
-        if not key or key == "title:":
+        key = f"title:{title.lower()}" if title else (f"url:{url.lower()}" if url else "")
+        if not key:
             continue
         row = {
-            "title": ev.title,
+            "title": title or (ev.condition or "Retrieved medical document"),
             "source": ev.source,
             "url": ev.url,
             "condition": ev.condition,
@@ -248,7 +254,11 @@ def build_possible_conditions(
     query: str = "",
 ) -> list[dict]:
     """Clinical explanation cards from note bodies — never raw symptom-pattern titles."""
-    from src.llm.notes_answer import clinical_ideas_from_notes, is_symptom_pattern_label
+    from src.llm.notes_answer import (
+        clinical_ideas_from_notes,
+        is_symptom_pattern_label,
+        normalize_condition_label,
+    )
 
     notes: list[dict[str, str]] = []
     score_by_title: dict[str, float] = {}
@@ -267,14 +277,20 @@ def build_possible_conditions(
     rows: list[dict] = []
     seen: set[str] = set()
     for idea in ideas:
-        key = (idea.get("condition") or "").strip().lower()
-        if not key or key in seen or is_symptom_pattern_label(key):
+        label = normalize_condition_label(str(idea.get("condition") or ""))
+        if not label:
+            continue
+        key = label.lower()
+        if key in seen:
             continue
         seen.add(key)
         title = idea.get("title") or ""
+        explanation = (idea.get("explanation") or idea.get("why") or "").strip()
+        if not explanation:
+            continue
         rows.append(
             {
-                "condition": _pretty_condition(str(idea.get("condition") or "Condition")),
+                "condition": _pretty_condition(label),
                 "title": title,
                 "source": idea.get("source") or "",
                 "url": next(
@@ -282,16 +298,19 @@ def build_possible_conditions(
                     "",
                 ),
                 "relevance_score": score_by_title.get(title.strip().lower(), 0.0),
+                "explanation": explanation,
             }
         )
         if len(rows) >= limit:
             return _attach_match_labels(rows)
 
-    # Fallback: unique non-generic condition metadata (still never symptom-pattern titles).
+    # Fallback: unique normalized condition metadata (never re-admit rejected labels).
+    # Underscore IDs such as "viral_cough" become "viral cough" via _pretty_condition first.
     for item in citations:
-        label = str(item.get("condition") or "").strip()
+        raw = _pretty_condition(str(item.get("condition") or "").strip())
+        label = normalize_condition_label(raw)
         title = str(item.get("title") or "").strip()
-        if not label or is_symptom_pattern_label(label):
+        if not label:
             continue
         if is_symptom_pattern_label(title) and label.lower() == title.lower():
             continue
@@ -306,10 +325,67 @@ def build_possible_conditions(
                 "source": item.get("source") or "",
                 "url": item.get("url") or "",
                 "relevance_score": item.get("relevance_score") or 0.0,
+                "explanation": f'Discussed in the retrieved note "{title or label}".',
             }
         )
         if len(rows) >= limit:
             break
+
+    # Soft topic cards when notes describe a pattern but name no discrete diagnosis.
+    # Prefer region metadata (e.g. "Knee Pain") over activity titles ("… When Walking").
+    if not rows and notes:
+        from src.llm.notes_answer import _GENERIC_CONDITION, _sentences, _trim_sentence
+
+        for note in notes:
+            title = (note.get("title") or "").strip()
+            text = (note.get("text") or "").strip()
+            if len(text) < 20:
+                continue
+            raw = ""
+            for item in citations:
+                if (item.get("title") or "").strip() == title:
+                    raw = str(item.get("condition") or "").strip()
+                    break
+            if not raw:
+                raw = title.split(" When ")[0].strip() if " When " in title else ""
+            from src.llm.notes_answer import _DOCUMENT_TOPIC_OR_WARNING
+
+            if raw and _DOCUMENT_TOPIC_OR_WARNING.search(raw):
+                continue
+            if title and _DOCUMENT_TOPIC_OR_WARNING.search(title) and not raw:
+                continue
+            label = normalize_condition_label(raw) if raw else None
+            soft_topic = False
+            if not label and raw and _GENERIC_CONDITION.match(raw):
+                # Region complaint card when notes lack a named diagnosis.
+                label = raw
+                soft_topic = True
+            if not label:
+                continue
+            if not soft_topic and is_symptom_pattern_label(label):
+                continue
+            key = label.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            overview = _sentences(text)
+            explanation = (
+                _trim_sentence(overview[0], 160)
+                if overview
+                else f'Discussed in the retrieved note "{title or label}".'
+            )
+            rows.append(
+                {
+                    "condition": _pretty_condition(label),
+                    "title": title,
+                    "source": note.get("source") or "",
+                    "url": note.get("url") or "",
+                    "relevance_score": score_by_title.get(title.lower(), 0.0),
+                    "explanation": explanation,
+                }
+            )
+            if len(rows) >= limit:
+                break
     del query
     return _attach_match_labels(rows)
 
@@ -617,6 +693,18 @@ def _needs_general_knowledge_disclosure(audit: FaithfulnessAudit | None) -> bool
     )
 
 
+def _with_context_clarification(answer: str, state: ConversationState) -> str:
+    note = (state.context_clarification or "").strip()
+    text = (answer or "").strip()
+    if not note:
+        return text
+    if not text:
+        return note
+    if note.lower() in text.lower():
+        return text
+    return f"{note}\n\n{text}"
+
+
 def _strip_leading_emergency_banner(answer: str) -> str:
     """Remove a duplicated Call-112 banner when triage.guidance already carries it."""
     text = (answer or "").strip()
@@ -805,6 +893,7 @@ def run_pipeline(
         answer = _with_emergency_banner(query, answer, triage)
     else:
         answer = _weak_or_emergency_answer(query, triage)
+    answer = _with_context_clarification(answer, state)
     timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
     citations = citations_from_evidence(evidence) if strong else []
     faithfulness = audit_citation_faithfulness(answer, citations) if strong else None
@@ -812,12 +901,21 @@ def run_pipeline(
     if strong and _needs_general_knowledge_disclosure(faithfulness):
         citations = [*citations, general_ai_citation()]
         origin = "mixed"
+    elif strong and any(
+        re.search(r"general (ai|medical knowledge)", (item.get("title") or ""), re.I)
+        for item in citations
+    ):
+        origin = "mixed"
     matches = (
         outcomes_for_query(query, citations, embedding_mode, citations, evidence=evidence)
         if strong
         else []
     )
+    if any((row.get("explanation") or "").strip() for row in matches):
+        matches = [row for row in matches if (row.get("explanation") or "").strip()]
     recs = _recommendations(triage, evidence) if strong else clarifying_questions(query, limit=2)
+    if state.context_clarification and state.context_clarification not in recs:
+        recs = [state.context_clarification, *recs][:4]
     triage, matches, recs = _apply_question_policy(
         state, triage=triage, matches=matches, recs=recs, strong=strong
     )
@@ -1106,7 +1204,7 @@ def iter_pipeline_stream(
     chunks: list[str] = []
     generate_started = time.perf_counter()
     if strong:
-        from src.llm.notes_answer import is_title_dump_answer, rewrite_if_title_dump
+        from src.llm.notes_answer import is_title_dump_answer, polish_grounded_answer, rewrite_if_title_dump
 
         context_blocks = [_format_context_block(ev, i + 1) for i, ev in enumerate(evidence)]
         banner = _with_emergency_banner(query, "", triage)
@@ -1124,8 +1222,9 @@ def iter_pipeline_stream(
                 raise RuntimeError("empty grounded stream")
             body = answer[len(banner) :].strip() if banner and answer.startswith(banner) else answer
             if is_title_dump_answer(body):
-                rewritten = rewrite_if_title_dump(body, query, context_blocks, mode=mode)
-                answer = f"{banner}\n\n{rewritten}".strip() if banner else rewritten
+                body = rewrite_if_title_dump(body, query, context_blocks, mode=mode)
+            body = polish_grounded_answer(body, mode=mode)
+            answer = f"{banner}\n\n{body}".strip() if banner else body
         except Exception:
             logger.exception("Assistant generation failed after notes were found; answering from retrieved notes")
             fallback = generate_notes_fallback_answer(
@@ -1135,19 +1234,32 @@ def iter_pipeline_stream(
             yield {"type": "token", "content": fallback}
             chunks = [banner + "\n\n" + fallback if banner else fallback]
             answer = "".join(chunks).strip()
+        answer = _with_context_clarification(answer, state)
         faithfulness = audit_citation_faithfulness(answer, citations)
         if _needs_general_knowledge_disclosure(faithfulness):
             citations = [*citations, general_ai_citation()]
         recs = _recommendations(triage, evidence)
+        if state.context_clarification and state.context_clarification not in recs:
+            recs = [state.context_clarification, *recs][:4]
     else:
         answer = _weak_or_emergency_answer(query, triage)
+        answer = _with_context_clarification(answer, state)
         yield {"type": "token", "content": answer}
         faithfulness = None
         recs = clarifying_questions(query, limit=2)
+        if state.context_clarification and state.context_clarification not in recs:
+            recs = [state.context_clarification, *recs][:4]
     timings["generate_ms"] = round((time.perf_counter() - generate_started) * 1000, 2)
     origin = "knowledge_base" if strong else "none"
-    if strong and any((item.get("title") or "").startswith("General AI") for item in citations):
+    if strong and any(
+        re.search(r"general (ai|medical knowledge)", (item.get("title") or ""), re.I)
+        for item in citations
+    ):
         origin = "mixed"
+    if any((row.get("explanation") or "").strip() for row in possible_conditions):
+        possible_conditions = [
+            row for row in possible_conditions if (row.get("explanation") or "").strip()
+        ]
     triage, possible_conditions, recs = _apply_question_policy(
         state, triage=triage, matches=possible_conditions, recs=recs, strong=strong
     )

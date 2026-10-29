@@ -90,4 +90,37 @@ describe("chat bubble rendering", () => {
     assert.match(sessionSource, /Prefer the finalized API result/);
     assert.match(sessionSource, /resultConditions\.length/);
   });
+
+  it("renders short explanations on possible-condition cards when present", () => {
+    assert.match(bubbleSource, /item\.explanation/);
+    const item = message({
+      content: "Overview of symptoms from notes.",
+      possible_conditions: [
+        {
+          condition: "Early osteoarthritis",
+          explanation: "Common possibilities include early osteoarthritis after repeated load.",
+          evidence_match_label: "Closest evidence match",
+        },
+      ],
+      triage: { level: "self_care", label: "Self care", guidance: "Monitor symptoms." },
+    });
+    const copy = formatAssistantCopy(item);
+    assert.match(copy, /Early osteoarthritis/);
+    assert.match(copy, /Common possibilities include early osteoarthritis/);
+  });
+
+  it("styles clickable source titles in blue with hover and focus, keeping metadata muted", () => {
+    assert.match(bubbleSource, /SOURCE_LINK_CLASS/);
+    assert.match(bubbleSource, /text-blue-700/);
+    assert.match(bubbleSource, /hover:text-blue-900/);
+    assert.match(bubbleSource, /hover:underline/);
+    assert.match(bubbleSource, /focus-visible:outline-blue-600/);
+    assert.match(bubbleSource, /text-slate-500"> — \{item\.source\}/);
+    assert.match(bubbleSource, /font-extrabold text-teal-800/);
+    // Only the title is the link target; numbering and publisher stay outside the <a>.
+    assert.match(
+      bubbleSource,
+      /<a href=\{item\.url\} target="_blank" rel="noreferrer" className=\{SOURCE_LINK_CLASS\}>\s*\{title\}\s*<\/a>/,
+    );
+  });
 });

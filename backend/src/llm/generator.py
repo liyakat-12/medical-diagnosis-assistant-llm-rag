@@ -25,27 +25,31 @@ follow-up question instead of guessing.
 recommend consulting a doctor or pharmacist.
 4. Never claim the user has a disease. Use "may be" or "one possible explanation is". \
 Do not give probabilities or percentages.
-5. Use plain English. Explain a familiar idea before an unfamiliar medical term.
+5. Use plain English. Prefer short sentences. Explain a familiar idea before an \
+unfamiliar medical term.
 6. Prefer a small set, at most 4 clinical explanations grounded in note BODY text \
-(for example osteoarthritis, strain, Baker's cyst). Never list a document title such as \
-"Knee Pain When Walking" or "Pain Behind the Knee" as if it were a diagnosis. Those \
-titles are symptom patterns, not conditions. Do not list an unrelated condition \
-(for example a muscle cramp) unless the note body and the user's wording both support it. \
-Put everyday explanations that fit the reported symptoms first, then other relevant \
-possibilities, then a serious condition only when the notes or the user's warning signs \
-make it relevant. Say in one short line why each possibility fits. Do not treat a \
-note's assumed trigger (alcohol, anxiety, skipped meals, and similar) as a fact about \
-the user unless they reported it.
-7. Keep the answer under 160 words. Start with a one-sentence overview, then brief \
-possibilities, then at most 2 short clarifying questions or next steps grounded in the \
-context. Do not repeat an urgency warning that is already stated.
+(for example a viral cold, acid reflux, migraine, a joint strain). Never list a \
+document title as if it were a diagnosis. Symptom-pattern titles are not conditions. \
+Do not list an unrelated condition unless the note body and the user's wording both \
+support it. Put everyday explanations first, then other relevant possibilities, then \
+a serious condition only when the notes or the user's warning signs make it relevant. \
+For each possibility, say in one short line why it could fit.
+7. Write a clear, useful answer (about 180-320 words when the notes support it). Use \
+this structure when the notes allow it:
+   (a) a short overview of what the notes say about these symptoms,
+   (b) possible explanations with a one-line why for each,
+   (c) simple self-care only if the notes support it,
+   (d) when to seek routine, urgent, or emergency care if the notes mention it,
+   (e) at most 2 short clarifying questions if key details are missing.
+Do not repeat an urgency warning that is already stated elsewhere.
 8. Previous conversation, if provided, is the same active complaint only. \
 Use it to interpret follow-up detail. If none is provided, ignore any earlier illness \
 and do not mention leftover conditions, cards, or sources.
-9. If one needed detail is missing, you may ask one targeted question. If you add one \
+9. If one needed detail is missing, ask a targeted question. If you add one \
 cautious general-knowledge sentence, say it is not from the retrieved notes. \
 Do not invent a (Source: ...) citation for that sentence.
-10. End with this exact line: Not a diagnosis — see a clinician if needed.
+10. Do not open with rare or alarming diseases when everyday explanations fit the notes.
+11. End with this exact line: Not a diagnosis — see a clinician if needed.
 """
 
 EDUCATION_SYSTEM_PROMPT = """You are a careful medical information assistant answering a \
@@ -56,7 +60,8 @@ general education.
 
 Use ONLY the reference context below.
 
-Structure, keeping to facts in the notes:
+Write a clear, well-organized answer in plain English (about 150-280 words when the \
+notes support it). Structure, keeping to facts in the notes:
 1. A clear plain-language definition.
 2. How it works or what causes it, when the notes support that.
 3. Common symptoms or triggers when relevant to the question.
@@ -77,16 +82,18 @@ End with: Not a diagnosis — this is general information from reference notes.
 """
 
 CAUSES_SYSTEM_PROMPT = """You are a careful medical information assistant. Explain \
-plausible causes supported by the reference notes. Distinguish common causes from \
-serious possibilities when the notes do. Do not assign numerical probabilities. \
-Do not claim a diagnosis. Cite (Source: <title>).
+plausible causes supported by the reference notes in clear plain English. Distinguish \
+common causes from serious possibilities when the notes do. Use short bullet points \
+when helpful. Do not assign numerical probabilities. Do not claim a diagnosis. \
+Cite (Source: <title>).
 End with: Not a diagnosis — this is general information from reference notes.
 """
 
 TREATMENT_SYSTEM_PROMPT = """You are a careful medical information assistant. Explain \
-general treatment and management options supported by the reference notes. Do not \
-prescribe a personalized plan, name a dose, or tell the user which medicine to take. \
-Cite (Source: <title>). If the notes are limited, say so.
+general treatment and management options supported by the reference notes in clear \
+plain English. Separate everyday self-care from situations that need a clinician when \
+the notes do. Do not prescribe a personalized plan, name a dose, or tell the user \
+which medicine to take. Cite (Source: <title>). If the notes are limited, say so.
 End with: Not a diagnosis — this is general information from reference notes.
 """
 
@@ -187,37 +194,43 @@ def _build_user_prompt(
     context = "\n\n".join(context_blocks)
     if mode == "symptom":
         instruction = (
-            "Using ONLY the note text (not the Source titles), write: (1) one short overview of "
-            "what the notes say about these symptoms without claiming a diagnosis, "
-            "(2) up to 4 clinical possibilities named from the note bodies with (Source: <title>) "
-            "citations, (3) one or two targeted follow-up questions. "
+            "Using ONLY the note text (not the Source titles), write a clear answer with: "
+            "(1) a short overview of what the notes say about these symptoms without claiming a diagnosis, "
+            "(2) up to 4 clinical possibilities named from the note bodies, each with one sentence "
+            "explaining why it could fit and a (Source: <title>) citation, "
+            "(3) brief self-care only if the notes support it, "
+            "(4) when to seek care if the notes mention warning signs, "
+            "(5) one or two targeted follow-up questions if useful details are missing. "
             "Do NOT copy document titles into the possibility list. "
             "If this is a follow-up, explain how the new detail relates to earlier possible matches."
         )
         label = "User symptom description"
     elif mode == "treatment":
         instruction = (
-            "Using ONLY the context above, explain general treatment and management options. "
+            "Using ONLY the context above, explain general treatment and management options in "
+            "plain English with short bullets when helpful. "
             "Do not prescribe a dose or a personalized plan."
         )
         label = "User question"
     elif mode == "causes":
         instruction = (
-            "Using ONLY the context above, explain plausible causes supported by the notes. "
+            "Using ONLY the context above, explain plausible causes supported by the notes in "
+            "plain English. Separate common from more serious possibilities when the notes do. "
             "Do not assign probabilities or diagnose the user."
         )
         label = "User question"
     elif mode == "symptom_education":
         instruction = (
             "Using ONLY the context above, describe typical symptoms and warning signs of the "
-            "named condition. Do not assume the user has it."
+            "named condition in plain English. Do not assume the user has it."
         )
         label = "User question"
     else:
         instruction = (
             "Using ONLY the context above, answer the educational question with a plain-language "
-            "definition and the supporting facts from the notes. Do not assume the user has the "
-            "condition and do not give a personalized urgency label."
+            "definition, then the supporting facts from the notes in a clear order "
+            "(causes or mechanism, common symptoms, general management if relevant, warnings). "
+            "Do not assume the user has the condition and do not give a personalized urgency label."
         )
         label = "User question"
     return (
@@ -227,6 +240,15 @@ def _build_user_prompt(
         f"{label}: {query}\n\n"
         f"{instruction}"
     )
+
+
+def _tokens_for_mode(mode: str, *, weak_match: bool = False) -> int:
+    if weak_match:
+        return min(220, int(getattr(config, "LLM_MEDICAL_MAX_TOKENS", 450)))
+    medical = int(getattr(config, "LLM_MEDICAL_MAX_TOKENS", 450))
+    if mode in {"education", "causes", "treatment", "symptom_education"}:
+        return max(medical, 420)
+    return medical
 
 
 def _call_llm(
@@ -267,11 +289,12 @@ def generate_notes_fallback_answer(
 ) -> str:
     """Write from retrieved notes when the configured assistant model fails."""
     from src.ai.providers.mock import MockProvider
-    from src.llm.notes_answer import rewrite_if_title_dump
+    from src.llm.notes_answer import polish_grounded_answer, rewrite_if_title_dump
 
     user_prompt = _build_user_prompt(query, context_blocks, history, mode=mode)
     answer = MockProvider().generate(_prompt_for_mode(mode), user_prompt, grounded=True)
-    return rewrite_if_title_dump(answer, query, context_blocks, mode=mode)
+    answer = rewrite_if_title_dump(answer, query, context_blocks, mode=mode)
+    return polish_grounded_answer(answer, mode=mode)
 
 
 def generate_grounded_answer(
@@ -283,14 +306,23 @@ def generate_grounded_answer(
     mode: str = "symptom",
 ) -> str:
     """RAG-grounded generation: the LLM must cite the given context blocks."""
-    from src.llm.notes_answer import rewrite_if_title_dump
+    from src.llm.notes_answer import polish_grounded_answer, rewrite_if_title_dump
 
     user_prompt = _build_user_prompt(query, context_blocks, history, mode=mode)
     prompt = _prompt_for_mode(mode, weak_match=weak_match)
     try:
-        answer = (_call_llm(prompt, user_prompt, grounded=True) or "").strip()
+        answer = (
+            _call_llm(
+                prompt,
+                user_prompt,
+                grounded=True,
+                max_tokens=_tokens_for_mode(mode, weak_match=weak_match),
+            )
+            or ""
+        ).strip()
         if answer:
-            return rewrite_if_title_dump(answer, query, context_blocks, mode=mode)
+            answer = rewrite_if_title_dump(answer, query, context_blocks, mode=mode)
+            return polish_grounded_answer(answer, mode=mode)
     except Exception:
         if weak_match or not context_blocks:
             raise
@@ -310,7 +342,12 @@ def stream_grounded_answer(
 ) -> Iterator[str]:
     user_prompt = _build_user_prompt(query, context_blocks, history, mode=mode)
     prompt = _prompt_for_mode(mode, weak_match=weak_match)
-    yield from stream_llm(prompt, user_prompt, grounded=True)
+    yield from get_provider().stream(
+        prompt,
+        user_prompt,
+        grounded=True,
+        max_tokens=_tokens_for_mode(mode, weak_match=weak_match),
+    )
 
 
 def generate_conversational_answer(query: str, history: list[dict] | None = None) -> str:

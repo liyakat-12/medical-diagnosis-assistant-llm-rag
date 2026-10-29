@@ -138,6 +138,9 @@ function OutcomeList({ message }: { message: ChatMessage }) {
               <span className="text-xs font-semibold text-teal-800">{item.evidence_match_label}</span>
             ) : null}
           </div>
+          {item.explanation ? (
+            <p className="mt-1 text-sm leading-5 text-slate-700">{item.explanation}</p>
+          ) : null}
         </li>
       ))}
     </ol>
@@ -188,6 +191,11 @@ function UrgencyList({
   );
 }
 
+const SOURCE_LINK_CLASS =
+  "rounded-sm font-semibold text-blue-700 underline-offset-2 " +
+  "hover:text-blue-900 hover:underline " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
+
 function CitationBullets({ message }: { message: ChatMessage }) {
   const citations = retrievedCitations(message);
   if (message.streaming && !citations.length) {
@@ -198,21 +206,17 @@ function CitationBullets({ message }: { message: ChatMessage }) {
     <ol className="space-y-2">
       {citations.map((item, index) => {
         const title = item.title || formatConditionName(item.condition);
-        const inner = (
-          <>
-            <span className="font-extrabold text-teal-800">{index + 1}.</span> {title}
-            {item.source ? <span className="text-slate-500"> — {item.source}</span> : null}
-          </>
-        );
         return (
           <li key={`${title}-${index}`} className="break-anywhere text-sm leading-6 text-slate-700">
+            <span className="font-extrabold text-teal-800">{index + 1}.</span>{" "}
             {item.url ? (
-              <a href={item.url} target="_blank" rel="noreferrer" className="font-semibold hover:text-teal-800">
-                {inner}
+              <a href={item.url} target="_blank" rel="noreferrer" className={SOURCE_LINK_CLASS}>
+                {title}
               </a>
             ) : (
-              inner
+              <span className="font-semibold text-slate-700">{title}</span>
             )}
+            {item.source ? <span className="text-slate-500"> — {item.source}</span> : null}
           </li>
         );
       })}

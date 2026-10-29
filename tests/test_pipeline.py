@@ -157,7 +157,7 @@ def test_outcomes_for_query_reuses_pool_without_second_retrieve(monkeypatch):
             {"condition": "flu", "title": "Flu", "source": "CDC", "url": "", "relevance_score": 0.5},
         ],
     )
-    assert [row["condition"] for row in rows] == ["cold", "flu"]
+    assert [row["condition"] for row in rows] == ["Cold", "Flu"]
     assert "match_percent" not in rows[0]
 
 

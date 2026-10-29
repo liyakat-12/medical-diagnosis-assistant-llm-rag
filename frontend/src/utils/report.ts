@@ -59,6 +59,7 @@ export function formatAssistantCopy(message: ChatMessage): string {
       for (const item of outcomes) {
         const label = item.evidence_match_label ? ` — ${item.evidence_match_label}` : "";
         lines.push(`• ${formatConditionName(item.condition)}${label}`);
+        if (item.explanation) lines.push(`  ${item.explanation}`);
       }
     }
     if (message.triage && message.triage.level !== "none") {

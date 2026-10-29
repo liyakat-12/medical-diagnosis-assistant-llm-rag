@@ -170,7 +170,7 @@ cd frontend
 npm run dev
 ```
 
-Website: http://localhost:5173 — API docs: http://localhost:8000/docs. Demo login is development-only (`demo@clinic.local` / `demo123`).
+Website: http://localhost:5173 — API docs: http://localhost:8000/docs. Demo login: `demo@clinic.local` / `demo123` (seeded on API startup when DEMO credentials are set).
 
 Try: “How can I protect my skin from the sun to lower skin cancer risk?”, “What is Gaucher disease?”, “I get a migrane with light hurting my eyes”, then a new complaint after a previous knee-pain thread.
 

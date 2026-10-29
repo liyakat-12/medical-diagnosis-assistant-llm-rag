@@ -160,7 +160,7 @@ npm run dev
 
 Or use `run_api.bat`, `run_web.bat`, or `run_full.bat`. Website: http://localhost:5173 — API docs: http://localhost:8000/docs
 
-Demo login (development only): **Fill demo details** on the sign-in page, then sign in (`demo@clinic.local` / `demo123`). Production does not seed this account.
+Demo login: **Fill demo details** on the sign-in page, then sign in (`demo@clinic.local` / `demo123`). The API seeds this account on startup whenever `DEMO_EMAIL` / `DEMO_PASSWORD` are set (including production).
 
 On startup the API warms the embedding model, Chroma collection, and cross-encoder (when `RERANK_ENABLED=true`) in a worker thread so the first chat is not a cold Hugging Face load.
 

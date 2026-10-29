@@ -87,14 +87,23 @@ async def refresh_user(refresh_token: str | None) -> str:
 
 
 async def seed_demo_user() -> None:
-    if config.is_production() or not (config.DEMO_EMAIL or "").strip():
-        logger.info("Skipping demo user seed")
+    """Ensure the advertised demo login works in every environment.
+
+    The sign-in page always offers demo@clinic.local / demo123. Production used
+    to skip seeding, so that button failed with "Incorrect email or password."
+    Seed (or repair) the account whenever DEMO_EMAIL and DEMO_PASSWORD are set.
+    """
+    email = _normalize_email(config.DEMO_EMAIL or "")
+    password = config.DEMO_PASSWORD or ""
+    if not email or not password:
+        logger.info("Skipping demo user seed (DEMO_EMAIL/DEMO_PASSWORD unset)")
         return
-    existing = await user_repository.find_by_email(config.DEMO_EMAIL)
+    existing = await user_repository.find_by_email(email)
+    digest = hash_password(password)
     if existing:
+        if not verify_password(password, existing.get("password_hash") or ""):
+            await user_repository.update_user(str(existing["_id"]), {"password_hash": digest})
+            logger.info("Repaired demo user password email=%s", email)
         return
-    await user_repository.create_user(
-        config.DEMO_NAME,
-        config.DEMO_EMAIL,
-        hash_password(config.DEMO_PASSWORD),
-    )
+    await user_repository.create_user(config.DEMO_NAME, email, digest)
+    logger.info("Seeded demo user email=%s", email)

@@ -7,7 +7,19 @@ import { DistributionBars, GroupedBarChart } from "../src/components/insights/Ch
 import { MetricCards } from "../src/components/evaluation/MetricCards.tsx";
 import { RagPipelineDiagram } from "../src/components/evaluation/RagPipelineDiagram.tsx";
 import type { EmbeddingRun, RetrievalRun } from "../src/types/evaluation.ts";
-import { categoryRows, embeddingGroups, embeddingNote, rankDistribution, retrievalMetricCards, retrievalRunGroups, retrievalRunsNote, scoreLabel, selectedRun } from "../src/utils/evaluationCharts.ts";
+import {
+  categoryRows,
+  embeddingEmptyMessage,
+  embeddingGroups,
+  embeddingNote,
+  missingHistoricalRunIds,
+  rankDistribution,
+  retrievalMetricCards,
+  retrievalRunGroups,
+  retrievalRunsNote,
+  scoreLabel,
+  selectedRun,
+} from "../src/utils/evaluationCharts.ts";
 
 function run(overrides: Partial<RetrievalRun> = {}): RetrievalRun {
   return {
@@ -90,12 +102,19 @@ const RUN_SERIES = [
 
 describe("chart data", () => {
   it("plots every stored run with recall and MRR distinguished on one axis", () => {
-    const runs = [run({ id: "baseline", label: "Baseline", metrics: { n: 87, found: 80, missed: 7, recall_at_1: 0.2, recall_at_3: 0.4, recall_at_4: 0.5, mrr: 0.3 }, corpus_docs: 40 }), run()];
+    const runs = [
+      run({ id: "baseline", label: "Baseline", metrics: { n: 87, found: 80, missed: 7, recall_at_1: 0.2, recall_at_3: 0.4, recall_at_4: 0.5, mrr: 0.3 }, corpus_docs: 40 }),
+      run({ id: "after", label: "After", metrics: { n: 103, found: 100, missed: 3, recall_at_1: 0.8, recall_at_3: 0.9, recall_at_4: 0.95, mrr: 0.85 }, corpus_docs: 1017 }),
+      run(),
+    ];
     const groups = retrievalRunGroups(runs, "batch4");
-    assert.deepEqual(groups.map((item) => item.label), ["Baseline", "Batch4"]);
-    assert.equal(groups[1].values.r1, 0.5);
-    assert.equal(groups[1].values.mrr, 0.62);
-    assert.match(groups[1].sublabel ?? "", /Selected/);
+    assert.deepEqual(groups.map((item) => item.label), ["Baseline", "After", "Batch4"]);
+    assert.equal(groups[0].values.r1, 0.2);
+    assert.equal(groups[1].values.r4, 0.95);
+    assert.equal(groups[2].values.r1, 0.5);
+    assert.equal(groups[2].values.mrr, 0.62);
+    assert.match(groups[2].sublabel ?? "", /Selected/);
+    assert.match(groups[2].sublabel ?? "", /n=20/);
     assert.match(retrievalRunsNote(runs), /query counts differ/);
     assert.match(retrievalRunsNote(runs), /corpus size differs/);
     assert.doesNotMatch(retrievalRunsNote(runs), /not recorded/);
@@ -119,18 +138,49 @@ describe("chart data", () => {
     assert.match(html, />MRR</);
     assert.match(html, /Batch4 · Recall@1: 0\.50/);
     assert.match(html, />Baseline</);
+    assert.match(html, />After</);
   });
 
-  it("counts rank 1, 2, 3, 4, and not in the top four without dropping queries", () => {
+  it("explains when historical Baseline/After/Batch4 runs are missing", () => {
+    const onlyProduction = [run({ id: "production", label: "Production" })];
+    assert.deepEqual(missingHistoricalRunIds(onlyProduction), ["baseline", "after", "batch4"]);
+    assert.match(retrievalRunsNote(onlyProduction), /Missing historical comparison runs: Baseline, After, Batch4/);
+    assert.deepEqual(
+      missingHistoricalRunIds(onlyProduction, {
+        directory: "",
+        directory_exists: true,
+        expected_glob: "kb_phase2_*.json",
+        dataset: "kb_expansion_phase2.jsonl",
+        report_files: [],
+        valid_runs: 1,
+        missing_historical_run_ids: ["baseline"],
+        missing_message: null,
+      }),
+      ["baseline"],
+    );
+    assert.deepEqual(
+      missingHistoricalRunIds([
+        run({ id: "baseline", label: "Baseline" }),
+        run({ id: "after", label: "After" }),
+        run({ id: "batch4", label: "Batch4" }),
+      ]),
+      [],
+    );
+  });
+
+  it("counts rank 1, 2, 3, 4, and not in top 4 with percentages that sum to the query count", () => {
     const buckets = rankDistribution(run());
     assert.ok(buckets);
-    assert.deepEqual(buckets.map((item) => [item.label, item.value]), [
-      ["Rank 1", 10],
-      ["Rank 2", 3],
-      ["Rank 3", 2],
-      ["Rank 4", 3],
-      ["Not in the top four", 2],
-    ]);
+    assert.deepEqual(
+      buckets.map((item) => [item.label, item.value]),
+      [
+        ["Rank 1", 10],
+        ["Rank 2", 3],
+        ["Rank 3", 2],
+        ["Rank 4", 3],
+        ["Not in top 4", 2],
+      ],
+    );
     assert.equal(buckets.reduce((sum, item) => sum + item.value, 0), 20);
     const switched = rankDistribution(run({ rank_distribution: { "1": 1, "2": 0, "3": 0, "4": 0, miss: 4 } }));
     assert.equal(switched?.[0].value, 1);
@@ -143,9 +193,11 @@ describe("chart data", () => {
         items: buckets,
       }),
     );
-    assert.match(html, /Not in the top four/);
+    assert.match(html, /Not in top 4/);
     assert.match(html, /Rank 2/);
     assert.match(html, /Rank 3/);
+    assert.match(html, /10[\s\S]*\(50%\)/);
+    assert.match(html, /2[\s\S]*\(10%\)/);
   });
 
   it("omits category and rank charts when that data is absent", () => {
@@ -190,6 +242,21 @@ describe("chart data", () => {
     assert.match(embeddingNote(runs) ?? "", /embedding_eval_general.csv/);
     assert.equal(embeddingNote([]), null);
   });
+
+  it("explains missing embedding comparison data without inventing scores", () => {
+    assert.equal(embeddingGroups([]).length, 0);
+    assert.match(embeddingEmptyMessage(), /evaluate_embeddings\.py/);
+    assert.match(
+      embeddingEmptyMessage({
+        expected_files: ["embedding_eval_general.csv"],
+        present_files: [],
+        missing_files: ["embedding_eval_general.csv"],
+        valid_runs: 0,
+        missing_message: "No stored embedding comparison CSVs were found.",
+      }),
+      /No stored embedding comparison CSVs were found/,
+    );
+  });
 });
 
 describe("pipeline diagram", () => {
@@ -215,6 +282,8 @@ describe("evaluation page surface", () => {
     assert.match(source, /rankDistribution\(run\)/);
     assert.match(source, /categoryRows\(run\)/);
     assert.match(source, /embeddingGroups\(embeddings\)/);
+    assert.match(source, /embeddingEmptyMessage/);
+    assert.match(source, /Number of queries/);
   });
 
   it("no longer renders the detailed evaluation panels", () => {

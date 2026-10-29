@@ -3,9 +3,9 @@ import { useId } from "react";
 export type Series = { key: string; label: string; color: string };
 export type BarGroup = { label: string; sublabel?: string; values: Record<string, number | null> };
 
-const WIDTH = 640;
-const HEIGHT = 280;
-const PAD = { top: 22, right: 16, bottom: 62, left: 52 };
+const WIDTH = 720;
+const HEIGHT = 300;
+const PAD = { top: 22, right: 16, bottom: 72, left: 52 };
 
 export function ChartLegend({ series }: { series: Series[] }) {
   return (
@@ -56,7 +56,7 @@ export function GroupedBarChart({
         <ChartLegend series={series} />
       </figcaption>
       <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-auto w-full min-w-[40rem]" role="img" aria-labelledby={`${id}-title ${id}-desc`}>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-auto w-full min-w-[44rem]" role="img" aria-labelledby={`${id}-title ${id}-desc`}>
         <desc id={`${id}-desc`}>{description}</desc>
         {ticks.map((tick) => (
           <g key={tick}>

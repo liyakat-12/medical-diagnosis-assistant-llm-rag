@@ -47,6 +47,16 @@ export interface RetrievalReportStatus {
   dataset: string;
   report_files: string[];
   valid_runs: number;
+  historical_run_ids?: string[];
+  missing_historical_run_ids?: string[];
+  missing_message: string | null;
+}
+
+export interface EmbeddingComparisonStatus {
+  expected_files: string[];
+  present_files: string[];
+  missing_files: string[];
+  valid_runs: number;
   missing_message: string | null;
 }
 
@@ -110,6 +120,7 @@ export interface EvaluationOverview {
   retrieval_runs: RetrievalRun[];
   retrieval_report_status?: RetrievalReportStatus;
   embedding_comparison: EmbeddingRun[];
+  embedding_comparison_status?: EmbeddingComparisonStatus;
   quality_reports: QualityReport[];
   grounding: GroundingSummary | null;
   test_suite: null;

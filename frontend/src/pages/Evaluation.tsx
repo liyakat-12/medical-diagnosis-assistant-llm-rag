@@ -11,7 +11,7 @@ import { cn } from "../lib/cn";
 import { getEvaluationOverview } from "../services/evaluation";
 import type { EvaluationOverview, RetrievalRun } from "../types/evaluation";
 import type { AsyncState } from "../utils/dashboardStats";
-import { categoryRows, embeddingGroups, embeddingNote, rankDistribution, retrievalRunGroups, retrievalRunsNote, scoreLabel, selectedRun } from "../utils/evaluationCharts";
+import { categoryRows, embeddingEmptyMessage, embeddingGroups, embeddingNote, rankDistribution, retrievalRunGroups, retrievalRunsNote, scoreLabel, selectedRun } from "../utils/evaluationCharts";
 
 const RUN_SERIES: Series[] = [
   { key: "r1", label: "Recall@1", color: "#0f766e" },
@@ -210,6 +210,8 @@ function ChartsBlock({ state, run }: { state: AsyncState<EvaluationOverview>; ru
   const categories = categoryRows(run);
   const embedGroups = embeddingGroups(embeddings);
   const embedCaption = embeddingNote(embeddings);
+  const reportStatus = state.data.retrieval_report_status;
+  const embedStatus = state.data.embedding_comparison_status;
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -222,13 +224,13 @@ function ChartsBlock({ state, run }: { state: AsyncState<EvaluationOverview>; ru
           format={scoreLabel}
           groups={retrievalRunGroups(runs, run.id)}
         />
-        <p className="mt-2 text-xs leading-5 text-slate-500">{retrievalRunsNote(runs)}</p>
+        <p className="mt-2 text-xs leading-5 text-slate-500">{retrievalRunsNote(runs, reportStatus)}</p>
       </ChartCard>
       {ranks ? (
         <ChartCard>
           <DistributionBars
             title={`Where the expected note ranked (${run.label})`}
-            description={`Rank of the expected note for ${run.metrics.n} test queries in ${run.label}. Not in the top four means it was not retrieved at rank 1, 2, 3, or 4.`}
+            description={`Rank of the expected note for ${run.metrics.n} test queries in ${run.label}. Not in top 4 means it was not retrieved at rank 1, 2, 3, or 4.`}
             total={run.metrics.n}
             items={ranks}
           />
@@ -239,23 +241,25 @@ function ChartsBlock({ state, run }: { state: AsyncState<EvaluationOverview>; ru
           <CategoryTable run={run} rows={categories} />
         </ChartCard>
       ) : null}
-      <ChartCard className="lg:col-span-2">
-        {embedGroups.length ? (
-          <>
-            <GroupedBarChart
-              title="Embedding model comparison (earlier experiment)"
-              description="Recall@1, Recall@3, Recall@5, and MRR from the stored embedding experiment. This is a different question set from the retrieval runs above."
-              yLabel="Score (0 to 1)"
-              series={EMBED_SERIES}
-              format={scoreLabel}
-              groups={embedGroups}
-            />
-            <p className="mt-2 text-xs leading-5 text-slate-500">{embedCaption}</p>
-          </>
-        ) : (
-          <EmptyState title="No embedding comparison is available." />
-        )}
-      </ChartCard>
+      {embedGroups.length ? (
+        <ChartCard className="lg:col-span-2">
+          <GroupedBarChart
+            title="Embedding model comparison (earlier experiment)"
+            description="Recall@1, Recall@3, Recall@5, and MRR from the stored embedding experiment. This is a different question set from the retrieval runs above."
+            yLabel="Score (0 to 1)"
+            series={EMBED_SERIES}
+            format={scoreLabel}
+            groups={embedGroups}
+          />
+          <p className="mt-2 text-xs leading-5 text-slate-500">{embedCaption}</p>
+        </ChartCard>
+      ) : (
+        <div className="lg:col-span-2">
+          <EmptyState title="No embedding comparison is available.">
+            <p>{embeddingEmptyMessage(embedStatus)}</p>
+          </EmptyState>
+        </div>
+      )}
     </div>
   );
 }
@@ -270,7 +274,7 @@ function CategoryTable({ run, rows }: { run: RetrievalRun; rows: NonNullable<Ret
           <thead>
             <tr className="border-b border-slate-200 text-slate-500">
               <th scope="col" className="py-1.5 pr-3 font-bold">Category</th>
-              <th scope="col" className="py-1.5 pr-3 text-right font-bold">Queries</th>
+              <th scope="col" className="py-1.5 pr-3 text-right font-bold">Number of queries</th>
               <th scope="col" className="py-1.5 pr-3 text-right font-bold">Recall@1</th>
               <th scope="col" className="py-1.5 text-right font-bold">MRR</th>
             </tr>

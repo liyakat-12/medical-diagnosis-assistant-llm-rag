@@ -26,12 +26,30 @@ RETRIEVAL_RUN_GLOB = "kb_phase2_*.json"
 RETRIEVAL_K_VALUES = (1, 3, 4)
 EMBEDDING_K_VALUES = (1, 3, 5)
 
+RUN_LABELS = {
+    "baseline": "Baseline",
+    "after": "After",
+    "batch4": "Batch4",
+    "production": "Production",
+}
+
 RUN_DESCRIPTIONS = {
     "baseline": "Before the Phase 2 knowledge-base expansion.",
     "after": "After the Phase 2 knowledge-base expansion.",
     "batch4": "After the re-ranker batch-size change (batch_size=4).",
     "production": "Production retrieval evaluation against the baked general knowledge-base index.",
 }
+
+# Historical triad shown in the Evaluation Dashboard reference charts.
+HISTORICAL_COMPARISON_RUN_IDS = ("baseline", "after", "batch4")
+
+MISSING_EMBEDDING_COMPARISON_MESSAGE = (
+    "No stored embedding comparison CSVs were found under evaluation/results "
+    "(expected embedding_eval_general.csv, embedding_eval_medical.csv, and "
+    "embedding_eval_general_rerank.csv). Generate them with "
+    "`python evaluation/evaluate_embeddings.py`, then include those files in "
+    "the API image. Live chat retrieval is separate and is not used here."
+)
 
 MISSING_RETRIEVAL_RUNS_MESSAGE = (
     "No stored retrieval evaluation report was found under evaluation/results "
@@ -146,7 +164,7 @@ def _summarize_run(path: Path) -> dict:
     report_config = data.get("config") if isinstance(data.get("config"), dict) else {}
     return {
         "id": run_id,
-        "label": run_id.replace("_", " ").title(),
+        "label": RUN_LABELS.get(run_id, run_id.replace("_", " ").title()),
         "description": RUN_DESCRIPTIONS.get(run_id, "Stored retrieval evaluation run."),
         "file": path.name,
         "generated_at": _mtime_iso(path),
@@ -358,6 +376,8 @@ def retrieval_report_status(results_dir: Path | None = None) -> dict:
     results_dir = results_dir or config.EVAL_RESULTS_DIR
     files = [path.name for path in _run_files(results_dir)]
     valid = retrieval_runs(results_dir)
+    present_ids = {run["id"] for run in valid}
+    missing_historical = [run_id for run_id in HISTORICAL_COMPARISON_RUN_IDS if run_id not in present_ids]
     return {
         "directory": str(results_dir),
         "directory_exists": results_dir.exists(),
@@ -365,17 +385,36 @@ def retrieval_report_status(results_dir: Path | None = None) -> dict:
         "dataset": RETRIEVAL_DATASET,
         "report_files": files,
         "valid_runs": len(valid),
+        "historical_run_ids": list(HISTORICAL_COMPARISON_RUN_IDS),
+        "missing_historical_run_ids": missing_historical,
         "missing_message": None if valid else MISSING_RETRIEVAL_RUNS_MESSAGE,
+    }
+
+
+def embedding_comparison_status(results_dir: Path | None = None) -> dict:
+    """Explain whether the packaged embedding experiment CSVs are available."""
+    results_dir = results_dir or config.EVAL_RESULTS_DIR
+    expected = [f"embedding_eval_{run_id}.csv" for run_id, _label, _description in EMBEDDING_RUNS]
+    present = [name for name in expected if (results_dir / name).exists()]
+    missing = [name for name in expected if name not in present]
+    return {
+        "expected_files": expected,
+        "present_files": present,
+        "missing_files": missing,
+        "valid_runs": len(present),
+        "missing_message": None if present else MISSING_EMBEDDING_COMPARISON_MESSAGE,
     }
 
 
 def overview() -> dict:
     runs = retrieval_runs()
+    embeddings = embedding_comparison()
     return {
         "knowledge_base": knowledge_base_status(),
         "retrieval_runs": runs,
         "retrieval_report_status": retrieval_report_status(),
-        "embedding_comparison": embedding_comparison(),
+        "embedding_comparison": embeddings,
+        "embedding_comparison_status": embedding_comparison_status(),
         "quality_reports": quality_reports(),
         "grounding": grounding_summary(),
         "test_suite": None,

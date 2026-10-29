@@ -150,6 +150,62 @@ def test_embedding_comparison_reads_ranks_beyond_depth_as_misses(tmp_path):
     assert metrics["mrr"] == pytest.approx((1 + 0 + 1 / 3) / 3)
 
 
+def test_multiple_saved_retrieval_runs_keep_stable_labels(tmp_path):
+    _write_run(
+        tmp_path,
+        "baseline",
+        [{"id": "q1", "category": "symptom", "query": "fever", "rank": 1, "retrieved": ["a", "b", "c", "d"]}],
+    )
+    _write_run(
+        tmp_path,
+        "after",
+        [{"id": "q1", "category": "symptom", "query": "fever", "rank": 2, "retrieved": ["x", "a", "b", "c"]}],
+    )
+    _write_run(
+        tmp_path,
+        "batch4",
+        [{"id": "q1", "category": "symptom", "query": "fever", "rank": 1, "retrieved": ["a", "b", "c", "d"]}],
+    )
+    runs = evaluation_service.retrieval_runs(tmp_path)
+    by_id = {run["id"]: run for run in runs}
+    assert set(by_id) == {"baseline", "after", "batch4"}
+    assert by_id["baseline"]["label"] == "Baseline"
+    assert by_id["after"]["label"] == "After"
+    assert by_id["batch4"]["label"] == "Batch4"
+    status = evaluation_service.retrieval_report_status(tmp_path)
+    assert status["missing_historical_run_ids"] == []
+    assert status["valid_runs"] == 3
+
+
+def test_missing_historical_runs_are_reported_without_inventing_metrics(tmp_path):
+    _write_run(
+        tmp_path,
+        "production",
+        [{"id": "q1", "category": "symptom", "query": "fever", "rank": 1, "retrieved": ["a", "b", "c", "d"]}],
+    )
+    runs = evaluation_service.retrieval_runs(tmp_path)
+    assert [run["id"] for run in runs] == ["production"]
+    status = evaluation_service.retrieval_report_status(tmp_path)
+    assert status["missing_historical_run_ids"] == ["baseline", "after", "batch4"]
+    assert status["missing_message"] is None
+
+
+def test_embedding_comparison_status_reports_missing_files(tmp_path):
+    status = evaluation_service.embedding_comparison_status(tmp_path)
+    assert status["valid_runs"] == 0
+    assert status["present_files"] == []
+    assert "embedding_eval_general.csv" in status["missing_files"]
+    assert "evaluate_embeddings.py" in (status["missing_message"] or "")
+
+    (tmp_path / "embedding_eval_general.csv").write_text(
+        "query,expected_doc_id,rank_of_correct_doc,top1_doc_id\nq,a,1,a\n", encoding="utf-8"
+    )
+    status = evaluation_service.embedding_comparison_status(tmp_path)
+    assert status["present_files"] == ["embedding_eval_general.csv"]
+    assert status["missing_message"] is None
+    assert status["valid_runs"] == 1
+
+
 def test_evaluation_endpoints_require_login(client):
     assert client.get("/api/v1/evaluation/overview").status_code == 401
     assert client.post("/api/v1/evaluation/retrieve", json={"query": "fever"}).status_code == 401

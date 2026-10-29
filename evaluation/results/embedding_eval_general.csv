@@ -1,0 +1,113 @@
+query,expected_doc_id,rank_of_correct_doc,top1_doc_id
+"I've got a stuffy nose, sneezing a lot, and a scratchy throat since yesterday",common_cold,2,seasonal_allergies
+My eyes are itchy and watery and I keep sneezing every spring,seasonal_allergies,>5,conjunctivitis
+There's a dull pressure squeezing around my whole head after a stressful day at work,tension_headache,1,tension_headache
+I pulled something in my calf while jogging and it hurts to move it,muscle_strain,>5,muscle_cramp
+I've been throwing up and have watery diarrhea since last night,mild_gastroenteritis,1,mild_gastroenteritis
+I get throbbing pain on one side of my head with nausea and bright lights bother me,migraine,1,migraine
+It burns when I pee and I feel like I constantly need to go to the bathroom,urinary_tract_infection,2,urethritis
+"I'm always thirsty, urinating a lot, and my vision has been blurry lately",type2_diabetes,3,dehydration
+My home blood pressure monitor keeps showing high numbers like 148 over 95,hypertension,1,hypertension
+I wheeze and get short of breath whenever I exercise or it's cold outside,asthma_mild,2,exercise_induced_asthma
+I get a burning feeling in my chest after meals and a sour taste in my mouth,gerd,2,burning_mouth_syndrome
+I've felt sad and empty most days for weeks and don't enjoy anything anymore,depression,2,seasonal_affective_disorder
+"I feel exhausted all the time, look pale, and get dizzy standing up",anemia,2,postural_hypotension
+"There's a red, warm, swollen patch spreading on my leg near a cut",cellulitis_mild,1,cellulitis_mild
+I have crushing chest pressure spreading to my jaw and I'm sweating heavily,heart_attack,1,heart_attack
+My arm suddenly went weak and my speech is slurred,stroke,>5,laryngitis
+Sharp pain moved from around my belly button to my lower right side and I have a fever,appendicitis,2,diverticulitis
+After eating peanuts my lips swelled up and I'm having trouble breathing,anaphylaxis,>5,achalasia
+I have a very high fever with chills and I feel confused and my heart is racing,sepsis,1,sepsis
+I keep thinking about hurting myself and feel like there's no way out,mental_health_crisis,1,mental_health_crisis
+"I have a high fever, severe headache, pain behind my eyes, and joint pain after mosquito bites",dengue_fever,1,dengue_fever
+I came back from a malaria area and now I have waves of fever with chills and sweating,malaria,1,malaria
+"I lost my sense of smell, have a dry cough, fever, and feel very tired",covid_19,1,covid_19
+"I have a cough with mucus, fever, chills, and chest pain when I breathe in",pneumonia,1,pneumonia
+"Sudden severe pain in my side and back shooting to the groin, and my urine looks pink",kidney_stones,4,pyelonephritis
+"My face feels blocked and heavy, thick mucus, and pain in my cheeks when I bend forward",sinusitis,>5,polymyalgia_rheumatica
+Dry itchy red patches in the bends of my elbows and behind my knees that I keep scratching,eczema,1,eczema
+I have not had a bowel movement for several days and the stools are hard and painful to pass,constipation,1,constipation
+"I feel cold all the time, have gained weight, my skin is dry, and I am always tired",hypothyroidism,>5,leukemia_warning
+"Pain in the upper right abdomen after a fatty meal, with nausea that lasts an hour",gallstones,3,gastritis
+"I was working in extreme heat and now I am confused, my skin is hot, and I feel like collapsing",heat_stroke,3,heat_exhaustion
+"Sudden high fever, a very stiff neck, severe headache, and bright light hurts my eyes",meningitis,1,meningitis
+"I fell on my wrist, it is swollen and deformed, and I cannot use the hand at all",bone_fracture,2,dislocated_shoulder
+"Sudden shortness of breath and sharp chest pain that gets worse when I take a deep breath, after a long flight",pulmonary_embolism,>5,pneumothorax
+"I have been coughing for more than three weeks, have night sweats, and I am losing weight",tuberculosis,1,tuberculosis
+"Itchy blister rash starting on the chest and face, with a mild fever, in my child",chickenpox,2,hand_foot_mouth_disease
+"High fever, cough, red eyes, then a blotchy rash that started on the face and spread down",measles,3,scarlet_fever
+"Both eyes are red, watery, and crusted shut in the morning, and they feel gritty",conjunctivitis,5,dry_eye
+"My toddler has ear pain, a fever, and is pulling at one ear after a cold",ear_infection,1,ear_infection
+"A cough that has lasted two weeks after a cold, with mucus, but only a low fever",acute_bronchitis,1,acute_bronchitis
+"I have a barky cough and a hoarse voice, and my toddler sounds like a seal when they cough",croup,1,croup
+"Painful swollen big toe that started overnight, the joint is red hot and I cannot even put a sheet on it",gout,1,gout
+My knee and finger joints are stiff for over an hour every morning and both sides are swollen,rheumatoid_arthritis,1,rheumatoid_arthritis
+"Sharp pain down the back of one leg when I cough or sit, after lifting a heavy box",sciatica,2,low_back_strain
+"The first step out of bed in the morning feels like a knife in my heel, then it eases a bit",plantar_fasciitis,1,plantar_fasciitis
+"One side of my face is drooping, I cannot close that eyelid, and the forehead will not wrinkle",bells_palsy,1,bells_palsy
+"The room is spinning badly, I feel sick, and one ear feels full after a cold",labyrinthitis,1,labyrinthitis
+"Attacks of spinning dizziness lasting hours, with ringing and hearing dropping in one ear",menieres_disease,1,menieres_disease
+"A painful red eye, strong discomfort in bright light, and blurred vision in that one eye",uveitis,2,optic_neuritis
+"A scratchy feeling in my eye after a fingernail poke, watering, and light hurts",corneal_abrasion,2,foreign_body_eye
+"I have a toothache that is worse with sweet drinks, and I can see a dark hole in the tooth",tooth_decay,1,tooth_decay
+"My gums bleed every time I brush, my breath is bad, and a tooth feels loose",periodontitis,2,gingivitis
+"Burning pain in the upper stomach that eases a little with food, plus bloating and burping",gastritis,2,peptic_ulcer
+"Sharp pain when I pass stool, then a streak of bright red blood on the paper",anal_fissure,1,anal_fissure
+"Watery diarrhoea for over a week after drinking untreated water, greasy stools and lots of wind",giardiasis,2,travel_diarrhea
+"Watery diarrhoea during or just after a course of antibiotics, with a strong smell and cramping",c_difficile,1,c_difficile
+I have had heartburn for years and now food feels like it sticks when I swallow,barretts_esophagus,3,gerd
+Chest tightness that comes on when I walk uphill and goes away after a few minutes of rest,angina_stable,1,angina_stable
+"Sharp central chest pain that is worse lying flat and better sitting forward, after a viral illness",pericarditis,1,pericarditis
+"A fast regular heartbeat that starts and stops suddenly, over 150 beats, with dizziness",supraventricular_tachycardia,2,bradycardia
+I get dizzy for a few seconds every time I stand up quickly from sitting,postural_hypotension,1,postural_hypotension
+My fingers turn white then blue then red and tingle painfully in the cold,raynauds,1,raynauds
+"Numbness and burning in both feet that is worse at night, and I have had diabetes for years",diabetic_neuropathy,1,diabetic_neuropathy
+"My eyelids droop and I get double vision that is worse by evening, then better after rest",myasthenia_gravis,1,myasthenia_gravis
+Weakness starting in both feet and climbing up my legs over a few days after a stomach bug,guillain_barre,1,guillain_barre
+I fall asleep during conversations and my legs go weak when I laugh,narcolepsy,1,narcolepsy
+Stroke-like face droop and arm weakness that lasted twenty minutes then fully went away,transient_ischemic_attack,3,stroke
+"A new headache that is worse in the morning and when I cough, plus repeated vomiting",brain_tumour_warning,1,brain_tumour_warning
+Leg pain and heaviness after walking a set distance that eases when I sit and lean forward,spinal_stenosis,1,spinal_stenosis
+"I have purple stretch marks, a round face, a large waist, and thin easily bruised skin from long-term steroids",cushings_syndrome,>5,bruise
+"Extreme tiredness, weight loss, dizziness on standing, salt craving, and darkening of my skin creases",addisons_disease,1,addisons_disease
+"A swelling at the front of my neck that moves when I swallow, and my clothes feel tight there",goiter,1,goiter
+"Weight loss despite eating well, a racing heartbeat, heat intolerance, and shaky hands",graves_disease,2,anorexia_nervosa
+"Puffy eyelids in the morning, swollen legs, frothy urine, and sudden weight gain from fluid",nephrotic_syndrome,1,nephrotic_syndrome
+"Cola-coloured urine, a puffy face, and high blood pressure a week after a sore throat",glomerulonephritis,3,viral_sore_throat
+"I leak urine when I cough, sneeze, or laugh, especially since having a baby",stress_incontinence,1,stress_incontinence
+I saw pink blood in my urine once even though it did not hurt,hematuria,1,hematuria
+"I am soaking a pad every hour during my period, passing large clots, and feel very tired",heavy_menstrual_bleeding,1,heavy_menstrual_bleeding
+"Painful blisters in the genital area, tingling before they appear, and painful urination",genital_herpes,1,genital_herpes
+"A hard painless lump in my breast, and the skin over it looks dimpled like orange peel",breast_cancer_warning,1,breast_cancer_warning
+"My baby cries for hours every evening, clenches fists, and draws the knees up, but feeds well",infant_colic,1,infant_colic
+Red sore skin in the nappy area that stings at each change,diaper_rash,1,diaper_rash
+Painful mouth ulcers plus small spots on the hands and feet after a short fever in my child,hand_foot_mouth_disease,1,hand_foot_mouth_disease
+"Sore throat, fever, then a fine sandpaper rash and a strawberry tongue",scarlet_fever,1,scarlet_fever
+"My newborn looks yellow on day two, starting on the face",neonatal_jaundice,1,neonatal_jaundice
+A painful red lump around a hair follicle that came to a yellow head,boil,1,boil
+"A changing mole with an uneven border, more than one colour, and it has grown",skin_cancer_warning,1,skin_cancer_warning
+Pain on the outer elbow when I grip a cup or shake hands,tennis_elbow,2,golfers_elbow
+I heard a snap in the back of my ankle during sport and now I cannot stand on tiptoe,achilles_rupture,1,achilles_rupture
+"My knee popped, swelled within hours, and now it gives way when I turn",acl_injury,1,acl_injury
+"My shoulder looks square after a fall, is extremely painful, and I cannot move it",dislocated_shoulder,1,dislocated_shoulder
+"Back pain and morning stiffness for months that is worse after rest and better with exercise, I am 32",ankylosing_spondylitis,1,ankylosing_spondylitis
+"New severe temple headache, jaw aching when I chew, and my scalp is sore, I am 72",temporal_arteritis,2,tmj_disorder
+"I have a pounding heart, sweating, and a feeling of losing control that peaks in ten minutes then eases",panic_disorder,4,heart_attack
+"Low mood every autumn, oversleeping, craving carbs, then I feel better in spring",seasonal_affective_disorder,1,seasonal_affective_disorder
+"I snore loudly, stop breathing in my sleep, and I am very sleepy in the daytime",sleep_apnea,1,sleep_apnea
+"A pale skin patch that has lost feeling, and my hands feel numb",leprosy,3,vitiligo
+"Fever, severe headache, and intense calf muscle pain after wading through flood water",leptospirosis,1,leptospirosis
+"Painless swollen glands in my neck for a month, night sweats, and unexplained weight loss",lymphoma_warning,1,lymphoma_warning
+"A swollen painful calf after surgery, and now I feel breathless",deep_vein_thrombosis,2,pulmonary_embolism
+"I cannot pass urine at all, my lower abdomen is painfully full",urinary_retention,1,urinary_retention
+"One-sided lower abdominal pain that started suddenly with vomiting, I have an ovarian cyst",ovarian_torsion,2,ovarian_cyst
+Sudden painless bright red bleeding in late pregnancy,placenta_previa,2,miscarriage
+"I am 28 weeks pregnant with a new severe headache, swelling of the face, and high blood pressure",preeclampsia,1,preeclampsia
+A painful boil-like lump in the armpit that keeps coming back and leaking,hidradenitis_suppurativa,1,hidradenitis_suppurativa
+Silvery scaly patches on my elbows and knees that itch,psoriasis,2,eczema
+"I grind my teeth at night, wake with jaw ache and a headache",bruxism,1,bruxism
+"Hoarse voice for a week after shouting at a match, and it hurts to talk",laryngitis,1,laryngitis
+I have hiccups that have lasted more than two days and they stop me sleeping,hiccups,1,hiccups
+A sudden tight painful knot in my calf at night that I have to stretch out,muscle_cramp,1,muscle_cramp
+"My eyes burn and feel dry after long hours on the computer, and near vision blurs",eye_strain,1,eye_strain
+Small itchy bumps on my neck and chest after sweating in hot weather,heat_rash,1,heat_rash

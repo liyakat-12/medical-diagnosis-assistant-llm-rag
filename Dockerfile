@@ -26,8 +26,9 @@ COPY knowledge_base ./knowledge_base
 COPY scripts ./scripts
 COPY evaluation ./evaluation
 
-# Bake general Chroma index, then a stored Phase-2 retrieval evaluation report
-# used by the Evaluation Dashboard (not regenerated on each API request).
+# Bake general Chroma index, then refresh the production Phase-2 retrieval report.
+# Historical Baseline/After/Batch4 JSON and embedding_eval_*.csv are copied above
+# and must remain for the Evaluation Dashboard multi-run / embedding charts.
 RUN mkdir -p "$HF_HOME" "$SENTENCE_TRANSFORMERS_HOME" evaluation/results \
     && EMBEDDING_BACKEND=fastembed EMBEDDING_MODE=general RERANK_ENABLED=false \
        python scripts/build_index.py general \
@@ -35,7 +36,7 @@ RUN mkdir -p "$HF_HOME" "$SENTENCE_TRANSFORMERS_HOME" evaluation/results \
        python -c "from src.retrieval.retriever import retrieve; hits = retrieve('persistent cough', mode='general'); assert hits, 'general Chroma index is empty after Docker build'" \
     && EMBEDDING_BACKEND=fastembed EMBEDDING_MODE=general RERANK_ENABLED=false \
        python evaluation/evaluate_kb_phase2.py --out evaluation/results/kb_phase2_production.json \
-    && python -c "import json; from pathlib import Path; p=Path('evaluation/results/kb_phase2_production.json'); d=json.loads(p.read_text()); assert d.get('per_query'), 'evaluation report missing per_query'; print('eval_recall@4', d.get('recall@4'), 'mrr', d.get('mrr'))"
+    && python -c "import json; from pathlib import Path; p=Path('evaluation/results/kb_phase2_production.json'); d=json.loads(p.read_text()); assert d.get('per_query'), 'evaluation report missing per_query'; print('eval_recall@4', d.get('recall@4'), 'mrr', d.get('mrr')); root=Path('evaluation/results'); hist=[n for n in ('kb_phase2_baseline.json','kb_phase2_after.json','kb_phase2_batch4.json') if (root/n).exists()]; emb=[n for n in ('embedding_eval_general.csv','embedding_eval_medical.csv','embedding_eval_general_rerank.csv') if (root/n).exists()]; print('packaged_historical', hist); print('packaged_embedding', emb)"
 
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

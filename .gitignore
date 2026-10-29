@@ -32,8 +32,14 @@ data/processed/*.json
 evaluation/results/*.csv
 evaluation/results/*.json
 !evaluation/results/.gitkeep
-# Packaged production retrieval report for the Evaluation Dashboard / Docker image
+# Packaged retrieval / embedding reports for the Evaluation Dashboard / Docker image
+!evaluation/results/kb_phase2_baseline.json
+!evaluation/results/kb_phase2_after.json
+!evaluation/results/kb_phase2_batch4.json
 !evaluation/results/kb_phase2_production.json
+!evaluation/results/embedding_eval_general.csv
+!evaluation/results/embedding_eval_medical.csv
+!evaluation/results/embedding_eval_general_rerank.csv
 
 # IDE
 .vscode/

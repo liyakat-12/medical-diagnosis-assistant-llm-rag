@@ -1,4 +1,4 @@
-import type { EmbeddingRun, RetrievalRun } from "../types/evaluation";
+import type { EmbeddingComparisonStatus, EmbeddingRun, RetrievalReportStatus, RetrievalRun } from "../types/evaluation";
 import { formatDate } from "./dates";
 import { formatCategory, formatPercent, formatScore } from "./evaluationMetrics";
 import type { BarGroup } from "../components/insights/Charts";
@@ -16,6 +16,8 @@ export type RankBucket = {
   tone: "good" | "warn" | "bad";
   color: string;
 };
+
+export const HISTORICAL_COMPARISON_RUN_IDS = ["baseline", "after", "batch4"] as const;
 
 export function selectedRun(runs: RetrievalRun[], requestedId: string | null): RetrievalRun | null {
   if (!runs.length) return null;
@@ -67,7 +69,7 @@ export function rankDistribution(run: RetrievalRun): RankBucket[] | null {
   const notInTopFour = Object.entries(distribution)
     .filter(([key]) => !ranked.includes(key as (typeof ranked)[number]))
     .reduce((sum, [, value]) => sum + value, 0);
-  buckets.push({ label: "Not in the top four", value: notInTopFour, tone: "bad", color: "#b45309" });
+  buckets.push({ label: "Not in top 4", value: notInTopFour, tone: "bad", color: "#b45309" });
   return buckets;
 }
 
@@ -98,9 +100,27 @@ export function retrievalRunGroups(runs: RetrievalRun[], selectedId: string | nu
   }));
 }
 
-export function retrievalRunsNote(runs: RetrievalRun[]): string {
+export function missingHistoricalRunIds(
+  runs: RetrievalRun[],
+  status?: RetrievalReportStatus | null,
+): string[] {
+  if (status?.missing_historical_run_ids?.length) return status.missing_historical_run_ids;
+  const present = new Set(runs.map((item) => item.id));
+  return HISTORICAL_COMPARISON_RUN_IDS.filter((id) => !present.has(id));
+}
+
+export function retrievalRunsNote(runs: RetrievalRun[], status?: RetrievalReportStatus | null): string {
   const mrr = "MRR is a rank score on the same 0–1 axis, not a recall rate.";
-  if (runs.length < 2) return mrr;
+  const missingHistorical = missingHistoricalRunIds(runs, status);
+  const missingNote =
+    missingHistorical.length > 0
+      ? ` Missing historical comparison run${missingHistorical.length === 1 ? "" : "s"}: ${missingHistorical
+          .map((id) => RUN_LABELS_FALLBACK[id] ?? id)
+          .join(", ")}.`
+      : "";
+  if (runs.length < 2) {
+    return `${mrr}${missingNote}`.trim();
+  }
   const issues: string[] = [];
   if (new Set(runs.map((item) => item.metrics.n)).size > 1) issues.push("query counts differ");
   const corpusMissing = runs.some((item) => item.corpus_docs === null);
@@ -109,9 +129,16 @@ export function retrievalRunsNote(runs: RetrievalRun[]): string {
   else if (corpusDiffers) issues.push("corpus size differs");
   else if (corpusMissing) issues.push("corpus size was not recorded");
   if (new Set(runs.map((item) => item.depth)).size > 1) issues.push("retrieval depth differs");
-  if (!issues.length) return mrr;
-  return `Shown together even though ${issues.join(", ")}. Each bar uses that run's own queries. ${mrr}`;
+  if (!issues.length) return `${mrr}${missingNote}`.trim();
+  return `Shown together even though ${issues.join(", ")}. Each bar uses that run's own queries. ${mrr}${missingNote}`;
 }
+
+const RUN_LABELS_FALLBACK: Record<string, string> = {
+  baseline: "Baseline",
+  after: "After",
+  batch4: "Batch4",
+  production: "Production",
+};
 
 export function embeddingLabel(label: string): string {
   return label
@@ -137,4 +164,15 @@ export function embeddingNote(runs: EmbeddingRun[]): string | null {
   if (!runs.length) return null;
   const counts = [...new Set(runs.map((item) => item.metrics.n))].join(", ");
   return `Earlier experiment, ${counts} questions (${runs.map((item) => item.file).join(", ")}). It used a different question set and an earlier knowledge base, so it is not directly comparable with the runs above.`;
+}
+
+export function embeddingEmptyMessage(status?: EmbeddingComparisonStatus | null): string {
+  if (status?.missing_message) return status.missing_message;
+  const missing = status?.missing_files?.length ? ` Missing: ${status.missing_files.join(", ")}.` : "";
+  return (
+    "No stored embedding comparison is available. Generate the supported CSVs with " +
+    "`python evaluation/evaluate_embeddings.py`, then package embedding_eval_general.csv, " +
+    "embedding_eval_medical.csv, and embedding_eval_general_rerank.csv with the API image." +
+    missing
+  );
 }
